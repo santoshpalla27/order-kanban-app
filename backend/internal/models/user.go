@@ -1,0 +1,55 @@
+package models
+
+import "time"
+
+type User struct {
+	ID        uint      `json:"id" gorm:"primaryKey"`
+	Name      string    `json:"name" gorm:"not null"`
+	Email     string    `json:"email" gorm:"uniqueIndex;not null"`
+	Password  string    `json:"-" gorm:"not null"`
+	RoleID    uint      `json:"role_id" gorm:"not null"`
+	Role      Role      `json:"role" gorm:"foreignKey:RoleID"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+type RegisterRequest struct {
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+}
+
+type CreateUserRequest struct {
+	Name     string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=6"`
+	RoleID   uint   `json:"role_id" binding:"required"`
+}
+
+type UpdateUserRoleRequest struct {
+	RoleID uint `json:"role_id" binding:"required"`
+}
+
+type UserResponse struct {
+	ID        uint      `json:"id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	RoleID    uint      `json:"role_id"`
+	Role      Role      `json:"role"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (u *User) ToResponse() UserResponse {
+	return UserResponse{
+		ID:        u.ID,
+		Name:      u.Name,
+		Email:     u.Email,
+		RoleID:    u.RoleID,
+		Role:      u.Role,
+		CreatedAt: u.CreatedAt,
+	}
+}

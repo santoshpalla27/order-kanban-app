@@ -1,0 +1,102 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg: #0f172a;
+  --color-surface: #1e293b;
+  --color-surface-hover: #334155;
+  --color-border: #334155;
+  --color-text: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-brand: #3b82f6;
+  --color-brand-hover: #2563eb;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Status badge colors */
+.status-yet_to_start {
+  @apply bg-gray-600/30 text-gray-300 border border-gray-600/50;
+}
+.status-working {
+  @apply bg-blue-600/30 text-blue-300 border border-blue-600/50;
+}
+.status-review {
+  @apply bg-amber-600/30 text-amber-300 border border-amber-600/50;
+}
+.status-done {
+  @apply bg-emerald-600/30 text-emerald-300 border border-emerald-600/50;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+}
+
+/* Card hover */
+.card-hover {
+  @apply transition-all duration-200;
+}
+.card-hover:hover {
+  @apply shadow-lg shadow-black/20;
+  transform: translateY(-1px);
+}
+
+/* Input styles */
+input,
+textarea,
+select {
+  @apply bg-surface-800 border border-surface-600 rounded-lg px-3 py-2 text-sm text-surface-100
+    focus:outline-none focus:ring-2 focus:ring-brand-500/50 focus:border-brand-500
+    placeholder:text-surface-500 transition-all duration-200;
+}
+
+/* Button base */
+.btn {
+  @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-surface-900
+    disabled:opacity-50 disabled:cursor-not-allowed;
+}
+.btn-primary {
+  @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
+}
+.btn-secondary {
+  @apply btn bg-surface-700 text-surface-200 hover:bg-surface-600 focus:ring-surface-500;
+}
+.btn-danger {
+  @apply btn bg-red-600/80 text-white hover:bg-red-700 focus:ring-red-500;
+}
+.btn-ghost {
+  @apply btn bg-transparent text-surface-400 hover:text-surface-200 hover:bg-surface-700/50;
+}
