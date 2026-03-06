@@ -21,15 +21,35 @@ func Init(dbPath string) {
 	}
 
 	var err error
-	DB, err = gorm.Open(sqlite.Open(dbPath+"?_journal_mode=WAL&_busy_timeout=5000"), &gorm.Config{
+	DB, err = gorm.Open(sqlite.Open(dbPath+"?_journal_mode=WAL&_busy_timeout=5000&_foreign_keys=ON"), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Warn),
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	sqlDB, _ := DB.DB()
+	sqlDB, err := DB.DB()
+	if err != nil {
+		log.Fatalf("Failed to get underlying sql.DB: %v", err)
+	}
+
+	// Connection pool: single writer prevents SQLITE_BUSY
 	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+
+	// Performance & reliability PRAGMAs
+	pragmas := []string{
+		"PRAGMA synchronous = NORMAL",  // Safe with WAL, 2-5× faster writes
+		"PRAGMA cache_size = -64000",   // 64MB page cache (default 2MB)
+		"PRAGMA temp_store = MEMORY",   // Temp tables in RAM
+		"PRAGMA mmap_size = 268435456", // 256MB memory-mapped I/O
+	}
+	for _, p := range pragmas {
+		if res := DB.Exec(p); res.Error != nil {
+			log.Printf("Warning: failed to set %s: %v", p, res.Error)
+		}
+	}
+	log.Println("SQLite optimizations applied (WAL, synchronous=NORMAL, 64MB cache, mmap)")
 
 	err = DB.AutoMigrate(
 		&models.Role{},
