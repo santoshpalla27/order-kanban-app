@@ -20,8 +20,8 @@ const getFileIcon = (type: string) => {
   if (['.pdf', '.docx', '.doc', '.txt'].includes(type)) return FileText;
   return File;
 };
-const isImageType = (type: string) => ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(type);
-const isImageUrl = (url: string) => /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(url);
+const isImageType = (type: string) => ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.heic'].includes(type.toLowerCase());
+const isImageUrl = (url: string) => /\.(jpg|jpeg|png|gif|webp|bmp|svg|heic)(\?|$)/i.test(url);
 const formatSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -272,8 +272,12 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { uploading, uploadCount, uploadFiles } = useMultiUpload(productId);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const deleteMutation = useMutation({ mutationFn: (id: number) => attachmentsApi.delete(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attachments', productId] }) });
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ''; };
+
+  const images = attachments.filter((a) => isImageType(a.file_type));
+  const files = attachments.filter((a) => !isImageType(a.file_type));
 
   return (
     <div className="space-y-4">
@@ -281,31 +285,86 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
       <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-2 w-full justify-center">
         <Upload className="w-4 h-4" /> {uploading ? `Uploading ${uploadCount.done}/${uploadCount.total}...` : 'Upload Files'}
       </button>
+
       {attachments.length === 0 ? (
-        <p className="text-center text-surface-500 text-sm py-8">No attachments yet</p>
-      ) : (
-        <div className="space-y-2">
-          {attachments.map((att) => {
-            const Icon = getFileIcon(att.file_type);
-            return (
-              <div key={att.id} className="flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors">
-                {isImageType(att.file_type) ? (
-                  <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-10 h-10 rounded object-cover cursor-pointer hover:ring-2 hover:ring-brand-500" onClick={() => onCommentAttachment(att)} />
-                ) : (
-                  <div className="w-10 h-10 rounded bg-surface-700 flex items-center justify-center cursor-pointer hover:bg-surface-600" onClick={() => onCommentAttachment(att)}><Icon className="w-5 h-5 text-surface-400" /></div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{att.file_name}</p>
-                  <p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name} · {new Date(att.uploaded_at).toLocaleDateString()}</p>
-                </div>
-                <button onClick={() => onCommentAttachment(att)} className="btn-ghost p-2 rounded-lg" title="Comment"><MessageSquare className="w-4 h-4" /></button>
-                <a href={attachmentsApi.download(att.id)} className="btn-ghost p-2 rounded-lg" target="_blank" rel="noreferrer"><Download className="w-4 h-4" /></a>
-                <button onClick={() => deleteMutation.mutate(att.id)} className="btn-ghost p-2 rounded-lg text-red-400 hover:text-red-300" title="Delete"><Trash2 className="w-4 h-4" /></button>
-              </div>
-            );
-          })}
+        <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-12 border-2 border-dashed border-surface-700/50 rounded-xl cursor-pointer hover:border-brand-500/30 hover:text-surface-400 transition-colors" onClick={() => fileInputRef.current?.click()}>
+          <Upload className="w-6 h-6 opacity-40" />
+          <span>No attachments — click to upload</span>
         </div>
+      ) : (
+        <>
+          {/* Image gallery */}
+          {images.length > 0 && (
+            <div className="grid grid-cols-2 gap-3">
+              {images.map((att) => (
+                <div key={att.id} className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
+                  <img
+                    src={getAttachmentUrl(att)}
+                    alt={att.file_name}
+                    className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300"
+                    onClick={() => setLightboxSrc(getAttachmentUrl(att))}
+                  />
+                  {/* Hover overlay with name + actions */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3">
+                    <p className="text-xs text-white font-medium truncate mb-2">{att.file_name}</p>
+                    <div className="flex items-center gap-1.5">
+                      <a
+                        href={attachmentsApi.download(att.id)}
+                        className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors"
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Download className="w-3 h-3" /> Download
+                      </a>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }}
+                        className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors"
+                      >
+                        <MessageSquare className="w-3 h-3" /> Comment
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(att.id); }}
+                        className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Non-image files */}
+          {files.length > 0 && (
+            <div className="space-y-1.5">
+              {images.length > 0 && <p className="text-xs font-medium text-surface-500 uppercase tracking-wider mt-2">Other Files</p>}
+              {files.map((att) => {
+                const Icon = getFileIcon(att.file_type);
+                return (
+                  <div key={att.id} className="group flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors">
+                    <div className="w-10 h-10 rounded-lg bg-surface-700 flex items-center justify-center flex-shrink-0">
+                      <Icon className="w-5 h-5 text-surface-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm truncate">{att.file_name}</p>
+                      <p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name} · {new Date(att.uploaded_at).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => onCommentAttachment(att)} className="btn-ghost p-1.5 rounded-lg" title="Comment"><MessageSquare className="w-3.5 h-3.5" /></button>
+                      <a href={attachmentsApi.download(att.id)} className="btn-ghost p-1.5 rounded-lg" target="_blank" rel="noreferrer"><Download className="w-3.5 h-3.5" /></a>
+                      <button onClick={() => deleteMutation.mutate(att.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
+
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} alt="attachment" onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 }
@@ -325,8 +384,9 @@ function parseCommentMessage(raw: string): ParsedComment {
   const textLines: string[] = [];
 
   for (const line of lines) {
-    // Parse attachment reference: [attachment:/path/to/file:filename.png]
-    const attMatch = line.match(/^\[attachment:(.+?):(.+?)\]$/);
+    // Parse attachment reference: [attachment:URL:filename]
+    // Greedy (.+) is used for the URL so it doesn't break on 'https://'
+    const attMatch = line.match(/^\[attachment:(.+):(.+?)\]$/);
     if (attMatch) {
       result.attachmentUrl = attMatch[1];
       result.attachmentName = attMatch[2];
@@ -468,19 +528,26 @@ function CommentsTab({ productId, comments }: { productId: number; comments: Com
 
                       {/* Attached image in comment (clickable + downloadable) */}
                       {parsed.attachmentUrl && isImageUrl(parsed.attachmentUrl) && (
-                        <div className="mt-2 relative group/img inline-block">
+                        <div className="mt-2 group/img relative aspect-[4/3] w-full max-w-[280px] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
                           <img
                             src={parsed.attachmentUrl}
                             alt={parsed.attachmentName || 'attachment'}
-                            className="max-w-[220px] max-h-[160px] rounded-lg border border-surface-700/50 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            className="w-full h-full object-cover cursor-pointer group-hover/img:scale-105 transition-transform duration-300"
                             onClick={() => setLightboxSrc(parsed.attachmentUrl!)}
                           />
-                          <div className="absolute top-1.5 right-1.5 flex gap-1 opacity-0 group-hover/img:opacity-100 transition-opacity">
-                            <a href={parsed.attachmentUrl} download className="bg-surface-800/90 p-1 rounded-md hover:bg-surface-700"><Download className="w-3 h-3" /></a>
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
+                            <p className="text-xs text-white font-medium truncate mb-2">{parsed.attachmentName}</p>
+                            <div className="flex items-center gap-1.5 pointer-events-auto">
+                              <a
+                                href={parsed.attachmentUrl}
+                                download
+                                className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Download className="w-3 h-3" /> Download
+                              </a>
+                            </div>
                           </div>
-                          {parsed.attachmentName && (
-                            <p className="text-[10px] text-surface-500 mt-1">{parsed.attachmentName}</p>
-                          )}
                         </div>
                       )}
 
