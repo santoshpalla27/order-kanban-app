@@ -57,6 +57,11 @@ body {
 :root ::-webkit-scrollbar-thumb {
   background: #475569;
   border-radius: 3px;
+  /* Lightbox and specific icon overrides */
+  .hover-icon-white svg {
+    stroke: white !important;
+    color: white !important;
+  }
 }
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover,
 :root ::-webkit-scrollbar-thumb:hover {

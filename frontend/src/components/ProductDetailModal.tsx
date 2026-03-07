@@ -354,10 +354,10 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
                   <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300" onClick={() => setLightboxSrc(getAttachmentUrl(att))} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
                     <p className="text-xs text-white font-medium truncate mb-2">{att.file_name}</p>
-                    <div className="flex items-center gap-1.5 pointer-events-auto">
-                      <a href={attachmentsApi.download(att.id)} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Download className="w-3 h-3" /> Download</a>
-                      <button onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors"><MessageSquare className="w-3 h-3" /> Comment</button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }} className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"><Trash2 className="w-3 h-3" /></button>
+                    <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
+                      <a href={attachmentsApi.download(att.id)} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Download className="w-3 h-3" /> Download</a>
+                      <button onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><MessageSquare className="w-3 h-3" /> Comment</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }} className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 </div>
@@ -605,11 +605,11 @@ function CommentsTab({ productId, comments }: { productId: number; comments: Com
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
                             <p className="text-xs text-white font-medium truncate mb-2">{parsed.attachmentName}</p>
-                            <div className="flex items-center gap-1.5 pointer-events-auto">
+                            <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
                               <a
                                 href={parsed.attachmentUrl}
                                 download
-                                className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors"
+                                className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <Download className="w-3 h-3" /> Download
