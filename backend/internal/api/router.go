@@ -29,6 +29,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	authHandler := handlers.NewAuthHandler(cfg)
 	productHandler := handlers.NewProductHandler()
 	attachmentHandler := handlers.NewAttachmentHandler()
+	activityHandler := handlers.NewActivityHandler()
 	commentHandler := handlers.NewCommentHandler()
 	chatHandler := handlers.NewChatHandler()
 	notificationHandler := handlers.NewNotificationHandler()
@@ -77,6 +78,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			// Standalone attachment/comment routes
 			protected.GET("/attachments/:id/download", attachmentHandler.Download)
 			protected.DELETE("/attachments/:id", middleware.RBACMiddleware("admin", "manager"), attachmentHandler.Delete)
+			protected.GET("/activity", activityHandler.GetRecent)
 			protected.PUT("/comments/:id", commentHandler.Update)
 			protected.DELETE("/comments/:id", commentHandler.Delete)
 

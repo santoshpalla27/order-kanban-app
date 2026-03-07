@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -58,6 +59,14 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	}
 
 	user, _ = services.GetUserByID(user.ID)
+	adminID := c.GetUint("user_id")
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   adminID,
+		Action:   "created",
+		Entity:   "user",
+		EntityID: user.ID,
+		Details:  fmt.Sprintf("Created user %s (%s)", user.Name, user.Email),
+	})
 	c.JSON(http.StatusCreated, user.ToResponse())
 }
 
@@ -80,6 +89,14 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 	}
 
 	user, _ := services.GetUserByID(uint(id))
+	adminID := c.GetUint("user_id")
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   adminID,
+		Action:   "role_changed",
+		Entity:   "user",
+		EntityID: user.ID,
+		Details:  fmt.Sprintf("Changed role of %s to %s", user.Name, user.Role.Name),
+	})
 	c.JSON(http.StatusOK, user.ToResponse())
 }
 
@@ -97,10 +114,23 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
+	targetUser, _ := services.GetUserByID(uint(id))
 	if err := services.DeleteUser(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
 		return
 	}
 
+	adminID2 := c.GetUint("user_id")
+	userDesc := fmt.Sprintf("%d", id)
+	if targetUser != nil {
+		userDesc = fmt.Sprintf("%s (%s)", targetUser.Name, targetUser.Email)
+	}
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   adminID2,
+		Action:   "deleted",
+		Entity:   "user",
+		EntityID: uint(id),
+		Details:  fmt.Sprintf("Deleted user %s", userDesc),
+	})
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
 }

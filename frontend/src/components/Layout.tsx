@@ -6,6 +6,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useQuery } from '@tanstack/react-query';
 import { notificationsApi } from '../api/client';
 import NotificationPanel from './NotificationPanel';
+import ActivityPanel from './ActivityPanel';
 import {
   LayoutDashboard,
   List,
@@ -18,6 +19,7 @@ import {
   ChevronDown,
   Sun,
   Moon,
+  Activity,
 } from 'lucide-react';
 
 export default function Layout() {
@@ -25,8 +27,10 @@ export default function Layout() {
   const { theme, toggleTheme } = useThemeStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const navigate = useNavigate();
+  const activityRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -43,6 +47,7 @@ export default function Layout() {
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
+      if (activityRef.current && !activityRef.current.contains(e.target as Node)) setActivityOpen(false);
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
     };
@@ -148,10 +153,22 @@ export default function Layout() {
               )}
             </button>
 
+            {/* Activity */}
+            <div ref={activityRef} className="relative">
+              <button
+                onClick={() => { setActivityOpen(!activityOpen); setNotifOpen(false); }}
+                className="btn-ghost p-2 rounded-lg"
+                title="Activity log"
+              >
+                <Activity className="w-5 h-5" />
+              </button>
+              {activityOpen && <ActivityPanel onClose={() => setActivityOpen(false)} />}
+            </div>
+
             {/* Notifications */}
             <div ref={notifRef} className="relative">
               <button
-                onClick={() => setNotifOpen(!notifOpen)}
+                onClick={() => { setNotifOpen(!notifOpen); setActivityOpen(false); }}
                 className="btn-ghost p-2 rounded-lg relative"
               >
                 <Bell className="w-5 h-5" />

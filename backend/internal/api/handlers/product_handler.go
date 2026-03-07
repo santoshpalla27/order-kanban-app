@@ -135,6 +135,14 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	}
 
 	product, _ := services.GetProductByIDSimple(uint(id))
+	userID := c.GetUint("user_id")
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   userID,
+		Action:   "updated",
+		Entity:   "product",
+		EntityID: product.ID,
+		Details:  fmt.Sprintf("Updated product %s", product.ProductID),
+	})
 	c.JSON(http.StatusOK, product)
 }
 
@@ -210,10 +218,24 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 		return
 	}
 
+	product, _ := services.GetProductByIDSimple(uint(id))
 	if err := services.DeleteProduct(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete product"})
 		return
 	}
+
+	delUserID := c.GetUint("user_id")
+	prodName := fmt.Sprintf("%d", id)
+	if product != nil {
+		prodName = product.ProductID
+	}
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   delUserID,
+		Action:   "deleted",
+		Entity:   "product",
+		EntityID: uint(id),
+		Details:  fmt.Sprintf("Deleted product %s", prodName),
+	})
 
 	wsMsg, _ := json.Marshal(WSMessage{
 		Type:    "product_deleted",

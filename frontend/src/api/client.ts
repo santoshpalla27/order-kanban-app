@@ -125,3 +125,7 @@ export const usersApi = {
     api.patch(`/users/${id}/role`, { role_id: roleId }),
   delete: (id: number) => api.delete(`/users/${id}`),
 };
+
+export const activityApi = {
+  getRecent: (limit = 100) => api.get(`/activity?limit=${limit}`),
+};
