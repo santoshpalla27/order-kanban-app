@@ -273,7 +273,30 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
   const queryClient = useQueryClient();
   const { uploading, uploadCount, uploadFiles } = useMultiUpload(productId);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const deleteMutation = useMutation({ mutationFn: (id: number) => attachmentsApi.delete(id), onSuccess: () => queryClient.invalidateQueries({ queryKey: ['attachments', productId] }) });
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({ 
+    mutationFn: (id: number) => attachmentsApi.delete(id), 
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attachments', productId] });
+      setDeleteConfirmId(null);
+      setDeleteError(null);
+    },
+    onError: (error: any) => {
+      if (error.response?.status === 403) {
+        setDeleteError("You don't have permission to delete this attachment.");
+      } else {
+        setDeleteError("Failed to delete attachment. Please try again.");
+      }
+    }
+  });
+
+  const handleDelete = (id: number) => {
+    setDeleteConfirmId(id);
+    setDeleteError(null);
+  };
+
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ''; };
 
   const images = attachments.filter((a) => isImageType(a.file_type));
@@ -291,35 +314,21 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
             onClick={async () => {
               for (const att of attachments) {
                 try {
-                  // Fetch the file as a blob to bypass browser cross-origin download navigation blocks
-                  // Must include Auth token because the API route is protected
                   const token = useAuthStore.getState().token;
                   const response = await fetch(attachmentsApi.download(att.id), {
                     headers: { Authorization: `Bearer ${token}` }
                   });
-                  
                   if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                  
                   const blob = await response.blob();
                   const blobUrl = window.URL.createObjectURL(blob);
-                  
                   const link = document.createElement('a');
                   link.href = blobUrl;
                   link.download = att.file_name;
                   document.body.appendChild(link);
                   link.click();
-                  
-                  // Cleanup
-                  setTimeout(() => {
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(blobUrl);
-                  }, 1000);
-                  
-                  // Small pause between downloads
+                  setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(blobUrl); }, 1000);
                   await new Promise(resolve => setTimeout(resolve, 300));
-                } catch (err) {
-                  console.error(`Failed to download ${att.file_name}:`, err);
-                }
+                } catch (err) { console.error(`Failed to download ${att.file_name}:`, err); }
               }
             }}
             className="btn-ghost border border-surface-700/50 hover:bg-surface-700/50 flex items-center gap-2 px-4 justify-center"
@@ -342,37 +351,13 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
             <div className="grid grid-cols-2 gap-3">
               {images.map((att) => (
                 <div key={att.id} className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
-                  <img
-                    src={getAttachmentUrl(att)}
-                    alt={att.file_name}
-                    className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300"
-                    onClick={() => setLightboxSrc(getAttachmentUrl(att))}
-                  />
-                  {/* Hover overlay with name + actions */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3">
+                  <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300" onClick={() => setLightboxSrc(getAttachmentUrl(att))} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
                     <p className="text-xs text-white font-medium truncate mb-2">{att.file_name}</p>
-                    <div className="flex items-center gap-1.5">
-                      <a
-                        href={attachmentsApi.download(att.id)}
-                        className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors"
-                        target="_blank"
-                        rel="noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Download className="w-3 h-3" /> Download
-                      </a>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }}
-                        className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors"
-                      >
-                        <MessageSquare className="w-3 h-3" /> Comment
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(att.id); }}
-                        className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                    <div className="flex items-center gap-1.5 pointer-events-auto">
+                      <a href={attachmentsApi.download(att.id)} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Download className="w-3 h-3" /> Download</a>
+                      <button onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors"><MessageSquare className="w-3 h-3" /> Comment</button>
+                      <button onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }} className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"><Trash2 className="w-3 h-3" /></button>
                     </div>
                   </div>
                 </div>
@@ -388,17 +373,12 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
                 const Icon = getFileIcon(att.file_type);
                 return (
                   <div key={att.id} className="group flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors">
-                    <div className="w-10 h-10 rounded-lg bg-surface-700 flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-5 h-5 text-surface-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm truncate">{att.file_name}</p>
-                      <p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name} · {new Date(att.uploaded_at).toLocaleDateString()}</p>
-                    </div>
+                    <div className="w-10 h-10 rounded-lg bg-surface-700 flex items-center justify-center flex-shrink-0"><Icon className="w-5 h-5 text-surface-400" /></div>
+                    <div className="flex-1 min-w-0"><p className="text-sm truncate">{att.file_name}</p><p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name} · {new Date(att.uploaded_at).toLocaleDateString()}</p></div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => onCommentAttachment(att)} className="btn-ghost p-1.5 rounded-lg" title="Comment"><MessageSquare className="w-3.5 h-3.5" /></button>
                       <a href={attachmentsApi.download(att.id)} className="btn-ghost p-1.5 rounded-lg" target="_blank" rel="noreferrer"><Download className="w-3.5 h-3.5" /></a>
-                      <button onClick={() => deleteMutation.mutate(att.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => handleDelete(att.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
                 );
@@ -406,6 +386,50 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
             </div>
           )}
         </>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setDeleteConfirmId(null)}>
+          <div className="w-full max-w-sm glass rounded-2xl p-6 text-center animate-scale-in" onClick={(e) => e.stopPropagation()}>
+            <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold mb-2">Delete Attachment?</h3>
+            
+            {deleteError ? (
+              <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                {deleteError}
+              </div>
+            ) : (
+              <p className="text-surface-400 text-sm mb-6">
+                Are you sure you want to delete this attachment? This action cannot be undone.
+              </p>
+            )}
+
+            <div className="flex gap-3 justify-center">
+              <button 
+                onClick={() => {
+                  setDeleteConfirmId(null);
+                  setDeleteError(null);
+                }} 
+                className="btn-ghost px-5 py-2.5"
+                disabled={deleteMutation.isPending}
+              >
+                Cancel
+              </button>
+              {!deleteError && (
+                <button 
+                  onClick={() => deleteMutation.mutate(deleteConfirmId)} 
+                  className="btn-danger px-5 py-2.5 flex items-center gap-2"
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {lightboxSrc && <ImageLightbox src={lightboxSrc} alt="attachment" onClose={() => setLightboxSrc(null)} />}
