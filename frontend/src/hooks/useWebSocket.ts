@@ -11,8 +11,12 @@ export function useWebSocket() {
   const connect = useCallback(() => {
     if (!token) return;
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?token=${token}`);
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const url = new URL(apiUrl);
+    const wsProtocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${url.host}${url.pathname}/ws?token=${token}`;
+
+    const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {

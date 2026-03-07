@@ -1,8 +1,10 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -48,17 +50,41 @@ export const productsApi = {
   delete: (id: number) => api.delete(`/products/${id}`),
 };
 
-// Attachments
+// Attachments — R2 only, no local fallback
 export const attachmentsApi = {
   getByProduct: (productId: number) =>
     api.get(`/products/${productId}/attachments`),
-  upload: (productId: number, file: File) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    return api.post(`/products/${productId}/attachments`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+
+  upload: async (productId: number, file: File) => {
+    // Step 1: Get presigned upload URL from backend
+    const presignRes = await api.get(`/products/${productId}/attachments/presign`, {
+      params: { filename: file.name },
+    });
+
+    const { upload_url, s3_key, content_type } = presignRes.data;
+
+    // Step 2: Upload directly to R2
+    try {
+      await axios.put(upload_url, file, {
+        headers: { 'Content-Type': content_type },
+      });
+    } catch (uploadError: any) {
+      // Provide a clear error message for R2 upload failures
+      const msg = uploadError?.response?.status
+        ? `R2 upload failed (${uploadError.response.status}). Check CORS settings on your R2 bucket.`
+        : 'R2 upload failed. Check your network connection and R2 bucket CORS settings.';
+      throw new Error(msg);
+    }
+
+    // Step 3: Confirm upload with backend
+    return api.post(`/products/${productId}/attachments/confirm`, {
+      s3_key: s3_key,
+      file_name: file.name,
+      file_size: file.size,
+      file_type: '.' + file.name.split('.').pop()?.toLowerCase(),
     });
   },
+
   download: (id: number) => `/api/attachments/${id}/download`,
   delete: (id: number) => api.delete(`/attachments/${id}`),
 };

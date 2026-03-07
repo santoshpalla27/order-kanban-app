@@ -1,9 +1,12 @@
 package api
 
 import (
+	"strings"
+
 	"kanban-app/config"
 	"kanban-app/internal/api/handlers"
 	"kanban-app/internal/middleware"
+	"kanban-app/internal/services"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -12,16 +15,23 @@ import (
 func SetupRouter(cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 
+	origins := strings.Split(cfg.CORSOrigins, ",")
+	for i := range origins {
+		origins[i] = strings.TrimSpace(origins[i])
+	}
+
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
+		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
+		AllowCredentials: cfg.CORSOrigins != "*",
 	}))
 
-	// Serve uploaded files
-	r.Static("/uploads", cfg.UploadDir)
+	// Serve uploaded files (local mode only)
+	if !cfg.R2Enabled {
+		r.Static("/uploads", cfg.UploadDir)
+	}
 
 	authHandler := handlers.NewAuthHandler(cfg)
 	productHandler := handlers.NewProductHandler()
@@ -62,7 +72,15 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 				// Attachments (nested under products/:id)
 				products.GET("/:id/attachments", attachmentHandler.GetByProduct)
-				products.POST("/:id/attachments", attachmentHandler.Upload)
+
+				if services.R2 != nil && services.R2.IsEnabled() {
+					// R2 mode: presigned upload only, no local storage
+					products.GET("/:id/attachments/presign", attachmentHandler.GetPresignedUploadURL)
+					products.POST("/:id/attachments/confirm", attachmentHandler.ConfirmUpload)
+				} else {
+					// Local mode: direct file upload
+					products.POST("/:id/attachments", attachmentHandler.Upload)
+				}
 
 				// Comments (nested under products/:id)
 				products.GET("/:id/comments", commentHandler.GetByProduct)

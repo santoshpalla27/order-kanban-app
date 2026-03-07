@@ -28,7 +28,7 @@ const formatSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 const getAttachmentUrl = (att: Attachment) =>
-  `/uploads/${att.product_id}/${att.file_path.split('/').pop()}`;
+  att.view_url || `/uploads/${att.product_id}/${att.file_path.split('/').pop()}`;
 
 // ── Shared multi-file upload hook ──
 function useMultiUpload(productId: number) {

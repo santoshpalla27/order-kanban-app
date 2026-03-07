@@ -38,6 +38,7 @@ export interface Attachment {
   uploaded_by: number;
   uploader: User;
   uploaded_at: string;
+  view_url?: string; // S3 presigned view URL (when S3 enabled)
 }
 
 export interface Comment {

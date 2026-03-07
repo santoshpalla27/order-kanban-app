@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useQuery } from '@tanstack/react-query';
 import { notificationsApi } from '../api/client';
@@ -15,16 +16,21 @@ import {
   Menu,
   X,
   ChevronDown,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuthStore();
+  const { theme, toggleTheme } = useThemeStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const navigate = useNavigate();
   const notifRef = useRef<HTMLDivElement>(null);
   const profileRef = useRef<HTMLDivElement>(null);
+
+  const isDark = theme === 'dark';
 
   useWebSocket();
 
@@ -57,15 +63,15 @@ export default function Layout() {
   ];
 
   return (
-    <div className="min-h-screen flex bg-surface-950">
+    <div className={`min-h-screen flex ${isDark ? 'bg-surface-950' : 'bg-surface-100'}`}>
       {/* Sidebar */}
       <aside
         className={`${
           sidebarOpen ? 'w-64' : 'w-0 lg:w-20'
-        } bg-surface-900 border-r border-surface-700/50 transition-all duration-300 flex flex-col overflow-hidden flex-shrink-0`}
+        } ${isDark ? 'bg-surface-900 border-surface-700/50' : 'bg-white border-surface-200'} border-r transition-all duration-300 flex flex-col overflow-hidden flex-shrink-0`}
       >
         {/* Logo */}
-        <div className="h-16 flex items-center px-5 border-b border-surface-700/50">
+        <div className={`h-16 flex items-center px-5 border-b ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center flex-shrink-0">
               <LayoutDashboard className="w-4 h-4 text-white" />
@@ -84,8 +90,12 @@ export default function Layout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-brand-600/20 text-brand-400'
-                    : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
+                    ? isDark
+                      ? 'bg-brand-600/20 text-brand-400'
+                      : 'bg-brand-100 text-brand-700'
+                    : isDark
+                    ? 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
+                    : 'text-surface-500 hover:text-surface-800 hover:bg-surface-100'
                 }`
               }
             >
@@ -97,14 +107,14 @@ export default function Layout() {
 
         {/* User info at bottom */}
         {sidebarOpen && user && (
-          <div className="p-3 border-t border-surface-700/50">
+          <div className={`p-3 border-t ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
             <div className="flex items-center gap-3 px-3 py-2">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-purple-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
                 {user.name.charAt(0).toUpperCase()}
               </div>
               <div className="overflow-hidden">
                 <p className="text-sm font-medium truncate">{user.name}</p>
-                <p className="text-xs text-surface-500 capitalize">{user.role?.name}</p>
+                <p className={`text-xs capitalize ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>{user.role?.name}</p>
               </div>
             </div>
           </div>
@@ -114,7 +124,9 @@ export default function Layout() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="h-16 bg-surface-900/80 backdrop-blur-md border-b border-surface-700/50 flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
+        <header className={`h-16 backdrop-blur-md border-b flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30 ${
+          isDark ? 'bg-surface-900/80 border-surface-700/50' : 'bg-white/80 border-surface-200'
+        }`}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="btn-ghost p-2 rounded-lg"
@@ -123,6 +135,19 @@ export default function Layout() {
           </button>
 
           <div className="flex items-center gap-2">
+            {/* Theme toggle */}
+            <button
+              onClick={toggleTheme}
+              className="theme-toggle btn-ghost p-2 rounded-lg"
+              title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            >
+              {isDark ? (
+                <Sun className="w-5 h-5 text-amber-400" />
+              ) : (
+                <Moon className="w-5 h-5 text-surface-500" />
+              )}
+            </button>
+
             {/* Notifications */}
             <div ref={notifRef} className="relative">
               <button
@@ -152,14 +177,16 @@ export default function Layout() {
               </button>
 
               {profileOpen && (
-                <div className="absolute right-0 top-full mt-2 w-48 glass rounded-xl py-2 animate-scale-in z-50">
-                  <div className="px-4 py-2 border-b border-surface-700/50">
+                <div className={`absolute right-0 top-full mt-2 w-48 glass rounded-xl py-2 animate-scale-in z-50`}>
+                  <div className={`px-4 py-2 border-b ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
                     <p className="text-sm font-medium">{user?.name}</p>
-                    <p className="text-xs text-surface-500">{user?.email}</p>
+                    <p className={`text-xs ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>{user?.email}</p>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-surface-700/50 transition-colors"
+                    className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 transition-colors ${
+                      isDark ? 'hover:bg-surface-700/50' : 'hover:bg-surface-100'
+                    }`}
                   >
                     <LogOut className="w-4 h-4" /> Sign Out
                   </button>
