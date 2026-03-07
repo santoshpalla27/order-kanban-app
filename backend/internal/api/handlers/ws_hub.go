@@ -3,7 +3,6 @@ package handlers
 import (
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -20,12 +19,17 @@ type WSClient struct {
 	Send     chan []byte
 }
 
+type directMsg struct {
+	userID uint
+	data   []byte
+}
+
 type WSHub struct {
 	clients    map[*WSClient]bool
 	broadcast  chan []byte
 	register   chan *WSClient
 	unregister chan *WSClient
-	mu         sync.RWMutex
+	sendDirect chan directMsg
 }
 
 type WSMessage struct {
@@ -38,58 +42,62 @@ var Hub = &WSHub{
 	broadcast:  make(chan []byte, 256),
 	register:   make(chan *WSClient),
 	unregister: make(chan *WSClient),
+	sendDirect: make(chan directMsg, 256),
 }
 
+// Run is the sole goroutine that owns the clients map.
+// No mutex is needed because only this goroutine reads or writes the map.
+// All external callers communicate through channels, eliminating all races.
 func (h *WSHub) Run() {
 	for {
 		select {
 		case client := <-h.register:
-			h.mu.Lock()
 			h.clients[client] = true
-			h.mu.Unlock()
-			log.Printf("Client connected: %s (ID: %d)", client.UserName, client.UserID)
+			log.Printf("WS connected: %s (ID: %d)", client.UserName, client.UserID)
 
 		case client := <-h.unregister:
-			h.mu.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.Send)
+				log.Printf("WS disconnected: %s (ID: %d)", client.UserName, client.UserID)
 			}
-			h.mu.Unlock()
-			log.Printf("Client disconnected: %s (ID: %d)", client.UserName, client.UserID)
 
 		case message := <-h.broadcast:
-			h.mu.RLock()
 			for client := range h.clients {
 				select {
 				case client.Send <- message:
 				default:
-					close(client.Send)
+					// Slow client: drop and disconnect.
+					// Only Run() ever calls close(), so no double-close is possible.
 					delete(h.clients, client)
+					close(client.Send)
 				}
 			}
-			h.mu.RUnlock()
+
+		case dm := <-h.sendDirect:
+			for client := range h.clients {
+				if client.UserID == dm.userID {
+					select {
+					case client.Send <- dm.data:
+					default:
+						delete(h.clients, client)
+						close(client.Send)
+					}
+				}
+			}
 		}
 	}
 }
 
+// BroadcastMessage sends a message to all connected clients.
 func (h *WSHub) BroadcastMessage(msg []byte) {
 	h.broadcast <- msg
 }
 
+// SendToUser sends a message to all connections for a specific user.
+// It communicates through a channel so Run() handles it safely.
 func (h *WSHub) SendToUser(userID uint, msg []byte) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-	for client := range h.clients {
-		if client.UserID == userID {
-			select {
-			case client.Send <- msg:
-			default:
-				close(client.Send)
-				delete(h.clients, client)
-			}
-		}
-	}
+	h.sendDirect <- directMsg{userID: userID, data: msg}
 }
 
 func HandleWebSocket(c *gin.Context) {
@@ -116,9 +124,7 @@ func HandleWebSocket(c *gin.Context) {
 }
 
 func (c *WSClient) writePump() {
-	defer func() {
-		c.Conn.Close()
-	}()
+	defer c.Conn.Close()
 	for msg := range c.Send {
 		if err := c.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
 			return

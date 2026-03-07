@@ -26,6 +26,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		AllowCredentials: cfg.CORSOrigins != "*",
 	}))
 
+	// Global 2 MB body limit for all JSON endpoints.
+	// File uploads bypass this — bytes go directly to R2 via presigned URL.
+	r.Use(middleware.MaxBodySize(2 << 20))
+
 	authHandler := handlers.NewAuthHandler(cfg)
 	productHandler := handlers.NewProductHandler()
 	attachmentHandler := handlers.NewAttachmentHandler()
@@ -37,8 +41,9 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 	api := r.Group("/api")
 	{
-		// Public routes
+		// Public routes — rate limited to 10 req/min per IP
 		auth := api.Group("/auth")
+		auth.Use(middleware.RateLimitAuth())
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
