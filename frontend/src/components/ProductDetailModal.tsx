@@ -155,13 +155,20 @@ function ImageCommentModal({
 }
 
 // ── Image Lightbox ──
-function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClose: () => void }) {
+function ImageLightbox({ src, alt, attId, onClose }: { src: string; alt: string; attId?: number; onClose: () => void }) {
+  const handleDownload = () => {
+    if (attId) {
+      downloadViaFetch(attachmentsApi.download(attId), alt || 'attachment', true);
+    } else {
+      downloadViaFetch(src, alt || 'attachment');
+    }
+  };
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <img src={src} alt={alt} className="max-w-full max-h-[85vh] object-contain rounded-xl" />
         <div className="absolute top-3 right-3 flex gap-2">
-          <button onClick={() => downloadViaFetch(src, alt || 'attachment')} className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
+          <button onClick={handleDownload} className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
             <Download className="w-5 h-5" />
           </button>
           <a href={src} target="_blank" rel="noreferrer" className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
@@ -304,7 +311,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { uploading, uploadCount, uploadFiles } = useMultiUpload(productId);
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; attId: number; filename: string } | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
@@ -371,7 +378,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
             <div className="grid grid-cols-2 gap-3">
               {images.map((att) => (
                 <div key={att.id} className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
-                  <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300" onClick={() => setLightboxSrc(getAttachmentUrl(att))} />
+                  <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300" onClick={() => setLightbox({ src: getAttachmentUrl(att), attId: att.id, filename: att.file_name })} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
                     <p className="text-xs text-white font-medium truncate mb-2">{att.file_name}</p>
                     <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
@@ -452,7 +459,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
         </div>
       )}
 
-      {lightboxSrc && <ImageLightbox src={lightboxSrc} alt="attachment" onClose={() => setLightboxSrc(null)} />}
+      {lightbox && <ImageLightbox src={lightbox.src} alt={lightbox.filename} attId={lightbox.attId} onClose={() => setLightbox(null)} />}
     </div>
   );
 }
@@ -513,7 +520,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
   const [editMessage, setEditMessage] = useState('');
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
-  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; attId?: number; filename: string } | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -599,109 +606,164 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
             };
 
             return (
-              <div key={c.id} className="group flex gap-3 relative">
-                {/* Avatar */}
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-purple-500 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5">
-                  {c.user?.name?.charAt(0)?.toUpperCase() || '?'}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  {/* Name + Time */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">{c.user?.name}</span>
-                    <span className="text-xs text-surface-500">{new Date(c.created_at).toLocaleString()}</span>
+              <div key={c.id} className={`group flex gap-2 w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                {/* Avatar (only for others) */}
+                {!isOwn && (
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-400 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-auto mb-1 shadow-sm">
+                    {c.user?.name?.charAt(0)?.toUpperCase() || '?'}
                   </div>
+                )}
 
-                  {/* Reply reference */}
-                  {parsed.replyToId && parsed.replyPreview && (
-                    <div className="mt-1 flex items-start gap-1.5 text-xs text-surface-500 bg-surface-800/60 border-l-2 border-brand-500/50 pl-2.5 pr-3 py-1.5 rounded-r-lg">
-                      <Reply className="w-3 h-3 mt-0.5 flex-shrink-0 rotate-180" />
-                      <span className="truncate">{parsed.replyPreview}</span>
-                    </div>
-                  )}
-
-                  {/* Edit mode */}
-                  {editingId === c.id ? (
-                    <div className="mt-1 flex gap-2">
-                      <input value={editMessage} onChange={(e) => setEditMessage(e.target.value)} className="flex-1 text-sm" autoFocus />
-                      <button onClick={() => updateMutation.mutate({ id: c.id, msg: editMessage })} className="btn-primary text-xs py-1 px-3">Save</button>
-                      <button onClick={() => setEditingId(null)} className="btn-ghost text-xs py-1 px-3">Cancel</button>
-                    </div>
-                  ) : (
-                    <>
-                      {/* Comment text */}
-                      {parsed.text && <p className="text-sm text-surface-300 mt-0.5">{parsed.text}</p>}
-
-                      {/* Attached image in comment (clickable + downloadable) */}
-                      {attachmentDisplayUrl && attachmentIsImage && (
-                        <div className="mt-2 group/img relative aspect-[4/3] w-full max-w-[280px] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
-                          <img
-                            src={attachmentDisplayUrl}
-                            alt={parsed.attachmentName || 'attachment'}
-                            className="w-full h-full object-cover cursor-pointer group-hover/img:scale-105 transition-transform duration-300"
-                            onClick={() => setLightboxSrc(attachmentDisplayUrl)}
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
-                            <p className="text-xs text-white font-medium truncate mb-2">{parsed.attachmentName}</p>
-                            <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
-                              <button
-                                onClick={handleAttachmentDownload}
-                                className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"
-                              >
-                                <Download className="w-3 h-3" /> Download
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Non-image attachment */}
-                      {attachmentDisplayUrl && !attachmentIsImage && (
-                        <button onClick={handleAttachmentDownload} className="mt-2 flex items-center gap-2 p-2 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors max-w-[220px] w-full text-left">
-                          <FileText className="w-4 h-4 text-surface-400 flex-shrink-0" />
-                          <span className="text-xs truncate text-surface-300">{parsed.attachmentName || 'File'}</span>
-                          <Download className="w-3 h-3 text-surface-500 ml-auto flex-shrink-0" />
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                {/* Action menu (⋯ on hover) */}
-                {editingId !== c.id && (
-                  <div className="absolute top-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Left side actions (for own messages) */}
+                {isOwn && editingId !== c.id && (
+                  <div className="flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity px-1">
                     <div className="relative">
                       <button
                         onClick={() => setMenuOpenId(menuOpenId === c.id ? null : c.id)}
-                        className="btn-ghost p-1 rounded-md"
+                        className="btn-ghost p-1 rounded-full bg-surface-800/80 shadow-sm border border-surface-700/50 hover:bg-surface-700"
                       >
-                        <MoreVertical className="w-3.5 h-3.5" />
+                        <MoreVertical className="w-3.5 h-3.5 text-surface-400" />
                       </button>
 
                       {menuOpenId === c.id && (
-                        <div className="absolute right-0 top-7 z-10 glass rounded-lg py-1 min-w-[120px] shadow-xl animate-scale-in">
+                        <div className="absolute right-0 top-8 z-10 glass rounded-lg py-1 min-w-[120px] shadow-xl animate-scale-in">
                           <button
                             onClick={() => { handleReply(c); }}
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-700/50 transition-colors"
                           >
                             <Reply className="w-3 h-3" /> Reply
                           </button>
-                          {isOwn && (
-                            <>
-                              <button
-                                onClick={() => { setEditingId(c.id); setEditMessage(parsed.text); setMenuOpenId(null); }}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-700/50 transition-colors"
-                              >
-                                <Edit2 className="w-3 h-3" /> Edit
-                              </button>
-                              <button
-                                onClick={() => { deleteMutation.mutate(c.id); setMenuOpenId(null); }}
-                                className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-surface-700/50 transition-colors"
-                              >
-                                <Trash2 className="w-3 h-3" /> Delete
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={() => { setEditingId(c.id); setEditMessage(parsed.text); setMenuOpenId(null); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-700/50 transition-colors"
+                          >
+                            <Edit2 className="w-3 h-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => { deleteMutation.mutate(c.id); setMenuOpenId(null); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-surface-700/50 transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Bubble Container */}
+                <div className={`flex flex-col max-w-[85%] ${isOwn ? 'items-end' : 'items-start'}`}>
+                  {/* Name + Time (header), shown outside the bubble */}
+                  <div className={`flex items-baseline gap-2 mb-1 px-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {!isOwn && <span className="text-[11px] font-medium text-surface-400">{c.user?.name}</span>}
+                    <span className="text-[10px] text-surface-500">
+                      {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+
+                  {/* Bubble */}
+                  <div className={`relative px-3.5 py-2 shadow-sm ${
+                    isOwn 
+                      ? 'bg-brand-600 text-white rounded-2xl rounded-tr-sm' 
+                      : 'bg-surface-800 text-surface-200 rounded-2xl rounded-tl-sm border border-surface-700/50'
+                  }`}>
+                    {/* Reply reference */}
+                    {parsed.replyToId && parsed.replyPreview && (
+                      <div className={`mb-1.5 flex items-start gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border-l-2 ${
+                        isOwn 
+                          ? 'bg-black/10 border-white/40 text-white/90' 
+                          : 'bg-surface-900/60 border-brand-500/50 text-surface-300'
+                      }`}>
+                        <Reply className="w-3 h-3 mt-0.5 flex-shrink-0 rotate-180" />
+                        <span className="truncate">{parsed.replyPreview}</span>
+                      </div>
+                    )}
+
+                    {/* Edit mode */}
+                    {editingId === c.id ? (
+                      <div className="flex gap-2">
+                        <input value={editMessage} onChange={(e) => setEditMessage(e.target.value)} className={`text-sm rounded px-2 py-1 min-w-[200px] ${
+                          isOwn ? 'bg-black/20 border border-white/20 text-white placeholder-white/50' : 'bg-surface-900 border border-surface-700 text-surface-200'
+                        }`} autoFocus />
+                        <div className="flex flex-col gap-1">
+                          <button onClick={() => updateMutation.mutate({ id: c.id, msg: editMessage })} className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                            isOwn ? 'bg-white text-brand-600' : 'bg-brand-500 text-white'
+                          }`}>Save</button>
+                          <button onClick={() => setEditingId(null)} className={`text-[10px] px-2 py-0.5 rounded ${
+                            isOwn ? 'bg-black/30 text-white' : 'bg-surface-700 text-surface-300'
+                          }`}>Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Comment text */}
+                        {parsed.text && (
+                          <p className={`text-sm whitespace-pre-wrap ${isOwn ? 'text-white/95' : 'text-surface-200'}`}>
+                            {parsed.text}
+                          </p>
+                        )}
+
+                        {/* Attached image in comment */}
+                        {attachmentDisplayUrl && attachmentIsImage && (
+                          <div className={`mt-2 group/img relative aspect-[4/3] w-[240px] rounded-xl overflow-hidden border-none ${
+                            isOwn ? 'bg-black/10' : 'bg-surface-900'
+                          }`}>
+                            <img
+                              src={attachmentDisplayUrl}
+                              alt={parsed.attachmentName || 'attachment'}
+                              className="w-full h-full object-cover cursor-pointer group-hover/img:scale-105 transition-transform duration-300"
+                              onClick={() => setLightbox({ src: attachmentDisplayUrl, attId: parsed.attachmentId, filename: parsed.attachmentName || "attachment" })}
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-2 pointer-events-none">
+                              <p className="text-[10px] text-white font-medium truncate mb-1.5">{parsed.attachmentName}</p>
+                              <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
+                                <button
+                                  onClick={handleAttachmentDownload}
+                                  className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"
+                                >
+                                  <Download className="w-3 h-3" /> Download
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Non-image attachment */}
+                        {attachmentDisplayUrl && !attachmentIsImage && (
+                          <button onClick={handleAttachmentDownload} className={`mt-2 flex items-center gap-2.5 p-2 rounded-xl transition-colors w-[220px] text-left ${
+                            isOwn ? 'bg-black/10 hover:bg-black/20' : 'bg-surface-900 hover:bg-surface-800 border border-surface-700/50'
+                          }`}>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isOwn ? 'bg-black/10' : 'bg-surface-800'}`}>
+                              <FileText className={`w-4 h-4 ${isOwn ? 'text-white/80' : 'text-surface-400'}`} />
+                            </div>
+                            <span className={`text-xs truncate flex-1 ${isOwn ? 'text-white/90' : 'text-surface-300'}`}>{parsed.attachmentName || 'File'}</span>
+                            <Download className={`w-3.5 h-3.5 flex-shrink-0 ${isOwn ? 'text-white/60' : 'text-surface-500'}`} />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right side actions (for others' messages) */}
+                {!isOwn && editingId !== c.id && (
+                  <div className="flex flex-col justify-center opacity-0 group-hover:opacity-100 transition-opacity px-1">
+                    <div className="relative">
+                      <button
+                        onClick={() => setMenuOpenId(menuOpenId === c.id ? null : c.id)}
+                        className="btn-ghost p-1 rounded-full bg-surface-800/80 shadow-sm border border-surface-700/50 hover:bg-surface-700"
+                      >
+                        <MoreVertical className="w-3.5 h-3.5 text-surface-400" />
+                      </button>
+
+                      {menuOpenId === c.id && (
+                        <div className="absolute left-0 top-8 z-10 glass rounded-lg py-1 min-w-[120px] shadow-xl animate-scale-in">
+                          <button
+                            onClick={() => { handleReply(c); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-300 hover:bg-surface-700/50 transition-colors"
+                          >
+                            <Reply className="w-3 h-3" /> Reply
+                          </button>
                         </div>
                       )}
                     </div>
@@ -736,7 +798,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
       </form>
 
       {/* Image lightbox */}
-      {lightboxSrc && <ImageLightbox src={lightboxSrc} alt="attachment" onClose={() => setLightboxSrc(null)} />}
+      {lightbox && <ImageLightbox src={lightbox.src} alt={lightbox.filename} attId={lightbox.attId} onClose={() => setLightbox(null)} />}
     </div>
   );
 }

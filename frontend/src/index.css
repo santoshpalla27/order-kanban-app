@@ -224,6 +224,7 @@ body {
 [data-theme='light'] .bg-surface-950 { background-color: #f1f5f9 !important; }
 [data-theme='light'] .bg-surface-900 { background-color: #ffffff !important; }
 [data-theme='light'] .bg-surface-900\/80 { background-color: rgba(255,255,255,0.8) !important; }
+[data-theme='light'] .bg-surface-900\/50 { background-color: rgba(255,255,255,0.5) !important; }
 [data-theme='light'] .bg-surface-800 { background-color: #f8fafc !important; }
 [data-theme='light'] .bg-surface-800\/80 { background-color: rgba(248,250,252,0.8) !important; }
 [data-theme='light'] .bg-surface-800\/50 { background-color: rgba(241,245,249,0.5) !important; }
