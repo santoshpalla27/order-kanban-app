@@ -282,9 +282,53 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
   return (
     <div className="space-y-4">
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleUpload} />
-      <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-2 w-full justify-center">
-        <Upload className="w-4 h-4" /> {uploading ? `Uploading ${uploadCount.done}/${uploadCount.total}...` : 'Upload Files'}
-      </button>
+      <div className="flex gap-2">
+        <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-2 flex-1 justify-center">
+          <Upload className="w-4 h-4" /> {uploading ? `Uploading ${uploadCount.done}/${uploadCount.total}...` : 'Upload Files'}
+        </button>
+        {attachments.length > 0 && (
+          <button 
+            onClick={async () => {
+              for (const att of attachments) {
+                try {
+                  // Fetch the file as a blob to bypass browser cross-origin download navigation blocks
+                  // Must include Auth token because the API route is protected
+                  const token = useAuthStore.getState().token;
+                  const response = await fetch(attachmentsApi.download(att.id), {
+                    headers: { Authorization: `Bearer ${token}` }
+                  });
+                  
+                  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                  
+                  const blob = await response.blob();
+                  const blobUrl = window.URL.createObjectURL(blob);
+                  
+                  const link = document.createElement('a');
+                  link.href = blobUrl;
+                  link.download = att.file_name;
+                  document.body.appendChild(link);
+                  link.click();
+                  
+                  // Cleanup
+                  setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(blobUrl);
+                  }, 1000);
+                  
+                  // Small pause between downloads
+                  await new Promise(resolve => setTimeout(resolve, 300));
+                } catch (err) {
+                  console.error(`Failed to download ${att.file_name}:`, err);
+                }
+              }
+            }}
+            className="btn-ghost border border-surface-700/50 hover:bg-surface-700/50 flex items-center gap-2 px-4 justify-center"
+            title="Download All Attachments"
+          >
+            <Download className="w-4 h-4" /> Download All
+          </button>
+        )}
+      </div>
 
       {attachments.length === 0 ? (
         <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-12 border-2 border-dashed border-surface-700/50 rounded-xl cursor-pointer hover:border-brand-500/30 hover:text-surface-400 transition-colors" onClick={() => fileInputRef.current?.click()}>
