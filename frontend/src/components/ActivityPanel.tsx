@@ -73,7 +73,7 @@ export default function ActivityPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-[380px] glass border border-surface-700/50 rounded-2xl shadow-2xl animate-scale-in z-50 overflow-hidden">
+    <div className="absolute right-0 top-full mt-2 w-[380px] glass-opaque border border-surface-700/50 rounded-2xl shadow-2xl animate-scale-in z-50 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-700/40">
         <div className="flex items-center gap-2">

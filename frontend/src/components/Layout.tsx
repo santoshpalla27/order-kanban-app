@@ -143,14 +143,22 @@ export default function Layout() {
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}
-              className="theme-toggle btn-ghost p-2 rounded-lg"
+              className={`relative flex items-center justify-between w-14 h-7 p-1 rounded-full transition-colors duration-500 focus:outline-none focus:ring-2 focus:ring-brand-500/50 ${
+                isDark ? 'bg-surface-800 border-surface-700 inner-shadow-dark' : 'bg-surface-200 border-surface-300 inner-shadow-light'
+              } border`}
               title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
             >
-              {isDark ? (
-                <Sun className="w-5 h-5 text-amber-400" />
-              ) : (
-                <Moon className="w-5 h-5 text-surface-500" />
-              )}
+              <div className={`z-10 flex items-center justify-center w-5 h-5 theme-switch-icon ${!isDark ? 'text-amber-500 scale-100' : 'text-surface-500 scale-75'}`}>
+                <Sun className="w-3.5 h-3.5" />
+              </div>
+              <div className={`z-10 flex items-center justify-center w-5 h-5 theme-switch-icon ${isDark ? 'text-brand-400 scale-100' : 'text-surface-400 scale-75'}`}>
+                <Moon className="w-3.5 h-3.5" />
+              </div>
+              <div
+                className={`absolute left-1 w-5 h-5 rounded-full shadow-sm theme-switch-thumb ${
+                  isDark ? 'translate-x-7 bg-surface-700' : 'translate-x-0 bg-white'
+                }`}
+              />
             </button>
 
             {/* Activity */}

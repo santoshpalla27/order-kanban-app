@@ -43,7 +43,7 @@ export default function NotificationPanel({ onClose }: Props) {
   };
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 glass rounded-xl animate-scale-in z-50 max-h-[480px] flex flex-col">
+    <div className="absolute right-0 top-full mt-2 w-80 glass-opaque rounded-xl animate-scale-in z-50 max-h-[480px] flex flex-col">
       <div className="flex items-center justify-between p-4 border-b border-surface-700/50">
         <h3 className="font-semibold flex items-center gap-2">
           <Bell className="w-4 h-4" /> Notifications
