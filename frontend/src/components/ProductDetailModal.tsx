@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, attachmentsApi, commentsApi } from '../api/client';
 import { useAuthStore } from '../store/authStore';
@@ -62,31 +63,125 @@ const formatSize = (bytes: number) => {
 };
 const getAttachmentUrl = (att: Attachment) => att.view_url || '';
 
+// ── Upload progress types + modal ──
+interface FileUploadState {
+  name: string;
+  size: number;
+  progress: number;
+  status: 'pending' | 'uploading' | 'done' | 'error' | 'cancelled';
+}
+
+function UploadProgressModal({ files, onCancel }: { files: FileUploadState[]; onCancel: () => void }) {
+  const done = files.filter(f => f.status === 'done').length;
+  const allSettled = files.every(f => ['done', 'error', 'cancelled'].includes(f.status));
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-md mx-4 bg-surface-900 border border-surface-700/50 rounded-2xl shadow-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-surface-700/50 flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-surface-100">
+              {allSettled ? 'Upload Complete' : 'Uploading Files'}
+            </h3>
+            <p className="text-xs text-surface-400 mt-0.5">{done} of {files.length} done</p>
+          </div>
+          {!allSettled && (
+            <button
+              onClick={onCancel}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-red-400 border border-red-400/30 hover:bg-red-400/10 transition-colors"
+            >
+              <X className="w-3.5 h-3.5" /> Cancel
+            </button>
+          )}
+        </div>
+        <div className="px-6 py-4 space-y-4 max-h-72 overflow-y-auto">
+          {files.map((f, i) => (
+            <div key={i}>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-sm text-surface-200 flex-1 truncate">{f.name}</span>
+                <span className={`text-xs flex-shrink-0 ${
+                  f.status === 'done' ? 'text-emerald-400' :
+                  f.status === 'error' ? 'text-red-400' :
+                  f.status === 'cancelled' ? 'text-surface-500' :
+                  'text-brand-400'
+                }`}>
+                  {f.status === 'done' ? '✓ Done' :
+                   f.status === 'error' ? '✗ Failed' :
+                   f.status === 'cancelled' ? 'Cancelled' :
+                   f.status === 'pending' ? 'Waiting…' :
+                   `${f.progress}%`}
+                </span>
+              </div>
+              <div className="h-1.5 bg-surface-700 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-200 ${
+                    f.status === 'done' ? 'bg-emerald-500' :
+                    f.status === 'error' ? 'bg-red-500' :
+                    f.status === 'cancelled' ? 'bg-surface-600' :
+                    'bg-brand-500'
+                  }`}
+                  style={{ width: `${f.progress}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
 // ── Shared multi-file upload hook ──
 function useMultiUpload(productId: number) {
   const queryClient = useQueryClient();
+  const [uploadFiles_state, setUploadFiles_state] = useState<FileUploadState[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadCount, setUploadCount] = useState({ done: 0, total: 0 });
+  const abortRef = useRef<AbortController | null>(null);
 
-  const uploadFiles = async (files: FileList | File[]) => {
+  const uploadFiles = async (files: FileList | File[], onFileDone?: (att: any) => void) => {
     const fileArray = Array.from(files);
     if (fileArray.length === 0) return;
+
+    const controller = new AbortController();
+    abortRef.current = controller;
     setUploading(true);
-    setUploadCount({ done: 0, total: fileArray.length });
+    setUploadFiles_state(fileArray.map(f => ({ name: f.name, size: f.size, progress: 0, status: 'pending' })));
+
     for (let i = 0; i < fileArray.length; i++) {
-      try {
-        await attachmentsApi.upload(productId, fileArray[i]);
-      } catch (err) {
-        console.error(`Failed to upload ${fileArray[i].name}:`, err);
+      if (controller.signal.aborted) {
+        setUploadFiles_state(prev => prev.map((f, idx) => idx >= i ? { ...f, status: 'cancelled' } : f));
+        break;
       }
-      setUploadCount((prev) => ({ ...prev, done: prev.done + 1 }));
+      setUploadFiles_state(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'uploading' } : f));
+      try {
+        const res = await attachmentsApi.uploadWithProgress(
+          productId,
+          fileArray[i],
+          (pct) => setUploadFiles_state(prev => prev.map((f, idx) => idx === i ? { ...f, progress: pct } : f)),
+          controller.signal,
+        );
+        setUploadFiles_state(prev => prev.map((f, idx) => idx === i ? { ...f, progress: 100, status: 'done' } : f));
+        onFileDone?.(res.data);
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          setUploadFiles_state(prev => prev.map((f, idx) => idx >= i ? { ...f, status: 'cancelled' } : f));
+          break;
+        }
+        setUploadFiles_state(prev => prev.map((f, idx) => idx === i ? { ...f, status: 'error' } : f));
+      }
     }
+
     queryClient.invalidateQueries({ queryKey: ['attachments', productId] });
+    await new Promise(r => setTimeout(r, 900));
     setUploading(false);
-    setUploadCount({ done: 0, total: 0 });
+    setUploadFiles_state([]);
+    abortRef.current = null;
   };
 
-  return { uploading, uploadCount, uploadFiles };
+  const cancelUpload = () => abortRef.current?.abort();
+
+  return { uploading, uploadFiles_state, uploadFiles, cancelUpload };
 }
 
 // ── Image Comment Modal (triggered from Details/Attachments) ──
@@ -236,10 +331,12 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 // ── Details Tab ──
 function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttachment }: { product: Product; productId: number; attachments: Attachment[]; onViewAll: () => void; onCommentAttachment: (att: Attachment) => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { uploading, uploadCount, uploadFiles } = useMultiUpload(productId);
+  const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ''; };
 
   return (
+    <>
+    {uploading && <UploadProgressModal files={uploadFiles_state} onCancel={cancelUpload} />}
     <div className="space-y-5">
       <div className="space-y-3">
         <DetailRow label="Product ID" value={product.product_id} />
@@ -258,7 +355,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
           <div className="flex items-center gap-2">
             <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleUpload} />
             <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition-colors bg-brand-500/10 hover:bg-brand-500/20 px-2.5 py-1.5 rounded-lg">
-              <Plus className="w-3.5 h-3.5" /> {uploading ? `Uploading ${uploadCount.done}/${uploadCount.total}...` : 'Add Files'}
+              <Plus className="w-3.5 h-3.5" /> Add Files
             </button>
             {attachments.length > 0 && <button onClick={onViewAll} className="text-xs text-surface-400 hover:text-surface-200 transition-colors">Manage →</button>}
           </div>
@@ -294,6 +391,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -310,7 +408,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 function AttachmentsTab({ productId, attachments, onCommentAttachment }: { productId: number; attachments: Attachment[]; onCommentAttachment: (att: Attachment) => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
-  const { uploading, uploadCount, uploadFiles } = useMultiUpload(productId);
+  const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
   const [lightbox, setLightbox] = useState<{ src: string; attId: number; filename: string } | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -342,11 +440,13 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
   const files = attachments.filter((a) => !isImageType(a.file_type));
 
   return (
+    <>
+    {uploading && <UploadProgressModal files={uploadFiles_state} onCancel={cancelUpload} />}
     <div className="space-y-4">
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleUpload} />
       <div className="flex gap-2">
         <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-2 flex-1 justify-center">
-          <Upload className="w-4 h-4" /> {uploading ? `Uploading ${uploadCount.done}/${uploadCount.total}...` : 'Upload Files'}
+          <Upload className="w-4 h-4" /> Upload Files
         </button>
         {attachments.length > 0 && (
           <button 
@@ -461,6 +561,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
 
       {lightbox && <ImageLightbox src={lightbox.src} alt={lightbox.filename} attId={lightbox.attId} onClose={() => setLightbox(null)} />}
     </div>
+    </>
   );
 }
 
@@ -521,11 +622,11 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [lightbox, setLightbox] = useState<{ src: string; attId?: number; filename: string } | null>(null);
-  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
 
   const createMutation = useMutation({
     mutationFn: (msg: string) => commentsApi.create(productId, msg),
@@ -549,21 +650,12 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['comments', productId] }),
   });
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    setUploading(true);
-    for (const file of Array.from(files)) {
-      try {
-        const res = await attachmentsApi.upload(productId, file);
-        const att = res.data;
-        createMutation.mutate(`📎 Uploaded: ${att.file_name}\n[attachment:${att.id}:${att.file_name}]`);
-      } catch (err) {
-        console.error(`Failed to upload ${file.name}:`, err);
-      }
-    }
-    queryClient.invalidateQueries({ queryKey: ['attachments', productId] });
-    setUploading(false);
+    uploadFiles(files, (att) => {
+      createMutation.mutate(`📎 Uploaded: ${att.file_name}\n[attachment:${att.id}:${att.file_name}]`);
+    });
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -585,6 +677,8 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
   };
 
   return (
+    <>
+    {uploading && <UploadProgressModal files={uploadFiles_state} onCancel={cancelUpload} />}
     <div className="flex flex-col h-full">
       <div className="flex-1 space-y-3 mb-4">
         {comments.length === 0 ? (
@@ -791,7 +885,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
       <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx,.txt,.xlsx,.csv" className="hidden" onChange={handleFileUpload} />
       <form onSubmit={handleSubmit} className="flex gap-2">
         <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-ghost p-2.5 rounded-xl flex-shrink-0" title="Upload files">
-          {uploading ? <div className="w-4 h-4 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+          <ImagePlus className="w-4 h-4" />
         </button>
         <input ref={inputRef} value={message} onChange={(e) => setMessage(e.target.value)} placeholder={replyTo ? `Reply to ${replyTo.user?.name}...` : 'Add a comment...'} className="flex-1" />
         <button type="submit" disabled={!message.trim()} className="btn-primary px-3"><Send className="w-4 h-4" /></button>
@@ -800,5 +894,6 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
       {/* Image lightbox */}
       {lightbox && <ImageLightbox src={lightbox.src} alt={lightbox.filename} attId={lightbox.attId} onClose={() => setLightbox(null)} />}
     </div>
+    </>
   );
 }

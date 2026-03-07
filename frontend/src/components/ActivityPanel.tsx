@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { activityApi } from '../api/client';
 import {
-  Plus, Trash2, RefreshCw, Edit3, UserPlus, UserMinus, ShieldCheck, X, Activity,
+  Plus, Trash2, RefreshCw, Edit3, ShieldCheck, X, Activity, ArrowRight,
 } from 'lucide-react';
 
 interface ActivityLog {
@@ -50,6 +51,7 @@ function getAvatarColor(name: string) {
 }
 
 export default function ActivityPanel({ onClose }: { onClose: () => void }) {
+  const navigate = useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ['activity'],
     queryFn: () => activityApi.getRecent(100),
@@ -85,9 +87,17 @@ export default function ActivityPanel({ onClose }: { onClose: () => void }) {
             </span>
           )}
         </div>
-        <button onClick={onClose} className="btn-ghost p-1 rounded-lg">
-          <X className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => { onClose(); navigate('/activity'); }}
+            className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 px-2 py-1 rounded-lg transition-colors"
+          >
+            View all <ArrowRight className="w-3 h-3" />
+          </button>
+          <button onClick={onClose} className="btn-ghost p-1 rounded-lg">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* List */}

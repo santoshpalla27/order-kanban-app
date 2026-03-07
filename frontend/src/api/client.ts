@@ -55,34 +55,45 @@ export const attachmentsApi = {
   getByProduct: (productId: number) =>
     api.get(`/products/${productId}/attachments`),
 
-  upload: async (productId: number, file: File) => {
-    // Step 1: Get presigned upload URL from backend
+  upload: (productId: number, file: File) =>
+    attachmentsApi.uploadWithProgress(productId, file, () => {}),
+
+  uploadWithProgress: async (
+    productId: number,
+    file: File,
+    onProgress: (pct: number) => void,
+    signal?: AbortSignal,
+  ) => {
     const presignRes = await api.get(`/products/${productId}/attachments/presign`, {
       params: { filename: file.name },
+      signal,
     });
-
     const { upload_url, s3_key, content_type } = presignRes.data;
 
-    // Step 2: Upload directly to R2
     try {
       await axios.put(upload_url, file, {
         headers: { 'Content-Type': content_type },
+        signal,
+        onUploadProgress: (e) => {
+          if (e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+        },
       });
     } catch (uploadError: any) {
-      // Provide a clear error message for R2 upload failures
+      if (axios.isCancel(uploadError) || uploadError?.name === 'CanceledError' || uploadError?.name === 'AbortError') {
+        throw new DOMException('Upload cancelled', 'AbortError');
+      }
       const msg = uploadError?.response?.status
         ? `R2 upload failed (${uploadError.response.status}). Check CORS settings on your R2 bucket.`
         : 'R2 upload failed. Check your network connection and R2 bucket CORS settings.';
       throw new Error(msg);
     }
 
-    // Step 3: Confirm upload with backend
     return api.post(`/products/${productId}/attachments/confirm`, {
-      s3_key: s3_key,
+      s3_key,
       file_name: file.name,
       file_size: file.size,
       file_type: '.' + file.name.split('.').pop()?.toLowerCase(),
-    });
+    }, { signal });
   },
 
   download: (id: number) => `/api/attachments/${id}/download`,

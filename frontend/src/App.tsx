@@ -8,6 +8,8 @@ import KanbanBoard from './pages/kanban/KanbanBoard';
 import ListView from './pages/boards/ListView';
 import ChatPage from './pages/chat/ChatPage';
 import AdminPanel from './pages/admin/AdminPanel';
+import ActivityPage from './pages/activity/ActivityPage';
+import NotificationsPage from './pages/notifications/NotificationsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,6 +45,8 @@ export default function App() {
             <Route path="/" element={<KanbanBoard />} />
             <Route path="/list" element={<ListView />} />
             <Route path="/chat" element={<ChatPage />} />
+            <Route path="/activity" element={<ActivityPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route
               path="/admin"
               element={

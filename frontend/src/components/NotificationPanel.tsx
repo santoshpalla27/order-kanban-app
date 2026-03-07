@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { notificationsApi } from '../api/client';
 import { Notification } from '../types';
-import { Bell, Check, CheckCheck } from 'lucide-react';
+import { Bell, Check, CheckCheck, ArrowRight } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
@@ -9,6 +10,7 @@ interface Props {
 
 export default function NotificationPanel({ onClose }: Props) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications'],
@@ -48,12 +50,20 @@ export default function NotificationPanel({ onClose }: Props) {
         <h3 className="font-semibold flex items-center gap-2">
           <Bell className="w-4 h-4" /> Notifications
         </h3>
-        <button
-          onClick={() => markAllRead.mutate()}
-          className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
-        >
-          <CheckCheck className="w-3 h-3" /> Mark all read
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { onClose(); navigate('/notifications'); }}
+            className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
+          >
+            View all <ArrowRight className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => markAllRead.mutate()}
+            className="text-xs text-surface-400 hover:text-surface-300 flex items-center gap-1"
+          >
+            <CheckCheck className="w-3 h-3" /> Mark all
+          </button>
+        </div>
       </div>
 
       <div className="overflow-y-auto flex-1">
