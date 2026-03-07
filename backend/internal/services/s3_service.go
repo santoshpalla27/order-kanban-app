@@ -18,22 +18,16 @@ type R2Service struct {
 	client    *s3.Client
 	presigner *s3.PresignClient
 	bucket    string
-	enabled   bool
 }
 
 var R2 *R2Service
 
 func InitR2(cfg *config.Config) {
-	R2 = &R2Service{enabled: cfg.R2Enabled}
-
-	if !cfg.R2Enabled {
-		log.Println("R2 storage disabled — using local disk")
-		return
-	}
-
 	if cfg.R2Bucket == "" || cfg.R2AccessKey == "" || cfg.R2SecretKey == "" || cfg.R2Endpoint == "" {
-		log.Fatal("R2 is enabled but R2_BUCKET, R2_ACCESS_KEY, R2_SECRET_KEY, or R2_ACCOUNT_ID is missing")
+		log.Fatal("R2 storage is required: R2_BUCKET, R2_ACCESS_KEY, R2_SECRET_KEY, and R2_ACCOUNT_ID must be set")
 	}
+
+	R2 = &R2Service{}
 
 	// R2 uses "auto" region
 	awsCfg, err := awsconfig.LoadDefaultConfig(context.Background(),
@@ -55,10 +49,6 @@ func InitR2(cfg *config.Config) {
 	R2.bucket = cfg.R2Bucket
 
 	log.Printf("R2 storage enabled — bucket: %s, endpoint: %s", cfg.R2Bucket, cfg.R2Endpoint)
-}
-
-func (s *R2Service) IsEnabled() bool {
-	return s.enabled
 }
 
 // GenerateUploadURL creates a presigned PUT URL for direct upload

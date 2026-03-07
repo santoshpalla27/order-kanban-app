@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
 
 	"kanban-app/config"
 	"kanban-app/database"
@@ -25,15 +24,8 @@ func main() {
 	// Initialize database
 	database.Init(cfg.DBPath)
 
-	// Initialize S3 (or fallback to local disk)
+	// Initialize R2 storage (required)
 	services.InitR2(cfg)
-
-	// Ensure local upload directory exists (when not using S3)
-	if !cfg.R2Enabled {
-		if err := os.MkdirAll(cfg.UploadDir, 0755); err != nil {
-			log.Fatalf("Failed to create upload directory: %v", err)
-		}
-	}
 
 	// Start WebSocket hub
 	go handlers.Hub.Run()

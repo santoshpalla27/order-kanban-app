@@ -14,6 +14,39 @@ interface Props {
   onClose: () => void;
 }
 
+// ── Download helper ──
+async function downloadViaFetch(url: string, filename: string, withAuth = false) {
+  const headers: Record<string, string> = {};
+  if (withAuth) {
+    const token = useAuthStore.getState().token;
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+  }
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`Download failed: ${res.status}`);
+  const contentType = res.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    // R2 mode: backend returns { url: presignedUrl } — navigate directly (bypasses CORS)
+    const { url: presignedUrl } = await res.json();
+    const link = document.createElement('a');
+    link.href = presignedUrl;
+    link.download = filename;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => document.body.removeChild(link), 1000);
+    return;
+  }
+  // Local mode: response is the binary file
+  const blob = await res.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(blobUrl); }, 1000);
+}
+
 // ── Helpers ──
 const getFileIcon = (type: string) => {
   if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(type)) return Image;
@@ -27,8 +60,7 @@ const formatSize = (bytes: number) => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
-const getAttachmentUrl = (att: Attachment) =>
-  att.view_url || `/uploads/${att.product_id}/${att.file_path.split('/').pop()}`;
+const getAttachmentUrl = (att: Attachment) => att.view_url || '';
 
 // ── Shared multi-file upload hook ──
 function useMultiUpload(productId: number) {
@@ -82,7 +114,7 @@ function ImageCommentModal({
     e.preventDefault();
     if (!comment.trim()) return;
     // Store as structured format: comment text + image URL on a new line
-    const msg = `${comment.trim()}\n[attachment:${getAttachmentUrl(attachment)}:${attachment.file_name}]`;
+    const msg = `${comment.trim()}\n[attachment:${attachment.id}:${attachment.file_name}]`;
     commentMutation.mutate(msg);
   };
 
@@ -129,9 +161,9 @@ function ImageLightbox({ src, alt, onClose }: { src: string; alt: string; onClos
       <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <img src={src} alt={alt} className="max-w-full max-h-[85vh] object-contain rounded-xl" />
         <div className="absolute top-3 right-3 flex gap-2">
-          <a href={src} download className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors" target="_blank" rel="noreferrer">
+          <button onClick={() => downloadViaFetch(src, alt || 'attachment')} className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
             <Download className="w-5 h-5" />
-          </a>
+          </button>
           <a href={src} target="_blank" rel="noreferrer" className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
             <ExternalLink className="w-5 h-5" />
           </a>
@@ -185,7 +217,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
           <div className="flex-1 overflow-y-auto p-5">
             {activeTab === 'details' && product && <DetailsTab product={product} productId={productId} attachments={attachments} onViewAll={() => setActiveTab('attachments')} onCommentAttachment={setCommentingAttachment} />}
             {activeTab === 'attachments' && <AttachmentsTab productId={productId} attachments={attachments} onCommentAttachment={setCommentingAttachment} />}
-            {activeTab === 'comments' && <CommentsTab productId={productId} comments={comments} />}
+            {activeTab === 'comments' && <CommentsTab productId={productId} comments={comments} attachments={attachments} />}
           </div>
         </div>
       </div>
@@ -247,7 +279,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
                 <div key={att.id} className="flex items-center gap-3 p-2.5 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors mb-1.5 cursor-pointer" onClick={() => onCommentAttachment(att)}>
                   <div className="w-8 h-8 rounded bg-surface-700 flex items-center justify-center flex-shrink-0"><Icon className="w-4 h-4 text-surface-400" /></div>
                   <div className="flex-1 min-w-0"><p className="text-sm truncate">{att.file_name}</p><p className="text-xs text-surface-500">{formatSize(att.file_size)}</p></div>
-                  <a href={attachmentsApi.download(att.id)} className="btn-ghost p-1.5 rounded-lg" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Download className="w-3.5 h-3.5" /></a>
+                  <button onClick={(e) => { e.stopPropagation(); downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true); }} className="btn-ghost p-1.5 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                 </div>
               );
             })}
@@ -314,19 +346,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
             onClick={async () => {
               for (const att of attachments) {
                 try {
-                  const token = useAuthStore.getState().token;
-                  const response = await fetch(attachmentsApi.download(att.id), {
-                    headers: { Authorization: `Bearer ${token}` }
-                  });
-                  if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                  const blob = await response.blob();
-                  const blobUrl = window.URL.createObjectURL(blob);
-                  const link = document.createElement('a');
-                  link.href = blobUrl;
-                  link.download = att.file_name;
-                  document.body.appendChild(link);
-                  link.click();
-                  setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(blobUrl); }, 1000);
+                  await downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true);
                   await new Promise(resolve => setTimeout(resolve, 300));
                 } catch (err) { console.error(`Failed to download ${att.file_name}:`, err); }
               }
@@ -355,7 +375,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
                     <p className="text-xs text-white font-medium truncate mb-2">{att.file_name}</p>
                     <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
-                      <a href={attachmentsApi.download(att.id)} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors" target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}><Download className="w-3 h-3" /> Download</a>
+                      <button onClick={(e) => { e.stopPropagation(); downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><Download className="w-3 h-3" /> Download</button>
                       <button onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><MessageSquare className="w-3 h-3" /> Comment</button>
                       <button onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }} className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"><Trash2 className="w-3 h-3" /></button>
                     </div>
@@ -377,7 +397,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
                     <div className="flex-1 min-w-0"><p className="text-sm truncate">{att.file_name}</p><p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name} · {new Date(att.uploaded_at).toLocaleDateString()}</p></div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => onCommentAttachment(att)} className="btn-ghost p-1.5 rounded-lg" title="Comment"><MessageSquare className="w-3.5 h-3.5" /></button>
-                      <a href={attachmentsApi.download(att.id)} className="btn-ghost p-1.5 rounded-lg" target="_blank" rel="noreferrer"><Download className="w-3.5 h-3.5" /></a>
+                      <button onClick={() => downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true)} className="btn-ghost p-1.5 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
                       <button onClick={() => handleDelete(att.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                     </div>
                   </div>
@@ -440,7 +460,8 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
 // ── Parse comment content ──
 interface ParsedComment {
   text: string;
-  attachmentUrl?: string;
+  attachmentId?: number;   // new format: stores attachment ID
+  attachmentUrl?: string;  // legacy format: stores URL directly
   attachmentName?: string;
   replyToId?: number;
   replyPreview?: string;
@@ -456,7 +477,13 @@ function parseCommentMessage(raw: string): ParsedComment {
     // Greedy (.+) is used for the URL so it doesn't break on 'https://'
     const attMatch = line.match(/^\[attachment:(.+):(.+?)\]$/);
     if (attMatch) {
-      result.attachmentUrl = attMatch[1];
+      const idOrUrl = attMatch[1];
+      const numId = parseInt(idOrUrl, 10);
+      if (!isNaN(numId) && String(numId) === idOrUrl) {
+        result.attachmentId = numId;
+      } else {
+        result.attachmentUrl = idOrUrl;
+      }
       result.attachmentName = attMatch[2];
       continue;
     }
@@ -480,7 +507,7 @@ function parseCommentMessage(raw: string): ParsedComment {
 }
 
 // ── Comments Tab ──
-function CommentsTab({ productId, comments }: { productId: number; comments: Comment[] }) {
+function CommentsTab({ productId, comments, attachments }: { productId: number; comments: Comment[]; attachments: Attachment[] }) {
   const [message, setMessage] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editMessage, setEditMessage] = useState('');
@@ -521,9 +548,9 @@ function CommentsTab({ productId, comments }: { productId: number; comments: Com
     setUploading(true);
     for (const file of Array.from(files)) {
       try {
-        await attachmentsApi.upload(productId, file);
-        const url = `/uploads/${productId}/${file.name}`;
-        createMutation.mutate(`📎 Uploaded: ${file.name}\n[attachment:${url}:${file.name}]`);
+        const res = await attachmentsApi.upload(productId, file);
+        const att = res.data;
+        createMutation.mutate(`📎 Uploaded: ${att.file_name}\n[attachment:${att.id}:${att.file_name}]`);
       } catch (err) {
         console.error(`Failed to upload ${file.name}:`, err);
       }
@@ -559,6 +586,17 @@ function CommentsTab({ productId, comments }: { productId: number; comments: Com
           comments.map((c) => {
             const parsed = parseCommentMessage(c.message);
             const isOwn = c.user_id === user?.id;
+            const resolvedAtt = parsed.attachmentId ? attachments.find(a => a.id === parsed.attachmentId) : null;
+            const attachmentDisplayUrl = resolvedAtt ? getAttachmentUrl(resolvedAtt) : parsed.attachmentUrl;
+            const attachmentIsImage = resolvedAtt ? isImageType(resolvedAtt.file_type) : (parsed.attachmentUrl ? isImageUrl(parsed.attachmentUrl) : false);
+            const handleAttachmentDownload = (e: React.MouseEvent) => {
+              e.stopPropagation();
+              if (parsed.attachmentId) {
+                downloadViaFetch(attachmentsApi.download(parsed.attachmentId), parsed.attachmentName || 'attachment', true);
+              } else if (parsed.attachmentUrl) {
+                downloadViaFetch(parsed.attachmentUrl, parsed.attachmentName || 'attachment');
+              }
+            };
 
             return (
               <div key={c.id} className="group flex gap-3 relative">
@@ -595,37 +633,35 @@ function CommentsTab({ productId, comments }: { productId: number; comments: Com
                       {parsed.text && <p className="text-sm text-surface-300 mt-0.5">{parsed.text}</p>}
 
                       {/* Attached image in comment (clickable + downloadable) */}
-                      {parsed.attachmentUrl && isImageUrl(parsed.attachmentUrl) && (
+                      {attachmentDisplayUrl && attachmentIsImage && (
                         <div className="mt-2 group/img relative aspect-[4/3] w-full max-w-[280px] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
                           <img
-                            src={parsed.attachmentUrl}
+                            src={attachmentDisplayUrl}
                             alt={parsed.attachmentName || 'attachment'}
                             className="w-full h-full object-cover cursor-pointer group-hover/img:scale-105 transition-transform duration-300"
-                            onClick={() => setLightboxSrc(parsed.attachmentUrl!)}
+                            onClick={() => setLightboxSrc(attachmentDisplayUrl)}
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
                             <p className="text-xs text-white font-medium truncate mb-2">{parsed.attachmentName}</p>
                             <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
-                              <a
-                                href={parsed.attachmentUrl}
-                                download
+                              <button
+                                onClick={handleAttachmentDownload}
                                 className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"
-                                onClick={(e) => e.stopPropagation()}
                               >
                                 <Download className="w-3 h-3" /> Download
-                              </a>
+                              </button>
                             </div>
                           </div>
                         </div>
                       )}
 
                       {/* Non-image attachment */}
-                      {parsed.attachmentUrl && !isImageUrl(parsed.attachmentUrl) && (
-                        <a href={parsed.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 p-2 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors max-w-[220px]">
+                      {attachmentDisplayUrl && !attachmentIsImage && (
+                        <button onClick={handleAttachmentDownload} className="mt-2 flex items-center gap-2 p-2 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors max-w-[220px] w-full text-left">
                           <FileText className="w-4 h-4 text-surface-400 flex-shrink-0" />
                           <span className="text-xs truncate text-surface-300">{parsed.attachmentName || 'File'}</span>
                           <Download className="w-3 h-3 text-surface-500 ml-auto flex-shrink-0" />
-                        </a>
+                        </button>
                       )}
                     </>
                   )}

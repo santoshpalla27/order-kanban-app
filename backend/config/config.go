@@ -6,11 +6,9 @@ type Config struct {
 	Port        string
 	JWTSecret   string
 	DBPath      string
-	UploadDir   string
 	CORSOrigins string // Comma-separated allowed origins
 
 	// R2 / S3-compatible Storage
-	R2Enabled   bool
 	R2Bucket    string
 	R2AccountID string
 	R2AccessKey string
@@ -31,10 +29,8 @@ func Load() *Config {
 		Port:        getEnv("PORT", "8080"),
 		JWTSecret:   getEnv("JWT_SECRET", "kanban-secret-key-change-in-production"),
 		DBPath:      getEnv("DB_PATH", "./data/kanban.db"),
-		UploadDir:   getEnv("UPLOAD_DIR", "./uploads"),
 		CORSOrigins: getEnv("CORS_ORIGINS", "*"),
 
-		R2Enabled:   getEnv("R2_ENABLED", "false") == "true",
 		R2Bucket:    getEnv("R2_BUCKET", ""),
 		R2AccountID: accountID,
 		R2AccessKey: getEnv("R2_ACCESS_KEY", ""),

@@ -273,6 +273,14 @@ body {
   color: #ffffff !important;
 }
 
+/* Preserve white icons/text on dark overlays in product details */
+[data-theme='light'] .from-black\/70 .text-white,
+[data-theme='light'] .from-black\/80 .text-white,
+[data-theme='light'] .bg-black\/0 .text-white,
+[data-theme='light'] .bg-black\/40 .text-white {
+  color: #ffffff !important;
+}
+
 /* Auth pages bg */
 [data-theme='light'] .min-h-screen.bg-surface-950 { background-color: #f1f5f9 !important; }
 

@@ -4,13 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
+	"strconv"
 	"time"
 
-	"kanban-app/config"
 	"kanban-app/internal/models"
 	"kanban-app/internal/services"
 
@@ -18,12 +16,10 @@ import (
 	"github.com/google/uuid"
 )
 
-type AttachmentHandler struct {
-	Config *config.Config
-}
+type AttachmentHandler struct{}
 
-func NewAttachmentHandler(cfg *config.Config) *AttachmentHandler {
-	return &AttachmentHandler{Config: cfg}
+func NewAttachmentHandler() *AttachmentHandler {
+	return &AttachmentHandler{}
 }
 
 var allowedExtensions = map[string]bool{
@@ -43,11 +39,6 @@ var extToContentType = map[string]string{
 
 // ── Presigned Upload URL (R2 mode) ──
 func (h *AttachmentHandler) GetPresignedUploadURL(c *gin.Context) {
-	if !services.R2.IsEnabled() {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "R2 storage is not enabled"})
-		return
-	}
-
 	productIDStr := c.Param("id")
 	_, err := strconv.ParseUint(productIDStr, 10, 32)
 	if err != nil {
@@ -145,81 +136,6 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 	c.JSON(http.StatusCreated, attachment)
 }
 
-// ── Upload (local disk mode — also works as fallback) ──
-func (h *AttachmentHandler) Upload(c *gin.Context) {
-	productIDStr := c.Param("id")
-	productID, err := strconv.ParseUint(productIDStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
-		return
-	}
-
-	file, err := c.FormFile("file")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No file provided"})
-		return
-	}
-
-	if file.Size > 10*1024*1024 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File too large (max 10MB)"})
-		return
-	}
-
-	ext := strings.ToLower(filepath.Ext(file.Filename))
-	if !allowedExtensions[ext] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "File type not allowed"})
-		return
-	}
-
-	// Create upload directory
-	uploadDir := filepath.Join(h.Config.UploadDir, productIDStr)
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create upload directory"})
-		return
-	}
-
-	filename := fmt.Sprintf("%s_%s%s", uuid.New().String()[:8], time.Now().Format("20060102"), ext)
-	filePath := filepath.Join(uploadDir, filename)
-
-	if err := c.SaveUploadedFile(file, filePath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save file"})
-		return
-	}
-
-	userID := c.GetUint("user_id")
-	userName, _ := c.Get("user_name")
-
-	attachment := &models.Attachment{
-		ProductID:  uint(productID),
-		FilePath:   filePath,
-		FileName:   file.Filename,
-		FileType:   ext,
-		FileSize:   file.Size,
-		UploadedBy: userID,
-		UploadedAt: time.Now(),
-	}
-
-	if err := services.CreateAttachment(attachment); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save attachment record"})
-		return
-	}
-
-	services.CreateActivityLog(&models.ActivityLog{
-		UserID:   userID,
-		Action:   "uploaded",
-		Entity:   "attachment",
-		EntityID: attachment.ID,
-		Details:  fmt.Sprintf("Uploaded %s to product %s", file.Filename, productIDStr),
-	})
-
-	message := fmt.Sprintf("%s uploaded '%s'", userName, file.Filename)
-	services.CreateNotificationForAllExcept(userID, message, "attachment_uploaded")
-
-	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_uploaded", Payload: attachment})
-	Hub.BroadcastMessage(wsMsg)
-
-	c.JSON(http.StatusCreated, attachment)
-}
 
 // ── Get By Product ──
 func (h *AttachmentHandler) GetByProduct(c *gin.Context) {
@@ -235,27 +151,21 @@ func (h *AttachmentHandler) GetByProduct(c *gin.Context) {
 		return
 	}
 
-	// If S3 is enabled, add presigned view URLs for image previews
-	if services.R2.IsEnabled() {
-		type attachmentWithURL struct {
-			models.Attachment
-			ViewURL string `json:"view_url,omitempty"`
-		}
-
-		result := make([]attachmentWithURL, len(attachments))
-		for i, att := range attachments {
-			result[i] = attachmentWithURL{Attachment: att}
-			if isImageExtension(att.FileType) {
-				if url, err := services.R2.GenerateViewURL(att.FilePath); err == nil {
-					result[i].ViewURL = url
-				}
-			}
-		}
-		c.JSON(http.StatusOK, result)
-		return
+	type attachmentWithURL struct {
+		models.Attachment
+		ViewURL string `json:"view_url,omitempty"`
 	}
 
-	c.JSON(http.StatusOK, attachments)
+	result := make([]attachmentWithURL, len(attachments))
+	for i, att := range attachments {
+		result[i] = attachmentWithURL{Attachment: att}
+		if isImageExtension(att.FileType) {
+			if url, err := services.R2.GenerateViewURL(att.FilePath); err == nil {
+				result[i].ViewURL = url
+			}
+		}
+	}
+	c.JSON(http.StatusOK, result)
 }
 
 // ── Download ──
@@ -272,19 +182,12 @@ func (h *AttachmentHandler) Download(c *gin.Context) {
 		return
 	}
 
-	// R2 mode: redirect to presigned download URL
-	if services.R2.IsEnabled() && strings.HasPrefix(attachment.FilePath, "attachments/") {
-		downloadURL, err := services.R2.GenerateDownloadURL(attachment.FilePath, attachment.FileName)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate download URL"})
-			return
-		}
-		c.Redirect(http.StatusTemporaryRedirect, downloadURL)
+	downloadURL, err := services.R2.GenerateDownloadURL(attachment.FilePath, attachment.FileName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate download URL"})
 		return
 	}
-
-	// Local mode: serve file directly
-	c.FileAttachment(attachment.FilePath, attachment.FileName)
+	c.JSON(http.StatusOK, gin.H{"url": downloadURL})
 }
 
 // ── Delete ──
@@ -301,14 +204,9 @@ func (h *AttachmentHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Delete from storage
-	if services.R2.IsEnabled() && strings.HasPrefix(attachment.FilePath, "attachments/") {
-		if err := services.R2.DeleteObject(attachment.FilePath); err != nil {
-			// Log but don't fail — DB record removal is more important
-			fmt.Printf("Warning: failed to delete R2 object %s: %v\n", attachment.FilePath, err)
-		}
-	} else {
-		os.Remove(attachment.FilePath)
+	// Delete from R2
+	if err := services.R2.DeleteObject(attachment.FilePath); err != nil {
+		fmt.Printf("Warning: failed to delete R2 object %s: %v\n", attachment.FilePath, err)
 	}
 
 	if err := services.DeleteAttachment(uint(id)); err != nil {
