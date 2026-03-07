@@ -81,7 +81,7 @@ export default function RegisterPage() {
                 placeholder="Min 6 characters"
                 required
                 minLength={6}
-                className="w-full pr-10"
+                className="w-full !pr-10"
               />
               <button
                 type="button"

@@ -198,10 +198,10 @@ function KanbanCard({ product, onClick }: { product: Product; onClick: () => voi
         <div
           {...attributes}
           {...listeners}
-          className="mt-0.5 text-surface-600 hover:text-surface-400 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity"
+          className="text-surface-600 hover:text-surface-400 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity p-1 -ml-1 -mt-1 self-stretch flex items-center justify-center"
           onClick={(e) => e.stopPropagation()}
         >
-          <GripVertical className="w-4 h-4" />
+          <GripVertical className="w-4 h-6" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">

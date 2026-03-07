@@ -177,7 +177,7 @@ export default function Layout() {
               </button>
 
               {profileOpen && (
-                <div className={`absolute right-0 top-full mt-2 w-48 glass rounded-xl py-2 animate-scale-in z-50`}>
+                <div className={`absolute right-0 top-full mt-2 w-48 ${isDark ? 'bg-surface-800 border-surface-700/50' : 'bg-white border-surface-200'} border rounded-xl py-2 animate-scale-in z-50 shadow-xl`}>
                   <div className={`px-4 py-2 border-b ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
                     <p className="text-sm font-medium">{user?.name}</p>
                     <p className={`text-xs ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>{user?.email}</p>

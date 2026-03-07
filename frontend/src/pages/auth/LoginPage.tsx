@@ -67,7 +67,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full pr-10"
+                className="w-full !pr-10"
               />
               <button
                 type="button"

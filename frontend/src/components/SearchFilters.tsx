@@ -44,7 +44,7 @@ export default function SearchFilters({ filters, onChange }: Props) {
             placeholder="Search products..."
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
-            className="w-full pl-10"
+            className="w-full !pl-10"
           />
         </div>
         <button
