@@ -4,6 +4,7 @@ import { chatApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { ChatMessage } from '../../types';
 import { Send, Smile, Users, Hash } from 'lucide-react';
+import MentionInput, { renderWithMentions, MentionInputHandle } from '../../components/MentionInput';
 
 const EMOJIS = ['👍', '👎', '😄', '😢', '🎉', '🔥', '❤️', '🚀', '👏', '✅', '❌', '💡', '⭐', '🙏', '😂'];
 
@@ -28,7 +29,7 @@ export default function ChatPage() {
   const [message, setMessage] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<MentionInputHandle>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
 
@@ -51,8 +52,8 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (message.trim()) sendMutation.mutate(message.trim());
   };
 
@@ -174,7 +175,7 @@ export default function ChatPage() {
                       }`}
                     >
                       <p className={`text-sm whitespace-pre-wrap ${isOwn ? 'text-white/95' : 'text-surface-200'}`}>
-                        {msg.message}
+                        {renderWithMentions(msg.message, user?.name)}
                         <span className={`float-right ml-3 mt-1.5 text-[9px] translate-y-0.5 ${isOwn ? 'text-white/60' : 'text-surface-500'}`}>
                           {formatTime(msg.created_at)}
                         </span>
@@ -219,13 +220,14 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Text input */}
-        <input
+        {/* Text input with @mention support */}
+        <MentionInput
           ref={inputRef}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          placeholder="Type a message..."
-          className="flex-1 bg-transparent border-none outline-none text-sm placeholder:text-surface-500 min-w-0"
+          onChange={setMessage}
+          onSubmit={handleSubmit}
+          placeholder="Type a message... (@name to mention)"
+          className="bg-transparent border-none outline-none text-sm placeholder:text-surface-500"
         />
 
         {/* Send button */}

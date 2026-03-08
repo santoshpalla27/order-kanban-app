@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { notificationsApi } from '../api/client';
 import NotificationPanel from './NotificationPanel';
 import ActivityPanel from './ActivityPanel';
+import NotificationToast from './NotificationToast';
 import {
   LayoutDashboard,
   List,
@@ -226,6 +227,7 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      <NotificationToast />
     </div>
   );
 }

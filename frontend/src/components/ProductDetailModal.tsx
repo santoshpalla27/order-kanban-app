@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, attachmentsApi, commentsApi } from '../api/client';
 import { useAuthStore } from '../store/authStore';
 import { Product, Attachment, Comment, STATUS_LABELS } from '../types';
+import MentionInput, { renderWithMentions, MentionInputHandle } from './MentionInput';
 import {
   X, Paperclip, MessageSquare, Package, Upload, Download, Trash2,
   Send, Edit2, Image, FileText, File, ImagePlus, Plus, Reply, MoreVertical,
@@ -623,7 +624,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [lightbox, setLightbox] = useState<{ src: string; attId?: number; filename: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<MentionInputHandle>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
@@ -659,8 +660,8 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!message.trim()) return;
     let msg = message.trim();
     if (replyTo) {
@@ -793,7 +794,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
                         {/* Comment text */}
                         {parsed.text && (
                           <p className={`text-sm whitespace-pre-wrap ${isOwn ? 'text-white/95' : 'text-surface-200'}`}>
-                            {parsed.text}
+                            {renderWithMentions(parsed.text, user?.name)}
                           </p>
                         )}
 
@@ -887,7 +888,13 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
         <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-ghost p-2.5 rounded-xl flex-shrink-0" title="Upload files">
           <ImagePlus className="w-4 h-4" />
         </button>
-        <input ref={inputRef} value={message} onChange={(e) => setMessage(e.target.value)} placeholder={replyTo ? `Reply to ${replyTo.user?.name}...` : 'Add a comment...'} className="flex-1" />
+        <MentionInput
+          ref={inputRef}
+          value={message}
+          onChange={setMessage}
+          onSubmit={handleSubmit}
+          placeholder={replyTo ? `Reply to ${replyTo.user?.name}... (@name to mention)` : 'Add a comment... (@name to mention)'}
+        />
         <button type="submit" disabled={!message.trim()} className="btn-primary px-3"><Send className="w-4 h-4" /></button>
       </form>
 

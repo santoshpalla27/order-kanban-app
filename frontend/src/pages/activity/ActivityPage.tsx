@@ -4,7 +4,7 @@ import { activityApi } from '../../api/client';
 import { useThemeStore } from '../../store/themeStore';
 import {
   Plus, Trash2, RefreshCw, Edit3, ShieldCheck, Activity,
-  Search, Filter, X, ChevronDown,
+  Search, Filter, X, ChevronDown, Paperclip,
 } from 'lucide-react';
 
 interface ActivityLog {
@@ -19,16 +19,18 @@ interface ActivityLog {
 }
 
 const ACTION_META: Record<string, { icon: React.ElementType; color: string; label: string }> = {
-  created:        { icon: Plus,        color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', label: 'Created' },
-  updated:        { icon: Edit3,       color: 'text-blue-400 bg-blue-400/10 border-blue-400/20',          label: 'Updated' },
-  deleted:        { icon: Trash2,      color: 'text-red-400 bg-red-400/10 border-red-400/20',              label: 'Deleted' },
-  status_changed: { icon: RefreshCw,   color: 'text-amber-400 bg-amber-400/10 border-amber-400/20',       label: 'Moved'   },
-  role_changed:   { icon: ShieldCheck, color: 'text-purple-400 bg-purple-400/10 border-purple-400/20',    label: 'Role'    },
+  created:        { icon: Plus,          color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', label: 'Created'  },
+  updated:        { icon: Edit3,         color: 'text-blue-400 bg-blue-400/10 border-blue-400/20',          label: 'Updated'  },
+  deleted:        { icon: Trash2,        color: 'text-red-400 bg-red-400/10 border-red-400/20',              label: 'Deleted'  },
+  status_changed: { icon: RefreshCw,     color: 'text-amber-400 bg-amber-400/10 border-amber-400/20',       label: 'Moved'    },
+  role_changed:   { icon: ShieldCheck,   color: 'text-purple-400 bg-purple-400/10 border-purple-400/20',    label: 'Role'     },
+  uploaded:       { icon: Paperclip,     color: 'text-orange-400 bg-orange-400/10 border-orange-400/20',    label: 'Uploaded' },
 };
 
 const ENTITY_LABELS: Record<string, string> = {
-  product: 'Product',
-  user: 'User',
+  product:    'Product',
+  user:       'User',
+  attachment: 'Attachment',
 };
 
 function getAvatarColor(name: string) {

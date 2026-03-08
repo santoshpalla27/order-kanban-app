@@ -19,7 +19,7 @@ func GetActivityLogs(entityType string, entityID uint) ([]models.ActivityLog, er
 func GetAllRecentActivityLogs(limit int) ([]models.ActivityLog, error) {
 	var logs []models.ActivityLog
 	err := database.DB.Preload("User").
-		Where("entity NOT IN ?", []string{"attachment", "comment"}).
+		Where("entity != ?", "comment").
 		Order("created_at DESC").Limit(limit).Find(&logs).Error
 	return logs, err
 }

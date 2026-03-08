@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
@@ -24,12 +25,18 @@ type directMsg struct {
 	data   []byte
 }
 
+type excludeMsg struct {
+	excludeID uint
+	data      []byte
+}
+
 type WSHub struct {
-	clients    map[*WSClient]bool
-	broadcast  chan []byte
-	register   chan *WSClient
-	unregister chan *WSClient
-	sendDirect chan directMsg
+	clients         map[*WSClient]bool
+	broadcast       chan []byte
+	register        chan *WSClient
+	unregister      chan *WSClient
+	sendDirect      chan directMsg
+	broadcastExcept chan excludeMsg
 }
 
 type WSMessage struct {
@@ -38,11 +45,12 @@ type WSMessage struct {
 }
 
 var Hub = &WSHub{
-	clients:    make(map[*WSClient]bool),
-	broadcast:  make(chan []byte, 256),
-	register:   make(chan *WSClient),
-	unregister: make(chan *WSClient),
-	sendDirect: make(chan directMsg, 256),
+	clients:         make(map[*WSClient]bool),
+	broadcast:       make(chan []byte, 256),
+	register:        make(chan *WSClient),
+	unregister:      make(chan *WSClient),
+	sendDirect:      make(chan directMsg, 256),
+	broadcastExcept: make(chan excludeMsg, 256),
 }
 
 // Run is the sole goroutine that owns the clients map.
@@ -85,6 +93,19 @@ func (h *WSHub) Run() {
 					}
 				}
 			}
+
+		case em := <-h.broadcastExcept:
+			for client := range h.clients {
+				if client.UserID == em.excludeID {
+					continue
+				}
+				select {
+				case client.Send <- em.data:
+				default:
+					delete(h.clients, client)
+					close(client.Send)
+				}
+			}
 		}
 	}
 }
@@ -98,6 +119,25 @@ func (h *WSHub) BroadcastMessage(msg []byte) {
 // It communicates through a channel so Run() handles it safely.
 func (h *WSHub) SendToUser(userID uint, msg []byte) {
 	h.sendDirect <- directMsg{userID: userID, data: msg}
+}
+
+// BroadcastNotificationExcept sends a "notification" WS event to all clients except the sender.
+// This prevents the sender from receiving a toast for their own action.
+func BroadcastNotificationExcept(excludeID uint, message string, notifType string) {
+	wsMsg, _ := json.Marshal(WSMessage{
+		Type:    "notification",
+		Payload: map[string]string{"message": message, "notif_type": notifType},
+	})
+	Hub.broadcastExcept <- excludeMsg{excludeID: excludeID, data: wsMsg}
+}
+
+// SendNotificationToUser sends a "notification" WS event to a specific user.
+func SendNotificationToUser(userID uint, message string, notifType string) {
+	wsMsg, _ := json.Marshal(WSMessage{
+		Type: "notification",
+		Payload: map[string]string{"message": message, "notif_type": notifType},
+	})
+	Hub.SendToUser(userID, wsMsg)
 }
 
 func HandleWebSocket(c *gin.Context) {

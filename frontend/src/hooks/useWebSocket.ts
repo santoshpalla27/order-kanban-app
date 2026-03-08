@@ -1,11 +1,14 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useQueryClient } from '@tanstack/react-query';
+import { useToastStore } from '../store/toastStore';
+import { playNotificationSound } from '../utils/sound';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const token = useAuthStore((s) => s.token);
   const queryClient = useQueryClient();
+  const addToast = useToastStore((s) => s.addToast);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const connect = useCallback(() => {
@@ -36,6 +39,7 @@ export function useWebSocket() {
           case 'comment_added':
             queryClient.invalidateQueries({ queryKey: ['comments'] });
             queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['unread-count'] });
             break;
           case 'attachment_uploaded':
             queryClient.invalidateQueries({ queryKey: ['attachments'] });
@@ -44,10 +48,15 @@ export function useWebSocket() {
           case 'chat_message':
             queryClient.invalidateQueries({ queryKey: ['chat'] });
             break;
-          case 'notification':
+          case 'notification': {
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
             queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+            const msg = data.payload?.message || 'New notification';
+            const ntype = data.payload?.notif_type || 'notification';
+            addToast(msg, ntype);
+            playNotificationSound();
             break;
+          }
         }
       } catch (e) {
         console.error('WS parse error:', e);
@@ -62,7 +71,7 @@ export function useWebSocket() {
     ws.onerror = () => {
       ws.close();
     };
-  }, [token, queryClient]);
+  }, [token, queryClient, addToast]);
 
   useEffect(() => {
     connect();

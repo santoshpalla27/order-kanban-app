@@ -128,8 +128,6 @@ func (h *AuthHandler) generateToken(user *models.User) (string, error) {
 func NotifyStatusChange(userID uint, userName string, product *models.Product, oldStatus, newStatus string) {
 	message := fmt.Sprintf("%s moved '%s' from %s to %s", userName, product.ProductID, oldStatus, newStatus)
 
-	services.CreateNotificationForAllExcept(userID, message, "status_change")
-
 	wsMsg, _ := json.Marshal(WSMessage{
 		Type: "product_update",
 		Payload: gin.H{
@@ -142,9 +140,5 @@ func NotifyStatusChange(userID uint, userName string, product *models.Product, o
 	})
 	Hub.BroadcastMessage(wsMsg)
 
-	notifMsg, _ := json.Marshal(WSMessage{
-		Type:    "notification",
-		Payload: gin.H{"message": message, "type": "status_change"},
-	})
-	Hub.BroadcastMessage(notifMsg)
+	BroadcastNotificationExcept(userID, message, "status_change")
 }

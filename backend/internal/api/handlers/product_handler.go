@@ -94,7 +94,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 
 	// Notify
 	message := fmt.Sprintf("%s created new product: %s", userName, product.ProductID)
-	services.CreateNotificationForAllExcept(userID, message, "product_created")
+	BroadcastNotificationExcept(userID, message, "product_created")
 
 	wsMsg, _ := json.Marshal(WSMessage{
 		Type:    "product_created",

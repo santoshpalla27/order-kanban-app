@@ -1,9 +1,64 @@
 package services
 
 import (
+	"regexp"
+
 	"kanban-app/database"
 	"kanban-app/internal/models"
 )
+
+// mentionRe matches @[Name] patterns inserted by the frontend mention picker.
+var mentionRe = regexp.MustCompile(`@\[([^\]]+)\]`)
+
+// CreateNotificationForUser sends a notification to a single user.
+func CreateNotificationForUser(userID uint, message string, notifType string) {
+	notif := models.Notification{
+		UserID:  userID,
+		Message: message,
+		Type:    notifType,
+	}
+	database.DB.Create(&notif)
+}
+
+// NotifyMentions parses @[Name] patterns in text, looks up each named user,
+// and sends them a "mention" notification (excluding the sender).
+func NotifyMentions(senderID uint, text string, notifMessage string) {
+	matches := mentionRe.FindAllStringSubmatch(text, -1)
+	seen := map[uint]bool{}
+	for _, m := range matches {
+		name := m[1]
+		var user models.User
+		if err := database.DB.Where("LOWER(name) = LOWER(?)", name).First(&user).Error; err != nil {
+			continue
+		}
+		if user.ID == senderID || seen[user.ID] {
+			continue
+		}
+		seen[user.ID] = true
+		CreateNotificationForUser(user.ID, notifMessage, "mention")
+	}
+}
+
+// GetMentionedUserIDs parses @[Name] tokens and returns the IDs of matched users,
+// excluding the sender. Useful for sending WS events to mentioned users.
+func GetMentionedUserIDs(senderID uint, text string) []uint {
+	matches := mentionRe.FindAllStringSubmatch(text, -1)
+	seen := map[uint]bool{}
+	var ids []uint
+	for _, m := range matches {
+		name := m[1]
+		var user models.User
+		if err := database.DB.Where("LOWER(name) = LOWER(?)", name).First(&user).Error; err != nil {
+			continue
+		}
+		if user.ID == senderID || seen[user.ID] {
+			continue
+		}
+		seen[user.ID] = true
+		ids = append(ids, user.ID)
+	}
+	return ids
+}
 
 func GetNotifications(userID uint) ([]models.Notification, error) {
 	var notifications []models.Notification

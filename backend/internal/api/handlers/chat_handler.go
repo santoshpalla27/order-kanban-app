@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -56,6 +57,13 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	if err := services.CreateChatMessage(msg); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
 		return
+	}
+
+	// Notify any @[Name] mentions in the message
+	mentionMsg := fmt.Sprintf("%s mentioned you in Team Chat", userName)
+	services.NotifyMentions(userID, req.Message, mentionMsg)
+	for _, uid := range services.GetMentionedUserIDs(userID, req.Message) {
+		SendNotificationToUser(uid, mentionMsg, "mention")
 	}
 
 	wsMsg, _ := json.Marshal(WSMessage{
