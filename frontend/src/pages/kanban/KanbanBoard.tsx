@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
@@ -15,8 +16,18 @@ import { CSS } from '@dnd-kit/utilities';
 import { Plus, GripVertical, Package } from 'lucide-react';
 
 export default function KanbanBoard() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({ search: '', status: '', created_by: '', date_from: '', date_to: '' });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
+
+  // Open a product modal when navigated via ?product=id (e.g. from a notification)
+  useEffect(() => {
+    const productId = searchParams.get('product');
+    if (productId) {
+      setSelectedProduct(Number(productId));
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
   const [showCreate, setShowCreate] = useState(false);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const { canCreateProduct } = useAuthStore();

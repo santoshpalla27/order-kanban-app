@@ -80,16 +80,12 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	})
 
 	message := fmt.Sprintf("%s commented on a product", userName)
-	services.CreateNotificationForAllExcept(userID, message, "comment_added")
-	// No broadcast notification here — the comment_added WS event refreshes badges for all.
-	// Only mentioned users receive a personal notification toast.
+	services.CreateNotificationForAllExcept(userID, message, "comment_added", "product", uint(productID))
+	BroadcastNotificationExcept(userID, message, "comment_added")
 
-	// Notify any @[Name] mentions in the comment
+	// Store mention notifications in DB — broadcast above already gives mentioned users a toast.
 	mentionMsg := fmt.Sprintf("%s mentioned you in a comment", userName)
-	services.NotifyMentions(userID, req.Message, mentionMsg)
-	for _, uid := range services.GetMentionedUserIDs(userID, req.Message) {
-		SendNotificationToUser(uid, mentionMsg, "mention")
-	}
+	services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID))
 
 	wsMsg, _ := json.Marshal(WSMessage{
 		Type: "comment_added",

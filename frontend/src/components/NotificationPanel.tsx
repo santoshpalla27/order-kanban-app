@@ -2,10 +2,16 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { notificationsApi } from '../api/client';
 import { Notification } from '../types';
-import { Bell, Check, CheckCheck, ArrowRight } from 'lucide-react';
+import { Bell, CheckCheck, ArrowRight, Eye } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
+}
+
+function getNotificationLink(n: Notification): string | null {
+  if (n.entity_type === 'product' && n.entity_id) return `/?product=${n.entity_id}`;
+  if (n.entity_type === 'chat') return '/chat';
+  return null;
 }
 
 export default function NotificationPanel({ onClose }: Props) {
@@ -44,6 +50,15 @@ export default function NotificationPanel({ onClose }: Props) {
     return `${Math.floor(hours / 24)}d ago`;
   };
 
+  const handleClick = (n: Notification) => {
+    if (!n.is_read) markRead.mutate(n.id);
+    const link = getNotificationLink(n);
+    if (link) {
+      onClose();
+      navigate(link);
+    }
+  };
+
   return (
     <div className="absolute right-0 top-full mt-2 w-80 glass-opaque rounded-xl animate-scale-in z-50 max-h-[480px] flex flex-col">
       <div className="flex items-center justify-between p-4 border-b border-surface-700/50">
@@ -72,30 +87,48 @@ export default function NotificationPanel({ onClose }: Props) {
         ) : notifications.length === 0 ? (
           <div className="p-8 text-center text-surface-500 text-sm">No notifications</div>
         ) : (
-          notifications.map((n) => (
-            <div
-              key={n.id}
-              className={`px-4 py-3 border-b border-surface-700/30 hover:bg-surface-700/30 transition-colors cursor-pointer ${
-                !n.is_read ? 'bg-brand-600/5' : ''
-              }`}
-              onClick={() => !n.is_read && markRead.mutate(n.id)}
-            >
-              <div className="flex items-start gap-3">
-                {!n.is_read && (
-                  <div className="w-2 h-2 rounded-full bg-brand-500 mt-1.5 flex-shrink-0" />
-                )}
-                <div className={`flex-1 ${n.is_read ? 'ml-5' : ''}`}>
-                  <p className="text-sm leading-relaxed">{n.message}</p>
-                  <p className="text-xs text-surface-500 mt-1">{formatTime(n.created_at)}</p>
+          notifications.map((n) => {
+            const link = getNotificationLink(n);
+            return (
+              <div
+                key={n.id}
+                className={`group flex items-start gap-3 px-4 py-3 border-b border-surface-700/30 transition-colors ${
+                  link ? 'cursor-pointer hover:bg-surface-700/30' : 'cursor-default'
+                } ${!n.is_read ? 'bg-brand-600/5' : ''}`}
+                onClick={() => handleClick(n)}
+              >
+                {/* Unread dot */}
+                <div className="flex-shrink-0 mt-1.5 w-2">
+                  {!n.is_read && <div className="w-2 h-2 rounded-full bg-brand-500" />}
                 </div>
+
+                {/* Message + hint + time */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm leading-relaxed">{n.message}</p>
+                  {link && (
+                    <p className="text-[11px] text-brand-400/70 mt-0.5">
+                      {n.entity_type === 'chat' ? 'Go to Team Chat →' : 'Go to product →'}
+                    </p>
+                  )}
+                  <p className="text-xs text-surface-500 mt-0.5">{formatTime(n.created_at)}</p>
+                </div>
+
+                {/* Eye icon — mark as read without navigating */}
                 {!n.is_read && (
-                  <button className="text-surface-500 hover:text-brand-400 p-1">
-                    <Check className="w-3 h-3" />
+                  <button
+                    title="Mark as read"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      markRead.mutate(n.id);
+                    }}
+                    className="flex-shrink-0 p-1 text-surface-500 hover:text-brand-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

@@ -59,9 +59,9 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	// Notify any @[Name] mentions in the message
+	// Notify @[Name] mentions — store in DB and send direct toast to mentioned users only.
 	mentionMsg := fmt.Sprintf("%s mentioned you in Team Chat", userName)
-	services.NotifyMentions(userID, req.Message, mentionMsg)
+	services.NotifyMentions(userID, req.Message, mentionMsg, "chat", 0)
 	for _, uid := range services.GetMentionedUserIDs(userID, req.Message) {
 		SendNotificationToUser(uid, mentionMsg, "mention")
 	}

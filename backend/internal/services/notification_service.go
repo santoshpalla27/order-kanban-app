@@ -11,18 +11,21 @@ import (
 var mentionRe = regexp.MustCompile(`@\[([^\]]+)\]`)
 
 // CreateNotificationForUser sends a notification to a single user.
-func CreateNotificationForUser(userID uint, message string, notifType string) {
+// entityType and entityID are optional context for deep-linking (e.g. "product", 42).
+func CreateNotificationForUser(userID uint, message string, notifType string, entityType string, entityID uint) {
 	notif := models.Notification{
-		UserID:  userID,
-		Message: message,
-		Type:    notifType,
+		UserID:     userID,
+		Message:    message,
+		Type:       notifType,
+		EntityType: entityType,
+		EntityID:   entityID,
 	}
 	database.DB.Create(&notif)
 }
 
 // NotifyMentions parses @[Name] patterns in text, looks up each named user,
 // and sends them a "mention" notification (excluding the sender).
-func NotifyMentions(senderID uint, text string, notifMessage string) {
+func NotifyMentions(senderID uint, text string, notifMessage string, entityType string, entityID uint) {
 	matches := mentionRe.FindAllStringSubmatch(text, -1)
 	seen := map[uint]bool{}
 	for _, m := range matches {
@@ -35,7 +38,7 @@ func NotifyMentions(senderID uint, text string, notifMessage string) {
 			continue
 		}
 		seen[user.ID] = true
-		CreateNotificationForUser(user.ID, notifMessage, "mention")
+		CreateNotificationForUser(user.ID, notifMessage, "mention", entityType, entityID)
 	}
 }
 
@@ -88,14 +91,16 @@ func MarkAllAsRead(userID uint) error {
 		Where("user_id = ? AND is_read = ?", userID, false).Update("is_read", true).Error
 }
 
-func CreateNotificationForAllExcept(excludeUserID uint, message string, notifType string) {
+func CreateNotificationForAllExcept(excludeUserID uint, message string, notifType string, entityType string, entityID uint) {
 	var users []models.User
 	database.DB.Where("id != ?", excludeUserID).Find(&users)
 	for _, user := range users {
 		notif := models.Notification{
-			UserID:  user.ID,
-			Message: message,
-			Type:    notifType,
+			UserID:     user.ID,
+			Message:    message,
+			Type:       notifType,
+			EntityType: entityType,
+			EntityID:   entityID,
 		}
 		database.DB.Create(&notif)
 	}
