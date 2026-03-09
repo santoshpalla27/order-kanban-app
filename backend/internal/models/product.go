@@ -1,19 +1,26 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"gorm.io/gorm"
+)
 
 type Product struct {
-	ID            uint         `json:"id" gorm:"primaryKey"`
-	ProductID     string       `json:"product_id" gorm:"uniqueIndex;not null"`
-	CustomerName  string       `json:"customer_name" gorm:"not null"`
-	CustomerPhone string       `json:"customer_phone"`
-	Description   string       `json:"description"`
-	Status        string       `json:"status" gorm:"default:yet_to_start;not null"`
-	CreatedBy     uint         `json:"created_by" gorm:"not null"`
-	Creator       User         `json:"creator" gorm:"foreignKey:CreatedBy"`
-	Attachments   []Attachment `json:"attachments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
-	Comments      []Comment    `json:"comments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
-	CreatedAt     time.Time    `json:"created_at"`
+	ID            uint           `json:"id" gorm:"primaryKey"`
+	ProductID     string         `json:"product_id" gorm:"uniqueIndex;not null"`
+	OriginalID    string         `json:"original_id" gorm:"default:''"`  // holds true ID while soft-deleted
+	CustomerName  string         `json:"customer_name" gorm:"not null"`
+	CustomerPhone string         `json:"customer_phone"`
+	Description   string         `json:"description"`
+	Status        string         `json:"status" gorm:"default:yet_to_start;not null"`
+	CreatedBy     uint           `json:"created_by" gorm:"not null"`
+	Creator       User           `json:"creator" gorm:"foreignKey:CreatedBy"`
+	Attachments   []Attachment   `json:"attachments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
+	Comments      []Comment      `json:"comments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
+	DeletedBy     uint           `json:"deleted_by" gorm:"default:0"`
+	CreatedAt     time.Time      `json:"created_at"`
+	DeletedAt     gorm.DeletedAt `json:"deleted_at" gorm:"index"` // enables GORM soft delete
 }
 
 type CreateProductRequest struct {

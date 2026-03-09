@@ -12,6 +12,7 @@ export default function ListView() {
   const [filters, setFilters] = useState({ search: '', status: '', created_by: '', date_from: '', date_to: '' });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const { canCreateProduct, canDeleteProduct } = useAuthStore();
   const queryClient = useQueryClient();
 
@@ -31,7 +32,10 @@ export default function ListView() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => productsApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setDeleteConfirmId(null);
+    },
   });
 
   const groupedProducts = STATUS_ORDER.reduce((acc, status) => {
@@ -125,9 +129,7 @@ export default function ListView() {
                                 </button>
                                 {canDeleteProduct() && (
                                   <button
-                                    onClick={() => {
-                                      if (confirm('Delete this product?')) deleteMutation.mutate(product.id);
-                                    }}
+                                    onClick={() => setDeleteConfirmId(product.id)}
                                     className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300"
                                     title="Delete"
                                   >
@@ -153,6 +155,43 @@ export default function ListView() {
       )}
       {showCreate && (
         <CreateProductModal onClose={() => setShowCreate(false)} />
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <div
+            className="w-full max-w-sm glass rounded-2xl p-6 text-center animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold mb-2">Delete Product?</h3>
+            <p className="text-surface-400 text-sm mb-6">
+              Are you sure you want to delete this product? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                className="btn-ghost px-5 py-2.5"
+                disabled={deleteMutation.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteMutation.mutate(deleteConfirmId)}
+                className="btn-danger px-5 py-2.5 flex items-center gap-2"
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

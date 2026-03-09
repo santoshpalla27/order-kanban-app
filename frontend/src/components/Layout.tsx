@@ -23,6 +23,7 @@ import {
   Moon,
   Activity,
   UserCircle,
+  Trash2,
 } from 'lucide-react';
 
 const AVATAR_COLORS = [
@@ -108,6 +109,7 @@ export default function Layout() {
     { to: '/list', icon: List, label: 'List View' },
     { to: '/chat', icon: MessageSquare, label: 'Team Chat' },
     ...(isAdmin() ? [{ to: '/admin', icon: Users, label: 'Admin Panel' }] : []),
+    ...(isAdmin() ? [{ to: '/trash', icon: Trash2, label: 'Trash' }] : []),
   ];
 
   return (

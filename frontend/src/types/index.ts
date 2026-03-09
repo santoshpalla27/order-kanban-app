@@ -16,6 +16,7 @@ export interface User {
 export interface Product {
   id: number;
   product_id: string;
+  original_id?: string;
   customer_name: string;
   customer_phone: string;
   description: string;
@@ -24,6 +25,8 @@ export interface Product {
   creator: User;
   attachments?: Attachment[];
   comments?: Comment[];
+  deleted_at?: string | null;
+  deleted_by?: number;
   created_at: string;
 }
 

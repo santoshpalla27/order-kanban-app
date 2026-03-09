@@ -64,6 +64,15 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		return
 	}
 
+	// Guard: block reuse of active or grace-period-deleted product IDs
+	if taken, reason, err := services.IsProductIDTaken(req.ProductID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate product ID"})
+		return
+	} else if taken {
+		c.JSON(http.StatusConflict, gin.H{"error": reason})
+		return
+	}
+
 	userID := c.GetUint("user_id")
 	userName, _ := c.Get("user_name")
 
@@ -83,7 +92,6 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 
 	product, _ = services.GetProductByIDSimple(product.ID)
 
-	// Log activity
 	services.CreateActivityLog(&models.ActivityLog{
 		UserID:   userID,
 		Action:   "created",
@@ -92,7 +100,6 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		Details:  fmt.Sprintf("Created product %s", product.ProductID),
 	})
 
-	// Notify
 	message := fmt.Sprintf("%s created new product: %s", userName, product.ProductID)
 	BroadcastNotificationExcept(userID, NotifPayload{
 		Message:    message,
@@ -175,7 +182,6 @@ func (h *ProductHandler) UpdateStatus(c *gin.Context) {
 	role, _ := c.Get("role")
 	roleName := role.(string)
 
-	// Check worker transitions
 	if roleName == "worker" {
 		allowed, ok := models.WorkerAllowedTransitions[oldStatus]
 		if !ok {
@@ -225,12 +231,13 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	}
 
 	product, _ := services.GetProductByIDSimple(uint(id))
-	if err := services.DeleteProduct(uint(id)); err != nil {
+	delUserID := c.GetUint("user_id")
+
+	if err := services.DeleteProduct(uint(id), delUserID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete product"})
 		return
 	}
 
-	delUserID := c.GetUint("user_id")
 	prodName := fmt.Sprintf("%d", id)
 	if product != nil {
 		prodName = product.ProductID
@@ -249,5 +256,51 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	})
 	Hub.BroadcastMessage(wsMsg)
 
-	c.JSON(http.StatusOK, gin.H{"message": "Product deleted"})
+	c.JSON(http.StatusOK, gin.H{"message": "Product moved to trash"})
+}
+
+// GetDeletedProducts returns products in the trash (within the grace period). Admin only.
+func (h *ProductHandler) GetDeletedProducts(c *gin.Context) {
+	products, err := services.GetDeletedProducts()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch deleted products"})
+		return
+	}
+	c.JSON(http.StatusOK, products)
+}
+
+// RestoreProduct un-deletes a product. Admin only.
+func (h *ProductHandler) RestoreProduct(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		return
+	}
+
+	if err := services.RestoreProduct(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to restore product"})
+		return
+	}
+
+	product, _ := services.GetProductByIDSimple(uint(id))
+	userID := c.GetUint("user_id")
+	prodName := fmt.Sprintf("%d", id)
+	if product != nil {
+		prodName = product.ProductID
+	}
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   userID,
+		Action:   "restored",
+		Entity:   "product",
+		EntityID: uint(id),
+		Details:  fmt.Sprintf("Restored product %s from trash", prodName),
+	})
+
+	wsMsg, _ := json.Marshal(WSMessage{
+		Type:    "product_created",
+		Payload: product,
+	})
+	Hub.BroadcastMessage(wsMsg)
+
+	c.JSON(http.StatusOK, gin.H{"message": "Product restored"})
 }

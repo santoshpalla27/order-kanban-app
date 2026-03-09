@@ -63,6 +63,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			products := protected.Group("/products")
 			{
 				products.GET("", productHandler.GetProducts)
+				products.GET("/deleted", middleware.RBACMiddleware("admin"), productHandler.GetDeletedProducts)
+				products.POST("/:id/restore", middleware.RBACMiddleware("admin"), productHandler.RestoreProduct)
 				products.GET("/:id", productHandler.GetProduct)
 				products.POST("", middleware.RBACMiddleware("admin", "manager"), productHandler.CreateProduct)
 				products.PUT("/:id", middleware.RBACMiddleware("admin", "manager"), productHandler.UpdateProduct)

@@ -48,6 +48,8 @@ export const productsApi = {
   updateStatus: (id: number, status: string) =>
     api.patch(`/products/${id}/status`, { status }),
   delete: (id: number) => api.delete(`/products/${id}`),
+  getDeleted: () => api.get('/products/deleted'),
+  restore: (id: number) => api.post(`/products/${id}/restore`),
 };
 
 // Attachments — R2 only, no local fallback

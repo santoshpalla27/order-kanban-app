@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"kanban-app/config"
 	"kanban-app/database"
@@ -29,6 +30,16 @@ func main() {
 
 	// Start WebSocket hub
 	go handlers.Hub.Run()
+
+	// Purge products past their 10-day grace period — runs every 6 hours
+	go func() {
+		for {
+			time.Sleep(6 * time.Hour)
+			if err := services.PurgeExpiredDeletedProducts(); err != nil {
+				log.Printf("Trash purge error: %v", err)
+			}
+		}
+	}()
 
 	// Setup router
 	router := api.SetupRouter(cfg)

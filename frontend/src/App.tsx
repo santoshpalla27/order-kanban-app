@@ -8,6 +8,7 @@ import KanbanBoard from './pages/kanban/KanbanBoard';
 import ListView from './pages/boards/ListView';
 import ChatPage from './pages/chat/ChatPage';
 import AdminPanel from './pages/admin/AdminPanel';
+import TrashPage from './pages/boards/TrashPage';
 import ActivityPage from './pages/activity/ActivityPage';
 import NotificationsPage from './pages/notifications/NotificationsPage';
 
@@ -52,6 +53,14 @@ export default function App() {
               element={
                 <ProtectedRoute adminOnly>
                   <AdminPanel />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/trash"
+              element={
+                <ProtectedRoute adminOnly>
+                  <TrashPage />
                 </ProtectedRoute>
               }
             />
