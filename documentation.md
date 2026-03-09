@@ -249,3 +249,20 @@ The app auto-configures these on startup:
 | **Worker**  | View + status          | Upload        | CRUD own | —          |
 
 First registered user is automatically **Admin**.
+
+https://app.santoshdevops.cloud → Traefik → nginx (frontend)
+https://app.santoshdevops.cloud/api → Traefik → nginx → backend:8080 (via nginx.conf proxy)
+https://app.santoshdevops.cloud/api/ws → same path, WebSocket supported
+https://traefik.santoshdevops.cloud → Traefik dashboard (basic auth)
+http://anything → auto-redirected to https://
+DNS records you need (both pointing to your server IP 52.90.199.225):
+
+app.santoshdevops.cloud A 52.90.199.225
+traefik.santoshdevops.cloud A 52.90.199.225
+Deploy:
+
+docker compose down
+docker compose up -d --build
+Check cert issuance:
+
+docker compose logs traefik -f

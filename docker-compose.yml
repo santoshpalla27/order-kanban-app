@@ -24,13 +24,11 @@ services:
       - kanban-net
     labels:
       - traefik.enable=true
-      # Dashboard at traefik.<DOMAIN>, protected by basic auth
-      - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)
-      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
-      - traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt
-      - traefik.http.routers.traefik-dashboard.service=api@internal
-      - traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth
-      # Generate with: echo $(htpasswd -nB admin) | sed -e s/\\$/\\$\\$/g
+      - traefik.http.routers.dashboard.rule=Host(`traefik.santoshdevops.cloud`)
+      - traefik.http.routers.dashboard.entrypoints=websecure
+      - traefik.http.routers.dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.middlewares=dashboard-auth
       - traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}
 
   backend:
@@ -43,7 +41,7 @@ services:
       - PORT=8080
       - JWT_SECRET=${JWT_SECRET}
       - DB_PATH=/app/data/kanban.db
-      - CORS_ORIGINS=${CORS_ORIGINS}
+      - CORS_ORIGINS=https://app.santoshdevops.cloud
       - R2_BUCKET=${R2_BUCKET}
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
       - R2_ACCESS_KEY=${R2_ACCESS_KEY}
@@ -59,7 +57,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    # Not exposed to Traefik — nginx inside frontend proxies /api to backend
     labels:
       - traefik.enable=false
 
@@ -68,7 +65,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_URL: https://app.santoshdevops.cloud/api
     container_name: kanban-frontend
     restart: unless-stopped
     depends_on:
@@ -78,8 +75,7 @@ services:
       - kanban-net
     labels:
       - traefik.enable=true
-      # Serve the app at app.<DOMAIN>
-      - traefik.http.routers.frontend.rule=Host(`app.${DOMAIN}`)
+      - traefik.http.routers.frontend.rule=Host(`app.santoshdevops.cloud`)
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls.certresolver=letsencrypt
       - traefik.http.services.frontend.loadbalancer.server.port=80
