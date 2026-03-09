@@ -48,7 +48,26 @@ export default function KanbanBoard() {
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       productsApi.updateStatus(id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+    onMutate: async ({ id, status }) => {
+      // Cancel any in-flight refetch so it doesn't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['products', filters] });
+      const previous = queryClient.getQueryData(['products', filters]);
+      // Immediately move the card to the target column in the cache
+      queryClient.setQueryData(['products', filters], (old: any) => ({
+        ...old,
+        data: (old?.data as Product[] | undefined)?.map((p) =>
+          p.id === id ? { ...p, status } : p
+        ),
+      }));
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      // Roll back on failure
+      if (context?.previous) {
+        queryClient.setQueryData(['products', filters], context.previous);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 
   const columns = STATUS_ORDER.map((status) => ({

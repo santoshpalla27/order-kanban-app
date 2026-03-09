@@ -42,6 +42,15 @@ export const authApi = {
 export const productsApi = {
   getAll: (params?: Record<string, string>) =>
     api.get('/products', { params }),
+  // Cursor-paginated fetch for list views — returns { data, next_cursor, has_more }
+  getPaged: (params?: Record<string, string>, limit = 50, cursor?: number) =>
+    api.get<{ data: any[]; next_cursor: number | null; has_more: boolean }>('/products', {
+      params: {
+        ...params,
+        limit: String(limit),
+        ...(cursor != null ? { cursor: String(cursor) } : {}),
+      },
+    }),
   getById: (id: number) => api.get(`/products/${id}`),
   create: (data: any) => api.post('/products', data),
   update: (id: number, data: any) => api.put(`/products/${id}`, data),

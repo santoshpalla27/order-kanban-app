@@ -6,6 +6,8 @@ import (
 
 	"kanban-app/database"
 	"kanban-app/internal/models"
+
+	"gorm.io/gorm"
 )
 
 const gracePeriodDays = 10
@@ -18,9 +20,15 @@ type ProductFilter struct {
 	DateTo    string
 }
 
-func GetProducts(filter ProductFilter) ([]models.Product, error) {
-	query := database.DB.Preload("Creator").Preload("Creator.Role")
+// ProductCursorPage is returned by GetProductsCursor for paginated list views.
+type ProductCursorPage struct {
+	Data       []models.Product `json:"data"`
+	NextCursor *uint            `json:"next_cursor"`
+	HasMore    bool             `json:"has_more"`
+}
 
+// applyProductFilters builds WHERE clauses shared by GetProducts and GetProductsCursor.
+func applyProductFilters(query *gorm.DB, filter ProductFilter) *gorm.DB {
 	if filter.Status != "" {
 		query = query.Where("status = ?", filter.Status)
 	}
@@ -29,7 +37,6 @@ func GetProducts(filter ProductFilter) ([]models.Product, error) {
 	}
 	if filter.Search != "" {
 		search := "%" + filter.Search + "%"
-		// ILIKE: case-insensitive LIKE — a Postgres advantage over SQLite
 		query = query.Where("product_id ILIKE ? OR customer_name ILIKE ? OR description ILIKE ?", search, search, search)
 	}
 	if filter.DateFrom != "" {
@@ -38,10 +45,52 @@ func GetProducts(filter ProductFilter) ([]models.Product, error) {
 	if filter.DateTo != "" {
 		query = query.Where("created_at <= ?", filter.DateTo)
 	}
+	return query
+}
 
+// GetProducts returns all matching products ordered by created_at DESC.
+// Used by the Kanban board which loads the full list once.
+func GetProducts(filter ProductFilter) ([]models.Product, error) {
+	query := applyProductFilters(
+		database.DB.Preload("Creator").Preload("Creator.Role"),
+		filter,
+	)
 	var products []models.Product
 	err := query.Order("created_at DESC").Find(&products).Error
 	return products, err
+}
+
+// GetProductsCursor returns one page of products using keyset (cursor) pagination.
+// cursor is the ID of the last product seen; pass 0 for the first page.
+// Products are ordered by id DESC so that the cursor is stable even if created_at values
+// are identical (e.g. bulk imports).
+func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCursorPage, error) {
+	query := applyProductFilters(
+		database.DB.Preload("Creator").Preload("Creator.Role"),
+		filter,
+	)
+	if cursor > 0 {
+		query = query.Where("id < ?", cursor)
+	}
+
+	// Fetch one extra row to detect whether a next page exists
+	var products []models.Product
+	if err := query.Order("id DESC").Limit(limit + 1).Find(&products).Error; err != nil {
+		return ProductCursorPage{}, err
+	}
+
+	hasMore := len(products) > limit
+	if hasMore {
+		products = products[:limit]
+	}
+
+	var nextCursor *uint
+	if hasMore && len(products) > 0 {
+		last := products[len(products)-1].ID
+		nextCursor = &last
+	}
+
+	return ProductCursorPage{Data: products, NextCursor: nextCursor, HasMore: hasMore}, nil
 }
 
 func GetProductByID(id uint) (*models.Product, error) {

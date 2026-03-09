@@ -33,13 +33,40 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 		}
 	}
 
-	products, err := services.GetProducts(filter)
+	// When limit is absent the Kanban board gets the full list (existing behaviour).
+	// When limit is present the list view gets a cursor-paginated page.
+	limitStr := c.Query("limit")
+	if limitStr == "" {
+		products, err := services.GetProducts(filter)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
+			return
+		}
+		c.JSON(http.StatusOK, products)
+		return
+	}
+
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	var cursor uint
+	if cursorStr := c.Query("cursor"); cursorStr != "" {
+		if id, err := strconv.ParseUint(cursorStr, 10, 32); err == nil {
+			cursor = uint(id)
+		}
+	}
+
+	page, err := services.GetProductsCursor(filter, limit, cursor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch products"})
 		return
 	}
-
-	c.JSON(http.StatusOK, products)
+	c.JSON(http.StatusOK, page)
 }
 
 func (h *ProductHandler) GetProduct(c *gin.Context) {

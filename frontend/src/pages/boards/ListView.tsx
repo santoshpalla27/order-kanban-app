@@ -1,12 +1,143 @@
+import { useRef } from 'react';
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { productsApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { Product, STATUS_LABELS, STATUS_ORDER, ProductStatus } from '../../types';
 import SearchFilters from '../../components/SearchFilters';
 import ProductDetailModal from '../../components/ProductDetailModal';
 import CreateProductModal from '../../components/CreateProductModal';
-import { Plus, ChevronDown, Eye, Trash2 } from 'lucide-react';
+import { Plus, Eye, Trash2, Loader2 } from 'lucide-react';
+
+const PAGE_SIZE = 50;
+// Number of rows per status group before switching to a scrollable virtual window
+const VIRTUAL_THRESHOLD = 15;
+const ROW_HEIGHT = 53; // px — matches the rendered tr height
+
+// ─── Virtual table for one status group ─────────────────────────────────────
+
+function StatusTable({
+  items,
+  onStatusChange,
+  onView,
+  onDelete,
+  canDelete,
+}: {
+  items: Product[];
+  onStatusChange: (id: number, status: string) => void;
+  onView: (id: number) => void;
+  onDelete: (id: number) => void;
+  canDelete: boolean;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const shouldVirtualize = items.length > VIRTUAL_THRESHOLD;
+
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ROW_HEIGHT,
+    overscan: 5,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const paddingTop = shouldVirtualize && virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingBottom =
+    shouldVirtualize && virtualItems.length > 0
+      ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
+      : 0;
+
+  const rows = shouldVirtualize
+    ? virtualItems.map((vr) => items[vr.index])
+    : items;
+
+  const tableHead = (
+    <thead className={shouldVirtualize ? 'sticky top-0 z-10 bg-surface-900/95 backdrop-blur-sm' : ''}>
+      <tr className="border-b border-surface-700/50">
+        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Product ID</th>
+        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Customer</th>
+        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Phone</th>
+        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Description</th>
+        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</th>
+        <th className="text-right text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Actions</th>
+      </tr>
+    </thead>
+  );
+
+  return (
+    <div
+      ref={parentRef}
+      className="glass rounded-xl overflow-hidden"
+      style={
+        shouldVirtualize
+          ? { maxHeight: `${VIRTUAL_THRESHOLD * ROW_HEIGHT + ROW_HEIGHT}px`, overflowY: 'auto' }
+          : {}
+      }
+    >
+      <table className="w-full">
+        {tableHead}
+        <tbody>
+          {shouldVirtualize && paddingTop > 0 && (
+            <tr><td colSpan={6} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} /></tr>
+          )}
+          {rows.map((product) => (
+            <tr
+              key={product.id}
+              className="border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors"
+            >
+              <td className="px-4 py-3">
+                <span className="text-sm font-medium text-brand-400">{product.product_id}</span>
+              </td>
+              <td className="px-4 py-3 text-sm">{product.customer_name}</td>
+              <td className="px-4 py-3 text-sm text-surface-400 hidden md:table-cell">
+                {product.customer_phone || '—'}
+              </td>
+              <td className="px-4 py-3 text-sm text-surface-400 hidden lg:table-cell max-w-[200px] truncate">
+                {product.description || '—'}
+              </td>
+              <td className="px-4 py-3">
+                <select
+                  value={product.status}
+                  onChange={(e) => onStatusChange(product.id, e.target.value)}
+                  className={`text-xs px-2 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer`}
+                >
+                  {STATUS_ORDER.map((s) => (
+                    <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <div className="flex items-center justify-end gap-1">
+                  <button
+                    onClick={() => onView(product.id)}
+                    className="btn-ghost p-1.5 rounded-lg"
+                    title="View details"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
+                  {canDelete && (
+                    <button
+                      onClick={() => onDelete(product.id)}
+                      className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))}
+          {shouldVirtualize && paddingBottom > 0 && (
+            <tr><td colSpan={6} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} /></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Main ListView ───────────────────────────────────────────────────────────
 
 export default function ListView() {
   const [filters, setFilters] = useState({ search: '', status: '', created_by: '', date_from: '', date_to: '' });
@@ -16,30 +147,29 @@ export default function ListView() {
   const { canCreateProduct, canDeleteProduct } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['products', filters],
-    queryFn: () => productsApi.getAll(
-      Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''))
-    ),
-  });
-  const products: Product[] = data?.data || [];
+  const filterParams = Object.fromEntries(
+    Object.entries(filters).filter(([_, v]) => v !== '')
+  ) as Record<string, string>;
 
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      productsApi.updateStatus(id, status),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['products', 'paged', filters],
+    queryFn: ({ pageParam }) =>
+      productsApi.getPaged(filterParams, PAGE_SIZE, pageParam as number | undefined),
+    getNextPageParam: (lastPage) => lastPage.data.next_cursor ?? undefined,
+    initialPageParam: undefined as number | undefined,
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: number) => productsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      setDeleteConfirmId(null);
-    },
-  });
+  // Flatten all pages into one list then group by status client-side
+  const allProducts: Product[] = data?.pages.flatMap((p) => p.data.data) ?? [];
 
   const groupedProducts = STATUS_ORDER.reduce((acc, status) => {
-    acc[status] = products.filter((p) => p.status === status);
+    acc[status] = allProducts.filter((p) => p.status === status);
     return acc;
   }, {} as Record<ProductStatus, Product[]>);
 
@@ -49,6 +179,42 @@ export default function ListView() {
     review: 'from-amber-500 to-amber-600',
     done: 'from-emerald-500 to-emerald-600',
   };
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: number; status: string }) =>
+      productsApi.updateStatus(id, status),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['products', 'paged', filters] });
+      const previous = queryClient.getQueryData(['products', 'paged', filters]);
+      queryClient.setQueryData(['products', 'paged', filters], (old: any) => ({
+        ...old,
+        pages: old?.pages?.map((page: any) => ({
+          ...page,
+          data: {
+            ...page.data,
+            data: page.data.data.map((p: Product) =>
+              p.id === id ? { ...p, status } : p
+            ),
+          },
+        })),
+      }));
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(['products', 'paged', filters], context.previous);
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => productsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setDeleteConfirmId(null);
+    },
+  });
 
   return (
     <div className="space-y-6">
@@ -70,8 +236,8 @@ export default function ListView() {
       ) : (
         <div className="space-y-8">
           {STATUS_ORDER.map((status) => {
-            const items = filters.status ? (filters.status === status ? groupedProducts[status] : []) : groupedProducts[status];
             if (filters.status && filters.status !== status) return null;
+            const items = groupedProducts[status];
 
             return (
               <div key={status}>
@@ -86,67 +252,34 @@ export default function ListView() {
                     No products
                   </div>
                 ) : (
-                  <div className="glass rounded-xl overflow-hidden">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b border-surface-700/50">
-                          <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Product ID</th>
-                          <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Customer</th>
-                          <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Phone</th>
-                          <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Description</th>
-                          <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</th>
-                          <th className="text-right text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {items.map((product) => (
-                          <tr key={product.id} className="border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors">
-                            <td className="px-4 py-3">
-                              <span className="text-sm font-medium text-brand-400">{product.product_id}</span>
-                            </td>
-                            <td className="px-4 py-3 text-sm">{product.customer_name}</td>
-                            <td className="px-4 py-3 text-sm text-surface-400 hidden md:table-cell">{product.customer_phone || '—'}</td>
-                            <td className="px-4 py-3 text-sm text-surface-400 hidden lg:table-cell max-w-[200px] truncate">{product.description || '—'}</td>
-                            <td className="px-4 py-3">
-                              <select
-                                value={product.status}
-                                onChange={(e) => statusMutation.mutate({ id: product.id, status: e.target.value })}
-                                className={`text-xs px-2 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer`}
-                              >
-                                {STATUS_ORDER.map((s) => (
-                                  <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                                ))}
-                              </select>
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => setSelectedProduct(product.id)}
-                                  className="btn-ghost p-1.5 rounded-lg"
-                                  title="View details"
-                                >
-                                  <Eye className="w-4 h-4" />
-                                </button>
-                                {canDeleteProduct() && (
-                                  <button
-                                    onClick={() => setDeleteConfirmId(product.id)}
-                                    className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300"
-                                    title="Delete"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <StatusTable
+                    items={items}
+                    onStatusChange={(id, s) => statusMutation.mutate({ id, status: s })}
+                    onView={setSelectedProduct}
+                    onDelete={setDeleteConfirmId}
+                    canDelete={canDeleteProduct()}
+                  />
                 )}
               </div>
             );
           })}
+
+          {/* Load more / pagination controls */}
+          {hasNextPage && (
+            <div className="flex justify-center pt-2">
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="btn-ghost flex items-center gap-2 px-6 py-2.5"
+              >
+                {isFetchingNextPage ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</>
+                ) : (
+                  'Load more'
+                )}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
