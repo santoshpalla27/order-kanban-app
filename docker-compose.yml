@@ -23,8 +23,8 @@ services:
     networks:
       - kanban-net
     labels:
-      # Traefik dashboard — only accessible over HTTPS, protected by basic auth
       - traefik.enable=true
+      # Dashboard at traefik.<DOMAIN>, protected by basic auth
       - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)
       - traefik.http.routers.traefik-dashboard.entrypoints=websecure
       - traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt
@@ -59,15 +59,9 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    # No ports exposed — Traefik routes directly over the internal network
+    # Not exposed to Traefik — nginx inside frontend proxies /api to backend
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
-      - traefik.http.routers.backend.entrypoints=websecure
-      - traefik.http.routers.backend.tls.certresolver=letsencrypt
-      - traefik.http.services.backend.loadbalancer.server.port=8080
-      # WebSocket support
-      - traefik.http.middlewares.backend-ws.headers.customrequestheaders.X-Forwarded-Proto=https
+      - traefik.enable=false
 
   frontend:
     build:
@@ -82,10 +76,10 @@ services:
         condition: service_healthy
     networks:
       - kanban-net
-    # No ports exposed — Traefik routes directly over the internal network
     labels:
       - traefik.enable=true
-      - traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)
+      # Serve the app at app.<DOMAIN>
+      - traefik.http.routers.frontend.rule=Host(`app.${DOMAIN}`)
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls.certresolver=letsencrypt
       - traefik.http.services.frontend.loadbalancer.server.port=80
