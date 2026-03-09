@@ -41,6 +41,11 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 	api := r.Group("/api")
 	{
+		// Health check (unauthenticated)
+		api.GET("/health", func(c *gin.Context) {
+			c.JSON(200, gin.H{"status": "ok"})
+		})
+
 		// Public routes — rate limited to 10 req/min per IP
 		auth := api.Group("/auth")
 		auth.Use(middleware.RateLimitAuth())
