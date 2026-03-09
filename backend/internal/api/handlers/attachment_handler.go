@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
 	"time"
 
+	"kanban-app/database"
 	"kanban-app/internal/models"
 	"kanban-app/internal/services"
 
@@ -28,7 +29,6 @@ var allowedExtensions = map[string]bool{
 	".txt": true, ".csv": true, ".zip": true,
 }
 
-// content type mapping for presigned URLs
 var extToContentType = map[string]string{
 	".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
 	".gif": "image/gif", ".webp": "image/webp", ".pdf": "application/pdf",
@@ -37,11 +37,9 @@ var extToContentType = map[string]string{
 	".txt": "text/plain", ".csv": "text/csv", ".zip": "application/zip",
 }
 
-// ── Presigned Upload URL (R2 mode) ──
 func (h *AttachmentHandler) GetPresignedUploadURL(c *gin.Context) {
 	productIDStr := c.Param("id")
-	_, err := strconv.ParseUint(productIDStr, 10, 32)
-	if err != nil {
+	if _, err := strconv.ParseUint(productIDStr, 10, 32); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
 		return
 	}
@@ -63,7 +61,6 @@ func (h *AttachmentHandler) GetPresignedUploadURL(c *gin.Context) {
 		contentType = "application/octet-stream"
 	}
 
-	// Generate unique R2 key
 	s3Key := fmt.Sprintf("attachments/%s/%s_%s%s",
 		productIDStr, uuid.New().String()[:8], time.Now().Format("20060102"), ext)
 
@@ -80,7 +77,6 @@ func (h *AttachmentHandler) GetPresignedUploadURL(c *gin.Context) {
 	})
 }
 
-// ── Confirm Upload (after frontend uploads to S3) ──
 func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseUint(productIDStr, 10, 32)
@@ -95,7 +91,6 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		FileSize int64  `json:"file_size"`
 		FileType string `json:"file_type"`
 	}
-
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: s3_key and file_name required"})
 		return
@@ -103,10 +98,11 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 
 	userID := c.GetUint("user_id")
 	userName, _ := c.Get("user_name")
+	senderName := fmt.Sprintf("%v", userName)
 
 	attachment := &models.Attachment{
 		ProductID:  uint(productID),
-		FilePath:   req.S3Key, // R2 key stored as file_path
+		FilePath:   req.S3Key,
 		FileName:   req.FileName,
 		FileType:   req.FileType,
 		FileSize:   req.FileSize,
@@ -127,23 +123,17 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		Details:  fmt.Sprintf("Uploaded %s to product %s (R2)", req.FileName, productIDStr),
 	})
 
-	message := fmt.Sprintf("%s uploaded '%s'", userName, req.FileName)
-	BroadcastNotificationExcept(userID, NotifPayload{
-		Message:    message,
-		NotifType:  "attachment_uploaded",
-		EntityType: "product",
-		EntityID:   attachment.ProductID,
-		SenderName: fmt.Sprintf("%v", userName),
-	})
+	// Persist notification for all users + toast via LISTEN/NOTIFY
+	message := fmt.Sprintf("%s uploaded '%s'", senderName, req.FileName)
+	services.CreateNotificationForAllExcept(userID, message, "attachment_uploaded", "product", attachment.ProductID, "", senderName)
 
+	// Broadcast UI update (attachment panel refresh)
 	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_uploaded", Payload: attachment})
-	Hub.BroadcastMessage(wsMsg)
+	database.EmitBroadcast(wsMsg)
 
 	c.JSON(http.StatusCreated, attachment)
 }
 
-
-// ── Get By Product ──
 func (h *AttachmentHandler) GetByProduct(c *gin.Context) {
 	productID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -174,7 +164,6 @@ func (h *AttachmentHandler) GetByProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-// ── Download ──
 func (h *AttachmentHandler) Download(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -196,7 +185,6 @@ func (h *AttachmentHandler) Download(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"url": downloadURL})
 }
 
-// ── Delete ──
 func (h *AttachmentHandler) Delete(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -210,7 +198,6 @@ func (h *AttachmentHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Delete from R2
 	if err := services.R2.DeleteObject(attachment.FilePath); err != nil {
 		fmt.Printf("Warning: failed to delete R2 object %s: %v\n", attachment.FilePath, err)
 	}

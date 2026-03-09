@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kanban-app/database"
 	"kanban-app/internal/models"
 	"kanban-app/internal/services"
 
@@ -76,31 +77,26 @@ func (h *CommentHandler) Create(c *gin.Context) {
 		Action:   "commented",
 		Entity:   "comment",
 		EntityID: uint(productID),
-		Details:  fmt.Sprintf("Added comment on product"),
+		Details:  "Added comment on product",
 	})
 
-	// Fetch product to get its display ID
 	product, _ := services.GetProductByIDSimple(uint(productID))
 	productLabel := fmt.Sprintf("#%d", productID)
 	if product != nil {
 		productLabel = product.ProductID
 	}
 
-	message := fmt.Sprintf("%s commented on %s", userName, productLabel)
-	services.CreateNotificationForAllExcept(userID, message, "comment_added", "product", uint(productID))
-	BroadcastNotificationExcept(userID, NotifPayload{
-		Message:    message,
-		NotifType:  "comment_added",
-		EntityType: "product",
-		EntityID:   uint(productID),
-		Content:    req.Message,
-		SenderName: userName.(string),
-	})
+	senderName := userName.(string)
+	message := fmt.Sprintf("%s commented on %s", senderName, productLabel)
 
-	// Store mention notifications in DB — send direct toast to mentioned users only.
-	mentionMsg := fmt.Sprintf("%s mentioned you in %s", userName, productLabel)
-	services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID))
+	// Persist notification for all users + deliver toast via LISTEN/NOTIFY
+	services.CreateNotificationForAllExcept(userID, message, "comment_added", "product", uint(productID), req.Message, senderName)
 
+	// Mention notifications (persisted + toasted to mentioned users only)
+	mentionMsg := fmt.Sprintf("%s mentioned you in %s", senderName, productLabel)
+	services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID), req.Message, senderName)
+
+	// Broadcast UI update event (comment panel refresh) via LISTEN/NOTIFY
 	wsMsg, _ := json.Marshal(WSMessage{
 		Type: "comment_added",
 		Payload: gin.H{
@@ -108,7 +104,7 @@ func (h *CommentHandler) Create(c *gin.Context) {
 			"comment":    created,
 		},
 	})
-	Hub.BroadcastMessage(wsMsg)
+	database.EmitBroadcast(wsMsg)
 
 	if created != nil {
 		c.JSON(http.StatusCreated, created)

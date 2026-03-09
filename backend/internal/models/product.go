@@ -8,8 +8,9 @@ import (
 
 type Product struct {
 	ID            uint           `json:"id" gorm:"primaryKey"`
-	ProductID     string         `json:"product_id" gorm:"uniqueIndex;not null"`
-	OriginalID    string         `json:"original_id" gorm:"default:''"`  // holds true ID while soft-deleted
+	// Partial unique index: enforced only for active (non-deleted) rows.
+	// Postgres allows the same product_id on soft-deleted rows without mangling.
+	ProductID string `json:"product_id" gorm:"not null;uniqueIndex:udx_product_id_active,where:deleted_at IS NULL"`
 	CustomerName  string         `json:"customer_name" gorm:"not null"`
 	CustomerPhone string         `json:"customer_phone"`
 	Description   string         `json:"description"`

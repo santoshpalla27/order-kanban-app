@@ -29,7 +29,8 @@ func GetProducts(filter ProductFilter) ([]models.Product, error) {
 	}
 	if filter.Search != "" {
 		search := "%" + filter.Search + "%"
-		query = query.Where("product_id LIKE ? OR customer_name LIKE ? OR description LIKE ?", search, search, search)
+		// ILIKE: case-insensitive LIKE — a Postgres advantage over SQLite
+		query = query.Where("product_id ILIKE ? OR customer_name ILIKE ? OR description ILIKE ?", search, search, search)
 	}
 	if filter.DateFrom != "" {
 		query = query.Where("created_at >= ?", filter.DateFrom)
@@ -62,12 +63,13 @@ func CreateProduct(product *models.Product) error {
 	return database.DB.Create(product).Error
 }
 
-// IsProductIDTaken returns (taken bool, reason string, err error).
-// Blocks reuse when an active product OR a grace-period soft-deleted product has the same ID.
+// IsProductIDTaken checks both active products and grace-period soft-deleted products.
+// The Postgres partial unique index (WHERE deleted_at IS NULL) handles active-product
+// uniqueness at the DB level; this check adds a grace-period guard with a friendly message.
 func IsProductIDTaken(productID string) (bool, string, error) {
 	var count int64
 
-	// Check active products
+	// Active products (GORM auto-applies deleted_at IS NULL scope)
 	if err := database.DB.Model(&models.Product{}).
 		Where("product_id = ?", productID).Count(&count).Error; err != nil {
 		return false, "", err
@@ -76,15 +78,18 @@ func IsProductIDTaken(productID string) (bool, string, error) {
 		return true, "product ID already exists", nil
 	}
 
-	// Check soft-deleted products still within the grace period
+	// Soft-deleted products still within the grace period
 	graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
 	if err := database.DB.Unscoped().Model(&models.Product{}).
-		Where("original_id = ? AND deleted_at IS NOT NULL AND deleted_at > ?", productID, graceCutoff).
+		Where("product_id = ? AND deleted_at IS NOT NULL AND deleted_at > ?", productID, graceCutoff).
 		Count(&count).Error; err != nil {
 		return false, "", err
 	}
 	if count > 0 {
-		return true, fmt.Sprintf("product ID is reserved — a recently deleted product with this ID can be restored for up to %d days", gracePeriodDays), nil
+		return true, fmt.Sprintf(
+			"product ID '%s' is reserved — it can be restored for up to %d days after deletion",
+			productID, gracePeriodDays,
+		), nil
 	}
 
 	return false, "", nil
@@ -98,24 +103,13 @@ func UpdateProductStatus(id uint, status string) error {
 	return database.DB.Model(&models.Product{}).Where("id = ?", id).Update("status", status).Error
 }
 
-// DeleteProduct soft-deletes: mangles product_id to free the unique index slot,
-// stores the real ID in original_id, records who deleted it, then sets deleted_at via GORM.
+// DeleteProduct soft-deletes a product. No ID mangling needed — the Postgres partial unique
+// index (WHERE deleted_at IS NULL) releases the uniqueness slot automatically on soft delete.
 func DeleteProduct(id uint, deletedByID uint) error {
-	product, err := GetProductByIDSimple(id)
-	if err != nil {
+	if err := database.DB.Model(&models.Product{}).Where("id = ?", id).
+		Update("deleted_by", deletedByID).Error; err != nil {
 		return err
 	}
-
-	mangledID := fmt.Sprintf("%s__del_%d", product.ProductID, time.Now().Unix())
-
-	if err := database.DB.Model(&models.Product{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"product_id":  mangledID,
-		"original_id": product.ProductID,
-		"deleted_by":  deletedByID,
-	}).Error; err != nil {
-		return err
-	}
-
 	return database.DB.Delete(&models.Product{}, id).Error
 }
 
@@ -131,17 +125,12 @@ func GetDeletedProducts() ([]models.Product, error) {
 	return products, err
 }
 
-// RestoreProduct un-deletes a product and restores its original product_id.
+// RestoreProduct un-deletes a product. The partial unique index re-enforces uniqueness
+// automatically once deleted_at is cleared back to NULL.
 func RestoreProduct(id uint) error {
-	var product models.Product
-	if err := database.DB.Unscoped().First(&product, id).Error; err != nil {
-		return err
-	}
 	return database.DB.Unscoped().Model(&models.Product{}).Where("id = ?", id).Updates(map[string]interface{}{
-		"product_id":  product.OriginalID,
-		"original_id": "",
-		"deleted_by":  0,
-		"deleted_at":  nil,
+		"deleted_at": nil,
+		"deleted_by": 0,
 	}).Error
 }
 

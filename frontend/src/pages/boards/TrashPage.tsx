@@ -82,7 +82,7 @@ export default function TrashPage() {
                   <tr key={product.id} className="border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors opacity-80">
                     <td className="px-4 py-3">
                       <span className="text-sm font-medium text-surface-300 line-through">
-                        {product.original_id || product.product_id}
+                        {product.product_id}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-surface-400">{product.customer_name}</td>

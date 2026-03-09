@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -47,6 +46,7 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 
 	userID := c.GetUint("user_id")
 	userName, _ := c.Get("user_name")
+	senderName := userName.(string)
 
 	msg := &models.ChatMessage{
 		UserID:    userID,
@@ -54,41 +54,20 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		CreatedAt: time.Now(),
 	}
 
+	// CreateChatMessage saves + broadcasts via LISTEN/NOTIFY
 	if err := services.CreateChatMessage(msg); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send message"})
 		return
 	}
 
-	// Notify @[Name] mentions — store in DB and send direct toast to mentioned users only.
-	mentionMsg := fmt.Sprintf("%s mentioned you in Team Chat", userName)
-	services.NotifyMentions(userID, req.Message, mentionMsg, "chat", 0)
-	for _, uid := range services.GetMentionedUserIDs(userID, req.Message) {
-		SendNotificationToUser(uid, NotifPayload{
-			Message:    mentionMsg,
-			NotifType:  "mention",
-			EntityType: "chat",
-			EntityID:   0,
-			Content:    req.Message,
-			SenderName: userName.(string),
-		})
-	}
-
-	wsMsg, _ := json.Marshal(WSMessage{
-		Type: "chat_message",
-		Payload: gin.H{
-			"id":         msg.ID,
-			"user_id":    userID,
-			"user_name":  userName,
-			"message":    req.Message,
-			"created_at": msg.CreatedAt,
-		},
-	})
-	Hub.BroadcastMessage(wsMsg)
+	// Persist + deliver mention notifications to @-mentioned users
+	mentionMsg := fmt.Sprintf("%s mentioned you in Team Chat", senderName)
+	services.NotifyMentions(userID, req.Message, mentionMsg, "chat", 0, req.Message, senderName)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":         msg.ID,
 		"user_id":    userID,
-		"user_name":  userName,
+		"user_name":  senderName,
 		"message":    req.Message,
 		"created_at": msg.CreatedAt,
 	})

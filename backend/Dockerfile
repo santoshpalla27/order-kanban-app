@@ -1,9 +1,7 @@
-# Build stage
+# Build stage — no CGO needed (pure-Go postgres driver, no sqlite)
 FROM golang:1.24-alpine AS builder
 
 ENV GOTOOLCHAIN=auto
-
-RUN apk add --no-cache gcc musl-dev
 
 WORKDIR /app
 
@@ -11,18 +9,16 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -o server ./cmd/main.go
 
-# Runtime stage
-FROM alpine:3.19
+# CGO_ENABLED=0: fully static binary, no gcc, no musl-dev required
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o server ./cmd/main.go
 
-RUN apk add --no-cache ca-certificates
+# Runtime stage — distroless for minimal attack surface
+FROM gcr.io/distroless/static-debian12
 
 WORKDIR /app
 
 COPY --from=builder /app/server .
-
-RUN mkdir -p /app/data /app/uploads
 
 EXPOSE 8080
 

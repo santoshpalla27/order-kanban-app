@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"kanban-app/database"
 	"kanban-app/internal/models"
 	"kanban-app/internal/services"
 
@@ -64,7 +65,6 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		return
 	}
 
-	// Guard: block reuse of active or grace-period-deleted product IDs
 	if taken, reason, err := services.IsProductIDTaken(req.ProductID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate product ID"})
 		return
@@ -75,6 +75,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 
 	userID := c.GetUint("user_id")
 	userName, _ := c.Get("user_name")
+	senderName := userName.(string)
 
 	product := &models.Product{
 		ProductID:     req.ProductID,
@@ -100,20 +101,11 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		Details:  fmt.Sprintf("Created product %s", product.ProductID),
 	})
 
-	message := fmt.Sprintf("%s created new product: %s", userName, product.ProductID)
-	BroadcastNotificationExcept(userID, NotifPayload{
-		Message:    message,
-		NotifType:  "product_created",
-		EntityType: "product",
-		EntityID:   product.ID,
-		SenderName: userName.(string),
-	})
+	message := fmt.Sprintf("%s created new product: %s", senderName, product.ProductID)
+	services.CreateNotificationForAllExcept(userID, message, "product_created", "product", product.ID, "", senderName)
 
-	wsMsg, _ := json.Marshal(WSMessage{
-		Type:    "product_created",
-		Payload: product,
-	})
-	Hub.BroadcastMessage(wsMsg)
+	wsMsg, _ := json.Marshal(WSMessage{Type: "product_created", Payload: product})
+	database.EmitBroadcast(wsMsg)
 
 	c.JSON(http.StatusCreated, product)
 }
@@ -180,14 +172,8 @@ func (h *ProductHandler) UpdateStatus(c *gin.Context) {
 
 	oldStatus := product.Status
 	role, _ := c.Get("role")
-	roleName := role.(string)
-
-	if roleName == "worker" {
-		allowed, ok := models.WorkerAllowedTransitions[oldStatus]
-		if !ok {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Invalid status transition"})
-			return
-		}
+	if role.(string) == "worker" {
+		allowed := models.WorkerAllowedTransitions[oldStatus]
 		valid := false
 		for _, s := range allowed {
 			if s == req.Status {
@@ -219,7 +205,6 @@ func (h *ProductHandler) UpdateStatus(c *gin.Context) {
 	})
 
 	NotifyStatusChange(userID, userName.(string), product, oldStatus, req.Status)
-
 	c.JSON(http.StatusOK, product)
 }
 
@@ -250,16 +235,12 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 		Details:  fmt.Sprintf("Deleted product %s", prodName),
 	})
 
-	wsMsg, _ := json.Marshal(WSMessage{
-		Type:    "product_deleted",
-		Payload: gin.H{"id": id},
-	})
-	Hub.BroadcastMessage(wsMsg)
+	wsMsg, _ := json.Marshal(WSMessage{Type: "product_deleted", Payload: gin.H{"id": id}})
+	database.EmitBroadcast(wsMsg)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Product moved to trash"})
 }
 
-// GetDeletedProducts returns products in the trash (within the grace period). Admin only.
 func (h *ProductHandler) GetDeletedProducts(c *gin.Context) {
 	products, err := services.GetDeletedProducts()
 	if err != nil {
@@ -269,7 +250,6 @@ func (h *ProductHandler) GetDeletedProducts(c *gin.Context) {
 	c.JSON(http.StatusOK, products)
 }
 
-// RestoreProduct un-deletes a product. Admin only.
 func (h *ProductHandler) RestoreProduct(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
@@ -296,11 +276,8 @@ func (h *ProductHandler) RestoreProduct(c *gin.Context) {
 		Details:  fmt.Sprintf("Restored product %s from trash", prodName),
 	})
 
-	wsMsg, _ := json.Marshal(WSMessage{
-		Type:    "product_created",
-		Payload: product,
-	})
-	Hub.BroadcastMessage(wsMsg)
+	wsMsg, _ := json.Marshal(WSMessage{Type: "product_created", Payload: product})
+	database.EmitBroadcast(wsMsg)
 
 	c.JSON(http.StatusOK, gin.H{"message": "Product restored"})
 }

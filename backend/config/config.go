@@ -5,8 +5,8 @@ import "os"
 type Config struct {
 	Port        string
 	JWTSecret   string
-	DBPath      string
-	CORSOrigins string // Comma-separated allowed origins
+	DatabaseURL string // PostgreSQL DSN
+	CORSOrigins string
 
 	// R2 / S3-compatible Storage
 	R2Bucket    string
@@ -28,7 +28,7 @@ func Load() *Config {
 	return &Config{
 		Port:        getEnv("PORT", "8080"),
 		JWTSecret:   getEnv("JWT_SECRET", "kanban-secret-key-change-in-production"),
-		DBPath:      getEnv("DB_PATH", "./data/kanban.db"),
+		DatabaseURL: getEnv("DATABASE_URL", ""),
 		CORSOrigins: getEnv("CORS_ORIGINS", "*"),
 
 		R2Bucket:    getEnv("R2_BUCKET", ""),

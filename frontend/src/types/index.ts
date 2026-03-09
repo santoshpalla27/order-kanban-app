@@ -16,7 +16,6 @@ export interface User {
 export interface Product {
   id: number;
   product_id: string;
-  original_id?: string;
   customer_name: string;
   customer_phone: string;
   description: string;

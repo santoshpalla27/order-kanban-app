@@ -24,14 +24,31 @@ services:
       - kanban-net
     labels:
       - traefik.enable=true
-      # Global HTTP → HTTPS redirect (Traefik v3 HostRegexp syntax)
       - traefik.http.routers.http-catchall.rule=HostRegexp(`.+`)
       - traefik.http.routers.http-catchall.entrypoints=web
       - traefik.http.routers.http-catchall.middlewares=redirect-to-https
       - traefik.http.routers.http-catchall.priority=1
       - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
       - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
-      # Dashboard disabled — no DNS record for traefik.santoshdevops.cloud
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: kanban-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-kanban}
+      - POSTGRES_USER=${POSTGRES_USER:-kanban}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - kanban-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kanban} -d ${POSTGRES_DB:-kanban}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   backend:
     build:
@@ -41,16 +58,17 @@ services:
     restart: unless-stopped
     environment:
       - PORT=8080
+      - DATABASE_URL=postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kanban}?sslmode=disable
       - JWT_SECRET=${JWT_SECRET}
-      - DB_PATH=/app/data/kanban.db
       - CORS_ORIGINS=https://app.santoshdevops.cloud
       - R2_BUCKET=${R2_BUCKET}
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
       - R2_ACCESS_KEY=${R2_ACCESS_KEY}
       - R2_SECRET_KEY=${R2_SECRET_KEY}
       - R2_ENDPOINT=${R2_ENDPOINT}
-    volumes:
-      - sqlite-data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - kanban-net
     healthcheck:
@@ -58,7 +76,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
     labels:
       - traefik.enable=false
 
@@ -82,7 +100,7 @@ services:
       - traefik.http.services.frontend.loadbalancer.server.port=80
 
 volumes:
-  sqlite-data:
+  postgres-data:
   letsencrypt-data:
 
 networks:

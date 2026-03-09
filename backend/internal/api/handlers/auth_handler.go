@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"kanban-app/config"
+	"kanban-app/database"
 	"kanban-app/internal/models"
 	"kanban-app/internal/services"
 
@@ -36,14 +37,10 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Count existing users - first user is admin
-	var count int64
 	existingUsers, _ := services.GetUsers()
-	count = int64(len(existingUsers))
-
-	roleID := uint(3) // worker by default
-	if count == 0 {
-		roleID = 1 // first user is admin
+	roleID := uint(3)
+	if len(existingUsers) == 0 {
+		roleID = 1
 	}
 
 	user := &models.User{
@@ -124,7 +121,8 @@ func (h *AuthHandler) generateToken(user *models.User) (string, error) {
 	return token.SignedString([]byte(h.Config.JWTSecret))
 }
 
-// NotifyStatusChange sends notification and WebSocket event when product status changes
+// NotifyStatusChange broadcasts a product_update WS event and persists toast notifications
+// for all users except the mover — all delivered via LISTEN/NOTIFY (multi-instance safe).
 func NotifyStatusChange(userID uint, userName string, product *models.Product, oldStatus, newStatus string) {
 	message := fmt.Sprintf("%s moved '%s' from %s to %s", userName, product.ProductID, oldStatus, newStatus)
 
@@ -138,13 +136,7 @@ func NotifyStatusChange(userID uint, userName string, product *models.Product, o
 			"updated_by": userName,
 		},
 	})
-	Hub.BroadcastMessage(wsMsg)
+	database.EmitBroadcast(wsMsg)
 
-	BroadcastNotificationExcept(userID, NotifPayload{
-		Message:    message,
-		NotifType:  "status_change",
-		EntityType: "product",
-		EntityID:   product.ID,
-		SenderName: userName,
-	})
+	services.CreateNotificationForAllExcept(userID, message, "status_change", "product", product.ID, "", userName)
 }

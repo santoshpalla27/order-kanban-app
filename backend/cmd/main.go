@@ -15,21 +15,38 @@ import (
 )
 
 func main() {
-	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found — using environment variables")
 	}
 
 	cfg := config.Load()
 
-	// Initialize database
-	database.Init(cfg.DBPath)
+	if cfg.DatabaseURL == "" {
+		log.Fatal("DATABASE_URL is required")
+	}
 
-	// Initialize R2 storage (required)
+	// Initialize PostgreSQL (AutoMigrate + seed roles)
+	database.Init(cfg.DatabaseURL)
+
+	// Initialize R2 storage
 	services.InitR2(cfg)
 
-	// Start WebSocket hub
+	// Start WebSocket hub (single goroutine owns the client map)
 	go handlers.Hub.Run()
+
+	// Start PostgreSQL LISTEN/NOTIFY listener.
+	// All WS broadcasts are routed through this so that multiple backend
+	// instances can each deliver to their own connected clients.
+	database.StartListener(cfg.DatabaseURL, func(eventType string, excludeID, userID uint, wsMsg []byte) {
+		switch eventType {
+		case "broadcast":
+			handlers.Hub.BroadcastMessage(wsMsg)
+		case "broadcast_except":
+			handlers.Hub.BroadcastExcept(excludeID, wsMsg)
+		case "user":
+			handlers.Hub.SendToUser(userID, wsMsg)
+		}
+	})
 
 	// Purge products past their 10-day grace period — runs every 6 hours
 	go func() {
@@ -41,10 +58,8 @@ func main() {
 		}
 	}()
 
-	// Setup router
 	router := api.SetupRouter(cfg)
 
-	// Start server
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	log.Printf("Server starting on %s", addr)
 	if err := router.Run(addr); err != nil {
