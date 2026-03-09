@@ -1,4 +1,38 @@
 services:
+  traefik:
+    image: traefik:v3.1
+    container_name: kanban-traefik
+    restart: unless-stopped
+    command:
+      - --api.dashboard=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - letsencrypt-data:/letsencrypt
+    networks:
+      - kanban-net
+    labels:
+      # Traefik dashboard — only accessible over HTTPS, protected by basic auth
+      - traefik.enable=true
+      - traefik.http.routers.traefik-dashboard.rule=Host(`traefik.${DOMAIN}`)
+      - traefik.http.routers.traefik-dashboard.entrypoints=websecure
+      - traefik.http.routers.traefik-dashboard.tls.certresolver=letsencrypt
+      - traefik.http.routers.traefik-dashboard.service=api@internal
+      - traefik.http.routers.traefik-dashboard.middlewares=dashboard-auth
+      # Generate with: echo $(htpasswd -nB admin) | sed -e s/\\$/\\$\\$/g
+      - traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}
+
   backend:
     build:
       context: ./backend
@@ -25,6 +59,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    # No ports exposed — Traefik routes directly over the internal network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.backend.entrypoints=websecure
+      - traefik.http.routers.backend.tls.certresolver=letsencrypt
+      - traefik.http.services.backend.loadbalancer.server.port=8080
+      # WebSocket support
+      - traefik.http.middlewares.backend-ws.headers.customrequestheaders.X-Forwarded-Proto=https
 
   frontend:
     build:
@@ -34,16 +77,22 @@ services:
         VITE_API_URL: ${VITE_API_URL}
     container_name: kanban-frontend
     restart: unless-stopped
-    ports:
-      - "${FRONTEND_PORT:-3000}:80"
     depends_on:
       backend:
         condition: service_healthy
     networks:
       - kanban-net
+    # No ports exposed — Traefik routes directly over the internal network
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)
+      - traefik.http.routers.frontend.entrypoints=websecure
+      - traefik.http.routers.frontend.tls.certresolver=letsencrypt
+      - traefik.http.services.frontend.loadbalancer.server.port=80
 
 volumes:
   sqlite-data:
+  letsencrypt-data:
 
 networks:
   kanban-net:
