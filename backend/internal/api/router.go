@@ -103,6 +103,10 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 				notifications.POST("/read-all", notificationHandler.MarkAllAsRead)
 			}
 
+			// Profile management (all authenticated users)
+			protected.GET("/users/me/avatar-presign", userHandler.GetAvatarUploadURL)
+			protected.PATCH("/users/me", userHandler.UpdateProfile)
+
 			// Users - admin only
 			users := protected.Group("/users")
 			users.Use(middleware.RBACMiddleware("admin"))

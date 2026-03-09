@@ -8,6 +8,7 @@ import { notificationsApi } from '../api/client';
 import NotificationPanel from './NotificationPanel';
 import ActivityPanel from './ActivityPanel';
 import NotificationToast from './NotificationToast';
+import ProfileModal from './ProfileModal';
 import {
   LayoutDashboard,
   List,
@@ -21,7 +22,47 @@ import {
   Sun,
   Moon,
   Activity,
+  UserCircle,
 } from 'lucide-react';
+
+const AVATAR_COLORS = [
+  'from-violet-500 to-purple-500',
+  'from-blue-500 to-cyan-500',
+  'from-emerald-500 to-teal-500',
+  'from-amber-500 to-orange-500',
+  'from-rose-500 to-pink-500',
+  'from-fuchsia-500 to-purple-500',
+];
+
+function getAvatarGradient(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function UserAvatar({ user, size = 'sm' }: { user: { name: string; avatar_url?: string }; size?: 'sm' | 'md' }) {
+  const [imgError, setImgError] = useState(false);
+  const gradient = getAvatarGradient(user.name);
+  const initial = user.name.charAt(0).toUpperCase();
+  const sizeClass = size === 'sm' ? 'w-7 h-7 text-xs' : 'w-8 h-8 text-sm';
+
+  if (user.avatar_url && !imgError) {
+    return (
+      <img
+        src={user.avatar_url}
+        alt={user.name}
+        className={`${sizeClass} rounded-full object-cover flex-shrink-0`}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return (
+    <div className={`${sizeClass} rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-bold text-white flex-shrink-0`}>
+      {initial}
+    </div>
+  );
+}
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuthStore();
@@ -30,6 +71,7 @@ export default function Layout() {
   const [notifOpen, setNotifOpen] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const navigate = useNavigate();
   const activityRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -114,15 +156,16 @@ export default function Layout() {
         {/* User info at bottom */}
         {sidebarOpen && user && (
           <div className={`p-3 border-t ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
-            <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-400 to-purple-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
-                {user.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="overflow-hidden">
+            <button
+              onClick={() => { setProfileModalOpen(true); }}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isDark ? 'hover:bg-surface-800' : 'hover:bg-surface-100'}`}
+            >
+              <UserAvatar user={user} size="md" />
+              <div className="overflow-hidden text-left">
                 <p className="text-sm font-medium truncate">{user.name}</p>
                 <p className={`text-xs capitalize ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>{user.role?.name}</p>
               </div>
-            </div>
+            </button>
           </div>
         )}
       </aside>
@@ -194,23 +237,39 @@ export default function Layout() {
             <div ref={profileRef} className="relative">
               <button
                 onClick={() => setProfileOpen(!profileOpen)}
-                className="flex items-center gap-2 btn-ghost px-3 py-2 rounded-lg"
+                className="flex items-center gap-2 btn-ghost px-2 py-1.5 rounded-lg"
               >
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-400 to-purple-500 flex items-center justify-center text-xs font-bold text-white">
-                  {user?.name.charAt(0).toUpperCase()}
-                </div>
+                {user && <UserAvatar user={user} size="sm" />}
                 <ChevronDown className="w-4 h-4" />
               </button>
 
               {profileOpen && (
-                <div className={`absolute right-0 top-full mt-2 w-48 ${isDark ? 'bg-surface-800 border-surface-700/50' : 'bg-white border-surface-200'} border rounded-xl py-2 animate-scale-in z-50 shadow-xl`}>
-                  <div className={`px-4 py-2 border-b ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
-                    <p className="text-sm font-medium">{user?.name}</p>
-                    <p className={`text-xs ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>{user?.email}</p>
+                <div className={`absolute right-0 top-full mt-2 w-52 ${isDark ? 'bg-surface-800 border-surface-700/50' : 'bg-white border-surface-200'} border rounded-xl py-2 animate-scale-in z-50 shadow-xl`}>
+                  {/* User info */}
+                  <div className={`px-4 py-3 border-b ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
+                    <div className="flex items-center gap-3">
+                      {user && <UserAvatar user={user} size="md" />}
+                      <div className="overflow-hidden">
+                        <p className="text-sm font-medium truncate">{user?.name}</p>
+                        <p className={`text-xs truncate ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>{user?.email}</p>
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Edit Profile */}
+                  <button
+                    onClick={() => { setProfileOpen(false); setProfileModalOpen(true); }}
+                    className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm transition-colors ${
+                      isDark ? 'text-surface-300 hover:bg-surface-700/50' : 'text-surface-700 hover:bg-surface-100'
+                    }`}
+                  >
+                    <UserCircle className="w-4 h-4" /> Edit Profile
+                  </button>
+
+                  {/* Sign Out */}
                   <button
                     onClick={handleLogout}
-                    className={`w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 transition-colors ${
+                    className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-400 transition-colors ${
                       isDark ? 'hover:bg-surface-700/50' : 'hover:bg-surface-100'
                     }`}
                   >
@@ -227,7 +286,9 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+
       <NotificationToast />
+      {profileModalOpen && <ProfileModal onClose={() => setProfileModalOpen(false)} />}
     </div>
   );
 }

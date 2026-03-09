@@ -137,6 +137,15 @@ export const usersApi = {
   delete: (id: number) => api.delete(`/users/${id}`),
 };
 
+// Profile
+export const profileApi = {
+  getAvatarUploadUrl: (filename: string) =>
+    api.get('/users/me/avatar-presign', { params: { filename } }),
+  update: (data: { name?: string; avatar_key?: string }) =>
+    api.patch('/users/me', data),
+  getMe: () => api.get('/auth/me'),
+};
+
 export const activityApi = {
   getRecent: (limit = 100) => api.get(`/activity?limit=${limit}`),
 };

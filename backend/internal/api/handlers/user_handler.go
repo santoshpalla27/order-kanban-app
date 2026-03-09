@@ -3,14 +3,26 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"kanban-app/internal/models"
 	"kanban-app/internal/services"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
+
+var allowedAvatarExtensions = map[string]bool{
+	".jpg": true, ".jpeg": true, ".png": true, ".gif": true, ".webp": true,
+}
+
+var avatarExtToContentType = map[string]string{
+	".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+	".gif": "image/gif", ".webp": "image/webp",
+}
 
 type UserHandler struct{}
 
@@ -133,4 +145,62 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		Details:  fmt.Sprintf("Deleted user %s", userDesc),
 	})
 	c.JSON(http.StatusOK, gin.H{"message": "User deleted"})
+}
+
+// GetAvatarUploadURL returns a presigned PUT URL so the client can upload an avatar directly to R2.
+func (h *UserHandler) GetAvatarUploadURL(c *gin.Context) {
+	filename := c.Query("filename")
+	if filename == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "filename query param required"})
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(filename))
+	if !allowedAvatarExtensions[ext] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Only image files (jpg, png, gif, webp) are allowed"})
+		return
+	}
+
+	userID := c.GetUint("user_id")
+	s3Key := fmt.Sprintf("avatars/%d/%s%s", userID, uuid.New().String()[:8], ext)
+	contentType := avatarExtToContentType[ext]
+
+	uploadURL, err := services.R2.GenerateUploadURL(s3Key, contentType, 5*1024*1024)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate upload URL"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"upload_url":   uploadURL,
+		"s3_key":       s3Key,
+		"content_type": contentType,
+	})
+}
+
+// UpdateProfile lets any authenticated user update their own name and/or avatar.
+func (h *UserHandler) UpdateProfile(c *gin.Context) {
+	userID := c.GetUint("user_id")
+
+	var req struct {
+		Name      string `json:"name"`
+		AvatarKey string `json:"avatar_key"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := services.UpdateProfile(userID, req.Name, req.AvatarKey); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		return
+	}
+
+	user, err := services.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch updated user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, services.GetUserResponseWithAvatar(user))
 }

@@ -34,3 +34,28 @@ func UpdateUserRole(id uint, roleID uint) error {
 func DeleteUser(id uint) error {
 	return database.DB.Delete(&models.User{}, id).Error
 }
+
+func UpdateProfile(id uint, name, avatarKey string) error {
+	updates := map[string]interface{}{}
+	if name != "" {
+		updates["name"] = name
+	}
+	if avatarKey != "" {
+		updates["avatar_key"] = avatarKey
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	return database.DB.Model(&models.User{}).Where("id = ?", id).Updates(updates).Error
+}
+
+// GetUserResponseWithAvatar builds a UserResponse with a presigned avatar URL (if the user has one).
+func GetUserResponseWithAvatar(user *models.User) models.UserResponse {
+	resp := user.ToResponse()
+	if user.AvatarKey != "" && R2 != nil {
+		if url, err := R2.GenerateViewURL(user.AvatarKey); err == nil {
+			resp.AvatarURL = url
+		}
+	}
+	return resp
+}
