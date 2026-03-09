@@ -63,7 +63,14 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 	mentionMsg := fmt.Sprintf("%s mentioned you in Team Chat", userName)
 	services.NotifyMentions(userID, req.Message, mentionMsg, "chat", 0)
 	for _, uid := range services.GetMentionedUserIDs(userID, req.Message) {
-		SendNotificationToUser(uid, mentionMsg, "mention")
+		SendNotificationToUser(uid, NotifPayload{
+			Message:    mentionMsg,
+			NotifType:  "mention",
+			EntityType: "chat",
+			EntityID:   0,
+			Content:    req.Message,
+			SenderName: userName.(string),
+		})
 	}
 
 	wsMsg, _ := json.Marshal(WSMessage{

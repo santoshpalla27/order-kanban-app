@@ -121,23 +121,39 @@ func (h *WSHub) SendToUser(userID uint, msg []byte) {
 	h.sendDirect <- directMsg{userID: userID, data: msg}
 }
 
-// BroadcastNotificationExcept sends a "notification" WS event to all clients except the sender.
-// This prevents the sender from receiving a toast for their own action.
-func BroadcastNotificationExcept(excludeID uint, message string, notifType string) {
+// NotifPayload holds all fields sent in a "notification" WS event.
+type NotifPayload struct {
+	Message    string
+	NotifType  string
+	EntityType string
+	EntityID   uint
+	Content    string // actual message body (comment text, chat text)
+	SenderName string // display name of the person who triggered the event
+}
+
+func buildNotifMsg(p NotifPayload) []byte {
 	wsMsg, _ := json.Marshal(WSMessage{
-		Type:    "notification",
-		Payload: map[string]string{"message": message, "notif_type": notifType},
+		Type: "notification",
+		Payload: map[string]interface{}{
+			"message":     p.Message,
+			"notif_type":  p.NotifType,
+			"entity_type": p.EntityType,
+			"entity_id":   p.EntityID,
+			"content":     p.Content,
+			"sender_name": p.SenderName,
+		},
 	})
-	Hub.broadcastExcept <- excludeMsg{excludeID: excludeID, data: wsMsg}
+	return wsMsg
+}
+
+// BroadcastNotificationExcept sends a "notification" WS event to all clients except the sender.
+func BroadcastNotificationExcept(excludeID uint, p NotifPayload) {
+	Hub.broadcastExcept <- excludeMsg{excludeID: excludeID, data: buildNotifMsg(p)}
 }
 
 // SendNotificationToUser sends a "notification" WS event to a specific user.
-func SendNotificationToUser(userID uint, message string, notifType string) {
-	wsMsg, _ := json.Marshal(WSMessage{
-		Type: "notification",
-		Payload: map[string]string{"message": message, "notif_type": notifType},
-	})
-	Hub.SendToUser(userID, wsMsg)
+func SendNotificationToUser(userID uint, p NotifPayload) {
+	Hub.SendToUser(userID, buildNotifMsg(p))
 }
 
 func HandleWebSocket(c *gin.Context) {

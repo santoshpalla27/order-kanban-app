@@ -74,17 +74,31 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	services.CreateActivityLog(&models.ActivityLog{
 		UserID:   userID,
 		Action:   "commented",
-		Entity:   "product",
+		Entity:   "comment",
 		EntityID: uint(productID),
 		Details:  fmt.Sprintf("Added comment on product"),
 	})
 
-	message := fmt.Sprintf("%s commented on a product", userName)
-	services.CreateNotificationForAllExcept(userID, message, "comment_added", "product", uint(productID))
-	BroadcastNotificationExcept(userID, message, "comment_added")
+	// Fetch product to get its display ID
+	product, _ := services.GetProductByIDSimple(uint(productID))
+	productLabel := fmt.Sprintf("#%d", productID)
+	if product != nil {
+		productLabel = product.ProductID
+	}
 
-	// Store mention notifications in DB — broadcast above already gives mentioned users a toast.
-	mentionMsg := fmt.Sprintf("%s mentioned you in a comment", userName)
+	message := fmt.Sprintf("%s commented on %s", userName, productLabel)
+	services.CreateNotificationForAllExcept(userID, message, "comment_added", "product", uint(productID))
+	BroadcastNotificationExcept(userID, NotifPayload{
+		Message:    message,
+		NotifType:  "comment_added",
+		EntityType: "product",
+		EntityID:   uint(productID),
+		Content:    req.Message,
+		SenderName: userName.(string),
+	})
+
+	// Store mention notifications in DB — send direct toast to mentioned users only.
+	mentionMsg := fmt.Sprintf("%s mentioned you in %s", userName, productLabel)
 	services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID))
 
 	wsMsg, _ := json.Marshal(WSMessage{

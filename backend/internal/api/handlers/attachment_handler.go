@@ -128,7 +128,13 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 	})
 
 	message := fmt.Sprintf("%s uploaded '%s'", userName, req.FileName)
-	BroadcastNotificationExcept(userID, message, "attachment_uploaded")
+	BroadcastNotificationExcept(userID, NotifPayload{
+		Message:    message,
+		NotifType:  "attachment_uploaded",
+		EntityType: "product",
+		EntityID:   attachment.ProductID,
+		SenderName: fmt.Sprintf("%v", userName),
+	})
 
 	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_uploaded", Payload: attachment})
 	Hub.BroadcastMessage(wsMsg)

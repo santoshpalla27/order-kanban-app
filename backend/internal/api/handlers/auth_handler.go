@@ -140,5 +140,11 @@ func NotifyStatusChange(userID uint, userName string, product *models.Product, o
 	})
 	Hub.BroadcastMessage(wsMsg)
 
-	BroadcastNotificationExcept(userID, message, "status_change")
+	BroadcastNotificationExcept(userID, NotifPayload{
+		Message:    message,
+		NotifType:  "status_change",
+		EntityType: "product",
+		EntityID:   product.ID,
+		SenderName: userName,
+	})
 }

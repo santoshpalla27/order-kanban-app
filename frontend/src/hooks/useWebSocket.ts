@@ -53,7 +53,14 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['unread-count'] });
             const msg = data.payload?.message || 'New notification';
             const ntype = data.payload?.notif_type || 'notification';
-            addToast(msg, ntype);
+            const entityType = (data.payload?.entity_type as string) || '';
+            const entityId = (data.payload?.entity_id as number) || 0;
+            const content = (data.payload?.content as string) || '';
+            const senderName = (data.payload?.sender_name as string) || '';
+            let link: string | null = null;
+            if (entityType === 'product' && entityId) link = `/?product=${entityId}`;
+            else if (entityType === 'chat') link = '/chat';
+            addToast({ message: msg, content, type: ntype, link, entityType, entityId, senderName });
             playNotificationSound();
             break;
           }
