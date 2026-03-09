@@ -1,19 +1,19 @@
 services:
   traefik:
-    image: traefik:v3.1
+    image: traefik:latest
     container_name: kanban-traefik
     restart: unless-stopped
     command:
-      - --api.dashboard=true
+      - --api.dashboard=false
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
       - --entrypoints.web.address=:80
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.letsencrypt.acme.tlschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
       - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --log.level=INFO
     ports:
       - "80:80"
       - "443:443"
@@ -24,12 +24,14 @@ services:
       - kanban-net
     labels:
       - traefik.enable=true
-      - traefik.http.routers.dashboard.rule=Host(`traefik.santoshdevops.cloud`)
-      - traefik.http.routers.dashboard.entrypoints=websecure
-      - traefik.http.routers.dashboard.tls.certresolver=letsencrypt
-      - traefik.http.routers.dashboard.service=api@internal
-      - traefik.http.routers.dashboard.middlewares=dashboard-auth
-      - traefik.http.middlewares.dashboard-auth.basicauth.users=${TRAEFIK_DASHBOARD_AUTH}
+      # Global HTTP → HTTPS redirect (Traefik v3 HostRegexp syntax)
+      - traefik.http.routers.http-catchall.rule=HostRegexp(`.+`)
+      - traefik.http.routers.http-catchall.entrypoints=web
+      - traefik.http.routers.http-catchall.middlewares=redirect-to-https
+      - traefik.http.routers.http-catchall.priority=1
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
+      # Dashboard disabled — no DNS record for traefik.santoshdevops.cloud
 
   backend:
     build:
@@ -53,9 +55,9 @@ services:
       - kanban-net
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 15s
+      timeout: 5s
+      retries: 5
       start_period: 10s
     labels:
       - traefik.enable=false
@@ -69,8 +71,7 @@ services:
     container_name: kanban-frontend
     restart: unless-stopped
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - kanban-net
     labels:
