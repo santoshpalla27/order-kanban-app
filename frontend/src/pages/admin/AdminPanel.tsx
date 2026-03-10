@@ -8,7 +8,9 @@ import { Users, UserPlus, Trash2, Shield, X } from 'lucide-react';
 const ROLES = [
   { id: 1, name: 'admin', label: 'Admin', color: 'text-red-400 bg-red-500/10' },
   { id: 2, name: 'manager', label: 'Manager', color: 'text-amber-400 bg-amber-500/10' },
-  { id: 3, name: 'worker', label: 'Worker', color: 'text-blue-400 bg-blue-500/10' },
+  { id: 3, name: 'organiser', label: 'Organiser', color: 'text-violet-400 bg-violet-500/10' },
+  { id: 4, name: 'employee', label: 'Employee', color: 'text-blue-400 bg-blue-500/10' },
+  { id: 5, name: 'view_only', label: 'View Only', color: 'text-surface-400 bg-surface-500/10' },
 ];
 
 export default function AdminPanel() {
@@ -125,7 +127,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [roleId, setRoleId] = useState(3);
+  const [roleId, setRoleId] = useState(4);
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
 

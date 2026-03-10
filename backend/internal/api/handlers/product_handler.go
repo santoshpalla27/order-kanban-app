@@ -208,21 +208,6 @@ func (h *ProductHandler) UpdateStatus(c *gin.Context) {
 	}
 
 	oldStatus := product.Status
-	role, _ := c.Get("role")
-	if role.(string) == "worker" {
-		allowed := models.WorkerAllowedTransitions[oldStatus]
-		valid := false
-		for _, s := range allowed {
-			if s == req.Status {
-				valid = true
-				break
-			}
-		}
-		if !valid {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Workers cannot make this status transition"})
-			return
-		}
-	}
 
 	if err := services.UpdateProductStatus(uint(id), req.Status); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update status"})

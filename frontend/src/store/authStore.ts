@@ -12,9 +12,16 @@ interface AuthState {
   logout: () => void;
   isAdmin: () => boolean;
   isManager: () => boolean;
-  isWorker: () => boolean;
+  isOrganiser: () => boolean;
+  isEmployee: () => boolean;
+  isViewOnly: () => boolean;
   canCreateProduct: () => boolean;
   canDeleteProduct: () => boolean;
+  canChangeStatus: () => boolean;
+  canUploadAttachment: () => boolean;
+  canComment: () => boolean;
+  canSendChat: () => boolean;
+  canAccessTrash: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -29,12 +36,37 @@ export const useAuthStore = create<AuthState>()(
       logout: () => set({ token: null, refreshToken: null, user: null }),
       isAdmin: () => get().user?.role?.name === 'admin',
       isManager: () => get().user?.role?.name === 'manager',
-      isWorker: () => get().user?.role?.name === 'worker',
+      isOrganiser: () => get().user?.role?.name === 'organiser',
+      isEmployee: () => get().user?.role?.name === 'employee',
+      isViewOnly: () => get().user?.role?.name === 'view_only',
       canCreateProduct: () => {
+        const role = get().user?.role?.name;
+        return role === 'admin' || role === 'manager' || role === 'organiser';
+      },
+      canDeleteProduct: () => {
         const role = get().user?.role?.name;
         return role === 'admin' || role === 'manager';
       },
-      canDeleteProduct: () => get().user?.role?.name === 'admin',
+      canChangeStatus: () => {
+        const role = get().user?.role?.name;
+        return role === 'admin' || role === 'manager' || role === 'organiser';
+      },
+      canUploadAttachment: () => {
+        const role = get().user?.role?.name;
+        return role === 'admin' || role === 'manager' || role === 'organiser' || role === 'employee';
+      },
+      canComment: () => {
+        const role = get().user?.role?.name;
+        return role === 'admin' || role === 'manager' || role === 'organiser' || role === 'employee';
+      },
+      canSendChat: () => {
+        const role = get().user?.role?.name;
+        return role === 'admin' || role === 'manager' || role === 'organiser' || role === 'employee';
+      },
+      canAccessTrash: () => {
+        const role = get().user?.role?.name;
+        return role === 'admin' || role === 'manager';
+      },
     }),
     { name: 'kanban-auth' }
   )

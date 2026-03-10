@@ -43,11 +43,3 @@ type UpdateStatusRequest struct {
 }
 
 var ValidStatuses = []string{"yet_to_start", "working", "review", "done"}
-
-// WorkerAllowedTransitions defines what status transitions workers can make
-var WorkerAllowedTransitions = map[string][]string{
-	"yet_to_start": {"working"},
-	"working":      {"review", "yet_to_start"},
-	"review":       {"working"},
-	"done":         {},
-}

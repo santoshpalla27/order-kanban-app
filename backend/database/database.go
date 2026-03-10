@@ -100,7 +100,9 @@ func seedRoles() {
 	roles := []models.Role{
 		{ID: 1, Name: "admin"},
 		{ID: 2, Name: "manager"},
-		{ID: 3, Name: "worker"},
+		{ID: 3, Name: "organiser"},
+		{ID: 4, Name: "employee"},
+		{ID: 5, Name: "view_only"},
 	}
 	for _, role := range roles {
 		DB.FirstOrCreate(&role, models.Role{Name: role.Name})

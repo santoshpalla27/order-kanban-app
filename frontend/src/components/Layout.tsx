@@ -66,7 +66,7 @@ function UserAvatar({ user, size = 'sm' }: { user: { name: string; avatar_url?: 
 }
 
 export default function Layout() {
-  const { user, logout, isAdmin } = useAuthStore();
+  const { user, logout, isAdmin, canAccessTrash } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -109,7 +109,7 @@ export default function Layout() {
     { to: '/list', icon: List, label: 'List View' },
     { to: '/chat', icon: MessageSquare, label: 'Team Chat' },
     ...(isAdmin() ? [{ to: '/admin', icon: Users, label: 'Admin Panel' }] : []),
-    ...(isAdmin() ? [{ to: '/trash', icon: Trash2, label: 'Trash' }] : []),
+    ...(canAccessTrash() ? [{ to: '/trash', icon: Trash2, label: 'Trash' }] : []),
   ];
 
   return (

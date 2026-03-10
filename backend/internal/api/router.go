@@ -76,37 +76,37 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			products := protected.Group("/products")
 			{
 				products.GET("", productHandler.GetProducts)
-				products.GET("/deleted", middleware.RBACMiddleware("admin"), productHandler.GetDeletedProducts)
-				products.POST("/:id/restore", middleware.RBACMiddleware("admin"), productHandler.RestoreProduct)
+				products.GET("/deleted", middleware.RBACMiddleware("admin", "manager"), productHandler.GetDeletedProducts)
+				products.POST("/:id/restore", middleware.RBACMiddleware("admin", "manager"), productHandler.RestoreProduct)
 				products.GET("/:id", productHandler.GetProduct)
-				products.POST("", middleware.RBACMiddleware("admin", "manager"), productHandler.CreateProduct)
-				products.PUT("/:id", middleware.RBACMiddleware("admin", "manager"), productHandler.UpdateProduct)
-				products.PATCH("/:id/status", productHandler.UpdateStatus)
-				products.DELETE("/:id", middleware.RBACMiddleware("admin"), productHandler.DeleteProduct)
+				products.POST("", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.CreateProduct)
+				products.PUT("/:id", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UpdateProduct)
+				products.PATCH("/:id/status", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UpdateStatus)
+				products.DELETE("/:id", middleware.RBACMiddleware("admin", "manager"), productHandler.DeleteProduct)
 
 				// Attachments (nested under products/:id)
 				products.GET("/:id/attachments", attachmentHandler.GetByProduct)
 
-				products.GET("/:id/attachments/presign", attachmentHandler.GetPresignedUploadURL)
-				products.POST("/:id/attachments/confirm", attachmentHandler.ConfirmUpload)
+				products.GET("/:id/attachments/presign", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), attachmentHandler.GetPresignedUploadURL)
+				products.POST("/:id/attachments/confirm", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), attachmentHandler.ConfirmUpload)
 
 				// Comments (nested under products/:id)
 				products.GET("/:id/comments", commentHandler.GetByProduct)
-				products.POST("/:id/comments", commentHandler.Create)
+				products.POST("/:id/comments", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Create)
 			}
 
 			// Standalone attachment/comment routes
 			protected.GET("/attachments/:id/download", attachmentHandler.Download)
-			protected.DELETE("/attachments/:id", middleware.RBACMiddleware("admin", "manager"), attachmentHandler.Delete)
+			protected.DELETE("/attachments/:id", attachmentHandler.Delete)
 			protected.GET("/activity", activityHandler.GetRecent)
-			protected.PUT("/comments/:id", commentHandler.Update)
-			protected.DELETE("/comments/:id", commentHandler.Delete)
+			protected.PUT("/comments/:id", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Update)
+			protected.DELETE("/comments/:id", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Delete)
 
 			// Chat
 			chat := protected.Group("/chat")
 			{
 				chat.GET("/messages", chatHandler.GetMessages)
-				chat.POST("/messages", chatHandler.SendMessage)
+				chat.POST("/messages", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), chatHandler.SendMessage)
 			}
 
 			// Notifications

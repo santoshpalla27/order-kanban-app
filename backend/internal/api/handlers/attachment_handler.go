@@ -198,6 +198,14 @@ func (h *AttachmentHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	userID := c.GetUint("user_id")
+	role, _ := c.Get("role")
+	roleName := role.(string)
+	if attachment.UploadedBy != userID && roleName != "admin" && roleName != "manager" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Can only delete your own attachments"})
+		return
+	}
+
 	if err := services.R2.DeleteObject(attachment.FilePath); err != nil {
 		fmt.Printf("Warning: failed to delete R2 object %s: %v\n", attachment.FilePath, err)
 	}
@@ -207,7 +215,6 @@ func (h *AttachmentHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	userID := c.GetUint("user_id")
 	services.CreateActivityLog(&models.ActivityLog{
 		UserID:   userID,
 		Action:   "deleted",

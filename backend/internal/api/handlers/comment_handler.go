@@ -170,7 +170,8 @@ func (h *CommentHandler) Delete(c *gin.Context) {
 
 	userID := c.GetUint("user_id")
 	role, _ := c.Get("role")
-	if comment.UserID != userID && role.(string) != "admin" {
+	roleName := role.(string)
+	if comment.UserID != userID && roleName != "admin" && roleName != "manager" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Can only delete your own comments"})
 		return
 	}

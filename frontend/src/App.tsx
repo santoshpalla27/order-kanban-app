@@ -43,10 +43,11 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ children, adminOnly = false }: { children: React.ReactNode; adminOnly?: boolean }) {
-  const { token, isAdmin } = useAuthStore();
+function ProtectedRoute({ children, adminOnly = false, trashOnly = false }: { children: React.ReactNode; adminOnly?: boolean; trashOnly?: boolean }) {
+  const { token, isAdmin, canAccessTrash } = useAuthStore();
   if (!token) return <Navigate to="/login" replace />;
   if (adminOnly && !isAdmin()) return <Navigate to="/" replace />;
+  if (trashOnly && !canAccessTrash()) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -101,7 +102,7 @@ export default function App() {
               <Route
                 path="/trash"
                 element={
-                  <ProtectedRoute adminOnly>
+                  <ProtectedRoute trashOnly>
                     <LazyRoute><TrashPage /></LazyRoute>
                   </ProtectedRoute>
                 }
