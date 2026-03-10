@@ -89,12 +89,13 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	senderName := userName.(string)
 	message := fmt.Sprintf("%s commented on %s", senderName, productLabel)
 
-	// Persist notification for all users + deliver toast via LISTEN/NOTIFY
-	services.CreateNotificationForAllExcept(userID, message, "comment_added", "product", uint(productID), req.Message, senderName)
-
-	// Mention notifications (persisted + toasted to mentioned users only)
+	// Mention notifications first — returns IDs of users who will receive a mention toast
 	mentionMsg := fmt.Sprintf("%s mentioned you in %s", senderName, productLabel)
-	services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID), req.Message, senderName)
+	mentionedIDs := services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID), req.Message, senderName)
+
+	// General "commented" notification for all other users, excluding sender and already-mentioned users
+	// so mentioned users don't receive two toasts for the same comment.
+	services.CreateNotificationForAllExcept(userID, mentionedIDs, message, "comment_added", "product", uint(productID), req.Message, senderName)
 
 	// Broadcast UI update event (comment panel refresh) via LISTEN/NOTIFY
 	wsMsg, _ := json.Marshal(WSMessage{

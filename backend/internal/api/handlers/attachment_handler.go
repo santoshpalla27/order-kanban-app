@@ -125,7 +125,7 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 
 	// Persist notification for all users + toast via LISTEN/NOTIFY
 	message := fmt.Sprintf("%s uploaded '%s'", senderName, req.FileName)
-	services.CreateNotificationForAllExcept(userID, message, "attachment_uploaded", "product", attachment.ProductID, "", senderName)
+	services.CreateNotificationForAllExcept(userID, nil, message, "attachment_uploaded", "product", attachment.ProductID, "", senderName)
 
 	// Broadcast UI update (attachment panel refresh)
 	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_uploaded", Payload: attachment})

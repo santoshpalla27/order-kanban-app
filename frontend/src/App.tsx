@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './store/authStore';
+import { authApi } from './api/client';
 import Layout from './components/Layout';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -49,12 +50,30 @@ function ProtectedRoute({ children, adminOnly = false }: { children: React.React
   return <>{children}</>;
 }
 
+// Validates the persisted token against the backend on startup.
+// If invalid (new DB, expired, etc.) clears auth so the user lands on /login.
+function AuthValidator({ children }: { children: React.ReactNode }) {
+  const { token, logout } = useAuthStore();
+  const [checked, setChecked] = useState(!token); // skip check if no token
+
+  useEffect(() => {
+    if (!token) return;
+    authApi.getMe()
+      .catch(() => logout())
+      .finally(() => setChecked(true));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!checked) return null; // blank screen for the brief validation round-trip
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     // Root ErrorBoundary catches crashes outside individual route boundaries
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
+          <AuthValidator>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -90,6 +109,7 @@ export default function App() {
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </AuthValidator>
         </BrowserRouter>
       </QueryClientProvider>
     </ErrorBoundary>

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, attachmentsApi, commentsApi } from '../api/client';
@@ -720,9 +720,22 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
   const [lightbox, setLightbox] = useState<{ src: string; attId?: number; filename: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<MentionInputHandle>(null);
+  const endRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
+
+  // Scroll to bottom on initial mount (tab open)
+  useEffect(() => {
+    endRef.current?.scrollIntoView();
+  }, []);
+
+  // Scroll to bottom when a new comment arrives
+  const lastCommentId = comments[comments.length - 1]?.id;
+  useEffect(() => {
+    if (!lastCommentId) return;
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [lastCommentId]);
 
   const createMutation = useMutation({
     mutationFn: (msg: string) => commentsApi.create(productId, msg),
@@ -963,6 +976,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
             );
           })
         )}
+        <div ref={endRef} />
       </div>
 
       {/* Reply bar */}

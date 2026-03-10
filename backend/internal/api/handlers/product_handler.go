@@ -129,7 +129,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	})
 
 	message := fmt.Sprintf("%s created new product: %s", senderName, product.ProductID)
-	services.CreateNotificationForAllExcept(userID, message, "product_created", "product", product.ID, "", senderName)
+	services.CreateNotificationForAllExcept(userID, nil, message, "product_created", "product", product.ID, "", senderName)
 
 	wsMsg, _ := json.Marshal(WSMessage{Type: "product_created", Payload: product})
 	database.EmitBroadcast(wsMsg)

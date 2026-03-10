@@ -42,11 +42,17 @@ func CreateNotificationForUser(userID uint, message, notifType, entityType strin
 	database.EmitToUser(userID, buildNotifWSMsg(notif))
 }
 
-// CreateNotificationForAllExcept persists a notification for every user except the sender,
-// then fires a single broadcast pg_notify for WS delivery — multi-instance safe.
-func CreateNotificationForAllExcept(excludeUserID uint, message, notifType, entityType string, entityID uint, content, senderName string) {
+// CreateNotificationForAllExcept persists a notification and delivers a WS toast for every
+// user except the sender and any IDs in alsoExclude (e.g. users already receiving a mention
+// notification). Each user gets their own EmitToUser call so the excluded set is exact.
+func CreateNotificationForAllExcept(excludeUserID uint, alsoExclude []uint, message, notifType, entityType string, entityID uint, content, senderName string) {
+	excluded := append([]uint{excludeUserID}, alsoExclude...)
 	var users []models.User
-	database.DB.Where("id != ?", excludeUserID).Find(&users)
+	database.DB.Where("id NOT IN ?", excluded).Find(&users)
+	wsMsg := buildNotifWSMsg(models.Notification{
+		Message: message, Type: notifType, EntityType: entityType,
+		EntityID: entityID, Content: content, SenderName: senderName,
+	})
 	for _, user := range users {
 		notif := models.Notification{
 			UserID:     user.ID,
@@ -58,20 +64,17 @@ func CreateNotificationForAllExcept(excludeUserID uint, message, notifType, enti
 			SenderName: senderName,
 		}
 		database.DB.Create(&notif)
-	}
-	if len(users) > 0 {
-		wsMsg := buildNotifWSMsg(models.Notification{
-			Message: message, Type: notifType, EntityType: entityType,
-			EntityID: entityID, Content: content, SenderName: senderName,
-		})
-		database.EmitBroadcastExcept(excludeUserID, wsMsg)
+		database.EmitToUser(user.ID, wsMsg)
 	}
 }
 
 // NotifyMentions parses @[Name] tokens, persists mention notifications, delivers via WS.
-func NotifyMentions(senderID uint, text, notifMessage, entityType string, entityID uint, content, senderName string) {
+// Returns the list of user IDs that were notified, so callers can exclude them from
+// the broader "comment_added" notification and avoid sending duplicate toasts.
+func NotifyMentions(senderID uint, text, notifMessage, entityType string, entityID uint, content, senderName string) []uint {
 	matches := mentionRe.FindAllStringSubmatch(text, -1)
 	seen := map[uint]bool{}
+	var notified []uint
 	for _, m := range matches {
 		var user models.User
 		if err := database.DB.Where("LOWER(name) = LOWER(?)", m[1]).First(&user).Error; err != nil {
@@ -81,8 +84,10 @@ func NotifyMentions(senderID uint, text, notifMessage, entityType string, entity
 			continue
 		}
 		seen[user.ID] = true
+		notified = append(notified, user.ID)
 		CreateNotificationForUser(user.ID, notifMessage, "mention", entityType, entityID, content, senderName)
 	}
+	return notified
 }
 
 // NotificationPage is the cursor-paginated response for the notifications list.

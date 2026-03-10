@@ -205,5 +205,5 @@ func NotifyStatusChange(userID uint, userName string, product *models.Product, o
 	})
 	database.EmitBroadcast(wsMsg)
 
-	services.CreateNotificationForAllExcept(userID, message, "status_change", "product", product.ID, "", userName)
+	services.CreateNotificationForAllExcept(userID, nil, message, "status_change", "product", product.ID, "", userName)
 }

@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [showEmoji, setShowEmoji] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDone = useRef(false);
   const inputRef = useRef<MentionInputHandle>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
@@ -106,9 +107,16 @@ export default function ChatPage() {
     },
   });
 
+  const lastMessageId = allMessages[allMessages.length - 1]?.id;
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [latestMessages.length]);
+    if (!lastMessageId) return;
+    if (!initialScrollDone.current) {
+      initialScrollDone.current = true;
+      messagesEndRef.current?.scrollIntoView();
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [lastMessageId]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
