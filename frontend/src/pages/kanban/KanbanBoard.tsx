@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { productsApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { Product, STATUS_LABELS, STATUS_ORDER, ProductStatus } from '../../types';
@@ -8,108 +9,147 @@ import SearchFilters from '../../components/SearchFilters';
 import ProductDetailModal from '../../components/ProductDetailModal';
 import CreateProductModal from '../../components/CreateProductModal';
 import {
-  DndContext, closestCorners, DragEndEvent, DragOverlay, DragStartEvent,
-  PointerSensor, useSensor, useSensors, DragOverEvent,
+  DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent,
+  PointerSensor, useSensor, useSensors, useDroppable, useDraggable,
 } from '@dnd-kit/core';
-import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { Plus, GripVertical, Package } from 'lucide-react';
+import { Plus, GripVertical, Package, Loader2 } from 'lucide-react';
+
+const PAGE_SIZE = 20;          // cards per page per column
+const CARD_ESTIMATE_PX = 100;  // estimated card height for virtualizer
+const VIRTUAL_THRESHOLD = 15;  // switch to virtual scrolling above this count
+
+// ─── Column query key ────────────────────────────────────────────────────────
+
+const colKey = (status: string, base: Record<string, string>) =>
+  ['products', 'kanban', status, base] as const;
+
+// ─── Root board ──────────────────────────────────────────────────────────────
 
 export default function KanbanBoard() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [filters, setFilters] = useState({ search: '', status: '', created_by: '', date_from: '', date_to: '' });
+  const [filters, setFilters] = useState({
+    search: '', status: '', created_by: '', date_from: '', date_to: '',
+  });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
-
-  // Open a product modal when navigated via ?product=id (e.g. from a notification)
-  useEffect(() => {
-    const productId = searchParams.get('product');
-    if (productId) {
-      setSelectedProduct(Number(productId));
-      setSearchParams({}, { replace: true });
-    }
-  }, [searchParams, setSearchParams]);
   const [showCreate, setShowCreate] = useState(false);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const { canCreateProduct } = useAuthStore();
   const queryClient = useQueryClient();
 
+  // Open product modal via ?product=id (e.g. from notification link)
+  useEffect(() => {
+    const id = searchParams.get('product');
+    if (id) {
+      setSelectedProduct(Number(id));
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['products', filters],
-    queryFn: () => productsApi.getAll(
-      Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''))
-    ),
-  });
-  const products: Product[] = data?.data || [];
+  // Base filters — status is injected per-column, not here
+  const baseFilters = Object.fromEntries(
+    Object.entries(filters).filter(([k, v]) => v !== '' && k !== 'status'),
+  ) as Record<string, string>;
 
-  const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: number; status: string }) =>
-      productsApi.updateStatus(id, status),
-    onMutate: async ({ id, status }) => {
-      // Cancel any in-flight refetch so it doesn't overwrite our optimistic update
-      await queryClient.cancelQueries({ queryKey: ['products', filters] });
-      const previous = queryClient.getQueryData(['products', filters]);
-      // Immediately move the card to the target column in the cache
-      queryClient.setQueryData(['products', filters], (old: any) => ({
-        ...old,
-        data: (old?.data as Product[] | undefined)?.map((p) =>
-          p.id === id ? { ...p, status } : p
-        ),
-      }));
-      return { previous };
+  // ── Drag mutation with full optimistic cross-column update ─────────────────
+
+  const dragMutation = useMutation({
+    mutationFn: ({ id, newStatus }: { id: number; srcStatus: string; newStatus: string; product: Product }) =>
+      productsApi.updateStatus(id, newStatus),
+
+    onMutate: async ({ id, srcStatus, newStatus, product }) => {
+      const srcKey = colKey(srcStatus, baseFilters);
+      const tgtKey = colKey(newStatus, baseFilters);
+
+      await queryClient.cancelQueries({ queryKey: srcKey });
+      await queryClient.cancelQueries({ queryKey: tgtKey });
+
+      const prevSrc = queryClient.getQueryData(srcKey);
+      const prevTgt = queryClient.getQueryData(tgtKey);
+
+      // Remove card from source column
+      queryClient.setQueryData(srcKey, (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            data: { ...page.data, data: page.data.data.filter((p: Product) => p.id !== id) },
+          })),
+        };
+      });
+
+      // Prepend card to target column's first page
+      queryClient.setQueryData(tgtKey, (old: any) => {
+        if (!old) return old;
+        const updated = { ...product, status: newStatus };
+        return {
+          ...old,
+          pages: old.pages.map((page: any, i: number) =>
+            i === 0
+              ? { ...page, data: { ...page.data, data: [updated, ...page.data.data] } }
+              : page,
+          ),
+        };
+      });
+
+      return { prevSrc, prevTgt, srcKey, tgtKey };
     },
-    onError: (_err, _vars, context) => {
-      // Roll back on failure
-      if (context?.previous) {
-        queryClient.setQueryData(['products', filters], context.previous);
-      }
+
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prevSrc) queryClient.setQueryData(ctx.srcKey, ctx.prevSrc);
+      if (ctx?.prevTgt) queryClient.setQueryData(ctx.tgtKey, ctx.prevTgt);
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+
+    onSettled: () =>
+      queryClient.invalidateQueries({ queryKey: ['products', 'kanban'] }),
   });
 
-  const columns = STATUS_ORDER.map((status) => ({
-    status,
-    label: STATUS_LABELS[status],
-    items: products.filter((p) => p.status === status),
-  }));
-
-  const columnColors: Record<ProductStatus, { bg: string; border: string; dot: string }> = {
-    yet_to_start: { bg: 'bg-gray-500/5', border: 'border-gray-600/30', dot: 'bg-gray-400' },
-    working: { bg: 'bg-blue-500/5', border: 'border-blue-600/30', dot: 'bg-blue-400' },
-    review: { bg: 'bg-amber-500/5', border: 'border-amber-600/30', dot: 'bg-amber-400' },
-    done: { bg: 'bg-emerald-500/5', border: 'border-emerald-600/30', dot: 'bg-emerald-400' },
-  };
+  // ── Drag handlers ──────────────────────────────────────────────────────────
 
   const handleDragStart = (event: DragStartEvent) => {
-    const product = products.find((p) => p.id === event.active.id);
-    setActiveProduct(product || null);
+    const product = (event.active.data.current as any)?.product as Product | undefined;
+    setActiveProduct(product ?? null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setActiveProduct(null);
-    const { active, over } = event;
-    if (!over) return;
+    const { over } = event;
+    if (!over || !activeProduct) return;
 
-    const productId = active.id as number;
-    const product = products.find((p) => p.id === productId);
-    if (!product) return;
+    // over.id is always a column status string — cards are not droppables
+    const targetStatus = over.id as string;
+    if (targetStatus === activeProduct.status) return;
 
-    // Determine target status
-    let targetStatus: string;
-    if (STATUS_ORDER.includes(over.id as ProductStatus)) {
-      targetStatus = over.id as string;
-    } else {
-      const overProduct = products.find((p) => p.id === over.id);
-      targetStatus = overProduct?.status || product.status;
-    }
-
-    if (targetStatus !== product.status) {
-      statusMutation.mutate({ id: productId, status: targetStatus });
-    }
+    dragMutation.mutate({
+      id: activeProduct.id,
+      srcStatus: activeProduct.status,
+      newStatus: targetStatus,
+      product: activeProduct,
+    });
   };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  const columnColors: Record<ProductStatus, { bg: string; border: string; dot: string }> = {
+    yet_to_start: { bg: 'bg-gray-500/5',    border: 'border-gray-600/30',   dot: 'bg-gray-400'    },
+    working:      { bg: 'bg-blue-500/5',    border: 'border-blue-600/30',   dot: 'bg-blue-400'    },
+    review:       { bg: 'bg-amber-500/5',   border: 'border-amber-600/30',  dot: 'bg-amber-400'   },
+    done:         { bg: 'bg-emerald-500/5', border: 'border-emerald-600/30', dot: 'bg-emerald-400' },
+  };
+
+  const visibleStatuses = filters.status
+    ? [filters.status as ProductStatus]
+    : STATUS_ORDER;
+
+  const gridCls = visibleStatuses.length === 1
+    ? 'grid-cols-1'
+    : visibleStatuses.length === 2
+      ? 'grid-cols-1 md:grid-cols-2'
+      : 'grid-cols-1 md:grid-cols-2 xl:grid-cols-4';
 
   return (
     <div className="space-y-6 h-full flex flex-col">
@@ -124,35 +164,30 @@ export default function KanbanBoard() {
 
       <SearchFilters filters={filters} onChange={setFilters} />
 
-      {isLoading ? (
-        <div className="flex justify-center py-12 flex-1">
-          <div className="w-8 h-8 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className={`grid ${gridCls} gap-4 flex-1 min-h-0`}>
+          {visibleStatuses.map((status) => (
+            <KanbanColumn
+              key={status}
+              status={status}
+              label={STATUS_LABELS[status]}
+              colors={columnColors[status]}
+              baseFilters={baseFilters}
+              activeProductId={activeProduct?.id ?? null}
+              onCardClick={setSelectedProduct}
+            />
+          ))}
         </div>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCorners}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 flex-1 min-h-0">
-            {columns.map((col) => (
-              <KanbanColumn
-                key={col.status}
-                status={col.status as ProductStatus}
-                label={col.label}
-                items={col.items}
-                colors={columnColors[col.status as ProductStatus]}
-                onCardClick={setSelectedProduct}
-              />
-            ))}
-          </div>
 
-          <DragOverlay>
-            {activeProduct && <KanbanCardOverlay product={activeProduct} />}
-          </DragOverlay>
-        </DndContext>
-      )}
+        <DragOverlay>
+          {activeProduct && <KanbanCardOverlay product={activeProduct} />}
+        </DragOverlay>
+      </DndContext>
 
       {selectedProduct && (
         <ProductDetailModal productId={selectedProduct} onClose={() => setSelectedProduct(null)} />
@@ -164,41 +199,120 @@ export default function KanbanBoard() {
   );
 }
 
+// ─── Column ───────────────────────────────────────────────────────────────────
+
 function KanbanColumn({
-  status, label, items, colors, onCardClick,
+  status, label, colors, baseFilters, activeProductId, onCardClick,
 }: {
   status: ProductStatus;
   label: string;
-  items: Product[];
   colors: { bg: string; border: string; dot: string };
+  baseFilters: Record<string, string>;
+  activeProductId: number | null;
   onCardClick: (id: number) => void;
 }) {
-  const { setNodeRef } = useSortable({ id: status });
+  const parentRef = useRef<HTMLDivElement>(null);
+  const { setNodeRef: setDropRef, isOver } = useDroppable({ id: status });
+
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: colKey(status, baseFilters),
+    queryFn: ({ pageParam }) =>
+      productsApi.getPaged({ ...baseFilters, status }, PAGE_SIZE, pageParam as number | undefined),
+    getNextPageParam: (lastPage) => lastPage.data.next_cursor ?? undefined,
+    initialPageParam: undefined as number | undefined,
+  });
+
+  const items: Product[] = data?.pages.flatMap((p) => p.data.data) ?? [];
+
+  // Keep the drag-source column as a flat list so @dnd-kit can measure all DOM nodes
+  const isDragSource = activeProductId !== null && items.some((p) => p.id === activeProductId);
+  const shouldVirtualize = items.length > VIRTUAL_THRESHOLD && !isDragSource;
+
+  const virtualizer = useVirtualizer({
+    count: shouldVirtualize ? items.length : 0,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => CARD_ESTIMATE_PX,
+    measureElement: (el) => el.getBoundingClientRect().height,
+    overscan: 3,
+  });
 
   return (
     <div
-      ref={setNodeRef}
-      className={`${colors.bg} border ${colors.border} rounded-2xl flex flex-col min-h-[200px]`}
+      ref={setDropRef}
+      className={`${colors.bg} border ${isOver ? 'border-brand-500/50' : colors.border} rounded-2xl flex flex-col min-h-[200px] transition-colors duration-150`}
     >
-      <div className="p-4 border-b border-surface-700/30">
+      {/* Header */}
+      <div className="p-4 border-b border-surface-700/30 flex-shrink-0">
         <div className="flex items-center gap-2">
           <div className={`w-2.5 h-2.5 rounded-full ${colors.dot}`} />
           <h3 className="font-semibold text-sm">{label}</h3>
           <span className="ml-auto text-xs text-surface-500 bg-surface-800/50 px-2 py-0.5 rounded-full">
-            {items.length}
+            {items.length}{hasNextPage ? '+' : ''}
           </span>
         </div>
       </div>
 
-      <div className="p-2 flex-1 overflow-y-auto space-y-2">
-        <SortableContext items={items.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-          {items.map((product) => (
-            <KanbanCard key={product.id} product={product} onClick={() => onCardClick(product.id)} />
-          ))}
-        </SortableContext>
-        {items.length === 0 && (
+      {/* Card list */}
+      <div ref={parentRef} className="p-2 flex-1 overflow-y-auto min-h-0">
+        {isLoading ? (
+          <div className="flex justify-center py-6">
+            <div className="w-6 h-6 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
+          </div>
+        ) : items.length === 0 ? (
           <div className="flex items-center justify-center h-20 text-surface-500 text-xs">
             Drop items here
+          </div>
+        ) : shouldVirtualize ? (
+          /* Virtual list — only visible cards are in the DOM */
+          <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
+            {virtualizer.getVirtualItems().map((vItem) => (
+              <div
+                key={vItem.key}
+                data-index={vItem.index}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${vItem.start}px)`,
+                  paddingBottom: '8px',
+                }}
+              >
+                <KanbanCard
+                  product={items[vItem.index]}
+                  status={status}
+                  onClick={() => onCardClick(items[vItem.index].id)}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Flat list — used when item count ≤ threshold or while dragging from this column */
+          <div className="space-y-2">
+            {items.map((product) => (
+              <KanbanCard
+                key={product.id}
+                product={product}
+                status={status}
+                onClick={() => onCardClick(product.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Per-column load more */}
+        {hasNextPage && (
+          <div className="flex justify-center pt-2">
+            <button
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
+              className="flex items-center gap-1.5 text-xs text-surface-400 hover:text-surface-200 px-3 py-1.5 rounded-lg hover:bg-surface-700/30 transition-colors disabled:opacity-50"
+            >
+              {isFetchingNextPage
+                ? <><Loader2 className="w-3 h-3 animate-spin" /> Loading…</>
+                : 'Load more'}
+            </button>
           </div>
         )}
       </div>
@@ -206,21 +320,25 @@ function KanbanColumn({
   );
 }
 
-function KanbanCard({ product, onClick }: { product: Product; onClick: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: product.id,
-  });
+// ─── Card ─────────────────────────────────────────────────────────────────────
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+function KanbanCard({
+  product, status, onClick,
+}: {
+  product: Product;
+  status: string;
+  onClick: () => void;
+}) {
+  // useDraggable (not useSortable) — no within-column sort, no transform conflict with virtualizer
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: product.id,
+    data: { product, status },
+  });
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{ opacity: isDragging ? 0.3 : 1 }}
       className="bg-surface-800/80 border border-surface-700/50 rounded-xl p-3 cursor-pointer card-hover group"
       onClick={onClick}
     >
@@ -250,6 +368,8 @@ function KanbanCard({ product, onClick }: { product: Product; onClick: () => voi
     </div>
   );
 }
+
+// ─── Drag overlay card (follows cursor) ──────────────────────────────────────
 
 function KanbanCardOverlay({ product }: { product: Product }) {
   return (
