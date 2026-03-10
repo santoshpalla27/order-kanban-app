@@ -32,6 +32,7 @@ type CreateProductRequest struct {
 }
 
 type UpdateProductRequest struct {
+	ProductID     string `json:"product_id"`
 	CustomerName  string `json:"customer_name"`
 	CustomerPhone string `json:"customer_phone"`
 	Description   string `json:"description"`

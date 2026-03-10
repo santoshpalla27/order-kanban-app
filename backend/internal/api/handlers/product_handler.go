@@ -151,15 +151,26 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	}
 
 	updates := map[string]interface{}{}
+	if req.ProductID != "" {
+		// Check uniqueness only if the ID is actually changing
+		existing, _ := services.GetProductByIDSimple(uint(id))
+		if existing == nil || existing.ProductID != req.ProductID {
+			if taken, reason, err := services.IsProductIDTaken(req.ProductID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to validate product ID"})
+				return
+			} else if taken {
+				c.JSON(http.StatusConflict, gin.H{"error": reason})
+				return
+			}
+		}
+		updates["product_id"] = req.ProductID
+	}
 	if req.CustomerName != "" {
 		updates["customer_name"] = req.CustomerName
 	}
-	if req.CustomerPhone != "" {
-		updates["customer_phone"] = req.CustomerPhone
-	}
-	if req.Description != "" {
-		updates["description"] = req.Description
-	}
+	// Allow clearing optional fields by always setting them when present in the request
+	updates["customer_phone"] = req.CustomerPhone
+	updates["description"] = req.Description
 
 	if err := services.UpdateProduct(uint(id), updates); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})

@@ -335,15 +335,110 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
   const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ''; };
 
+  const queryClient = useQueryClient();
+  const { canCreateProduct } = useAuthStore();
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ product_id: '', customer_name: '', customer_phone: '', description: '' });
+  const [editError, setEditError] = useState<string | null>(null);
+
+  const startEdit = () => {
+    setEditForm({
+      product_id: product.product_id,
+      customer_name: product.customer_name,
+      customer_phone: product.customer_phone || '',
+      description: product.description || '',
+    });
+    setEditError(null);
+    setEditing(true);
+  };
+
+  const editMutation = useMutation({
+    mutationFn: (data: typeof editForm) => productsApi.update(productId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      setEditing(false);
+      setEditError(null);
+    },
+    onError: (err: any) => {
+      setEditError(err.response?.data?.error || 'Failed to save changes');
+    },
+  });
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.product_id.trim() || !editForm.customer_name.trim()) return;
+    editMutation.mutate(editForm);
+  };
+
   return (
     <>
     {uploading && <UploadProgressModal files={uploadFiles_state} onCancel={cancelUpload} />}
     <div className="space-y-5">
       <div className="space-y-3">
-        <DetailRow label="Product ID" value={product.product_id} />
-        <DetailRow label="Customer Name" value={product.customer_name} />
-        <DetailRow label="Customer Phone" value={product.customer_phone || '—'} />
-        <DetailRow label="Description" value={product.description || '—'} />
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-surface-500 uppercase tracking-wider">Product Details</span>
+          {canCreateProduct() && !editing && (
+            <button onClick={startEdit} className="flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition-colors bg-brand-500/10 hover:bg-brand-500/20 px-2.5 py-1.5 rounded-lg">
+              <Edit2 className="w-3.5 h-3.5" /> Edit
+            </button>
+          )}
+        </div>
+
+        {editing ? (
+          <form onSubmit={handleSave} className="space-y-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-surface-500 uppercase tracking-wider">Product ID</label>
+              <input
+                value={editForm.product_id}
+                onChange={(e) => setEditForm(f => ({ ...f, product_id: e.target.value }))}
+                className="text-sm"
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-surface-500 uppercase tracking-wider">Customer Name</label>
+              <input
+                value={editForm.customer_name}
+                onChange={(e) => setEditForm(f => ({ ...f, customer_name: e.target.value }))}
+                className="text-sm"
+                required
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-surface-500 uppercase tracking-wider">Customer Phone</label>
+              <input
+                value={editForm.customer_phone}
+                onChange={(e) => setEditForm(f => ({ ...f, customer_phone: e.target.value }))}
+                className="text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-surface-500 uppercase tracking-wider">Description</label>
+              <textarea
+                value={editForm.description}
+                onChange={(e) => setEditForm(f => ({ ...f, description: e.target.value }))}
+                rows={3}
+                className="text-sm resize-none"
+              />
+            </div>
+            {editError && <p className="text-xs text-red-400">{editError}</p>}
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setEditing(false)} className="btn-ghost px-4 py-2 text-sm flex-1" disabled={editMutation.isPending}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary px-4 py-2 text-sm flex-1" disabled={editMutation.isPending}>
+                {editMutation.isPending ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          <>
+            <DetailRow label="Product ID" value={product.product_id} />
+            <DetailRow label="Customer Name" value={product.customer_name} />
+            <DetailRow label="Customer Phone" value={product.customer_phone || '—'} />
+            <DetailRow label="Description" value={product.description || '—'} />
+          </>
+        )}
         <DetailRow label="Created By" value={product.creator?.name || '—'} />
         <DetailRow label="Created At" value={new Date(product.created_at).toLocaleString()} />
       </div>
