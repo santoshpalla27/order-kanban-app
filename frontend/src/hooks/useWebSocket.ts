@@ -65,6 +65,7 @@ export function useWebSocket() {
                 entityId: actEntityId,
                 senderName: actorName,
               });
+              playNotificationSound();
             }
             break;
           case 'notification': {
