@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,14 +21,25 @@ import (
 )
 
 func main() {
+	// ── Structured logger ─────────────────────────────────────────────────────
+	// JSON in production (LOG_FORMAT=json), human-readable text otherwise.
+	var logger *slog.Logger
+	if os.Getenv("LOG_FORMAT") == "json" {
+		logger = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	} else {
+		logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	}
+	slog.SetDefault(logger)
+
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found — using environment variables")
+		slog.Info("No .env file found — using environment variables")
 	}
 
 	cfg := config.Load()
 
 	if cfg.DatabaseURL == "" {
-		log.Fatal("DATABASE_URL is required")
+		slog.Error("DATABASE_URL is required")
+		os.Exit(1)
 	}
 
 	// Initialize PostgreSQL (versioned migrations + seed roles)
@@ -41,8 +52,6 @@ func main() {
 	go handlers.Hub.Run()
 
 	// Start PostgreSQL LISTEN/NOTIFY listener.
-	// All WS broadcasts are routed through this so that multiple backend
-	// instances can each deliver to their own connected clients.
 	database.StartListener(cfg.DatabaseURL, func(eventType string, excludeID, userID uint, wsMsg []byte) {
 		switch eventType {
 		case "broadcast":
@@ -54,72 +63,60 @@ func main() {
 		}
 	})
 
-	// Purge products past their 10-day grace period — runs every 6 hours
-	go func() {
-		for {
-			time.Sleep(6 * time.Hour)
-			if err := services.PurgeExpiredDeletedProducts(); err != nil {
-				log.Printf("Trash purge error: %v", err)
-			}
-		}
-	}()
+	// ── Background purge jobs ─────────────────────────────────────────────────
 
-	// Purge expired refresh tokens — runs every hour
-	go func() {
-		for {
-			time.Sleep(1 * time.Hour)
-			if err := services.PurgeExpiredRefreshTokens(); err != nil {
-				log.Printf("Refresh token purge error: %v", err)
+	purge := func(name string, interval time.Duration, fn func() error) {
+		go func() {
+			for {
+				time.Sleep(interval)
+				if err := fn(); err != nil {
+					slog.Error("purge job failed", "job", name, "error", err)
+				} else {
+					slog.Info("purge job completed", "job", name)
+				}
 			}
-		}
-	}()
+		}()
+	}
 
-	// Purge notifications older than 5 days — runs every 24 hours
-	go func() {
-		for {
-			time.Sleep(24 * time.Hour)
-			if err := services.PurgeOldNotifications(5); err != nil {
-				log.Printf("Notification purge error: %v", err)
-			}
-		}
-	}()
+	purge("trash",         6*time.Hour,  services.PurgeExpiredDeletedProducts)
+	purge("refresh_token", 1*time.Hour,  services.PurgeExpiredRefreshTokens)
+	purge("notification",  24*time.Hour, func() error { return services.PurgeOldNotifications(5) })
+	purge("activity_log",  24*time.Hour, func() error { return services.PurgeOldActivityLogs(10) })
+	purge("chat_message",  24*time.Hour, func() error { return services.PurgeOldChatMessages(30) })
 
-	// Purge activity logs older than 10 days — runs every 24 hours
-	go func() {
-		for {
-			time.Sleep(24 * time.Hour)
-			if err := services.PurgeOldActivityLogs(10); err != nil {
-				log.Printf("Activity log purge error: %v", err)
-			}
-		}
-	}()
+	// ── HTTP server ───────────────────────────────────────────────────────────
 
 	router := api.SetupRouter(cfg)
 
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%s", cfg.Port),
-		Handler: router,
+		Addr:              fmt.Sprintf(":%s", cfg.Port),
+		Handler:           router,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
-	// Start server in background goroutine
 	go func() {
-		log.Printf("Server starting on %s", srv.Addr)
+		slog.Info("server starting", "addr", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("Failed to start server: %v", err)
+			slog.Error("server failed", "error", err)
+			os.Exit(1)
 		}
 	}()
 
-	// Block until SIGINT or SIGTERM
+	// ── Graceful shutdown ─────────────────────────────────────────────────────
+
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutdown signal received — draining connections (30s)…")
+	slog.Info("shutdown signal received — draining connections", "timeout", "30s")
 
-	// Give in-flight requests and WS connections 30s to finish
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		slog.Error("server forced to shutdown", "error", err)
+		os.Exit(1)
 	}
-	log.Println("Server exited cleanly")
+	slog.Info("server exited cleanly")
 }
