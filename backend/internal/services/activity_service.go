@@ -1,12 +1,50 @@
 package services
 
 import (
+	"encoding/json"
+	"fmt"
+
 	"kanban-app/database"
 	"kanban-app/internal/models"
 )
 
 func CreateActivityLog(log *models.ActivityLog) error {
-	return database.DB.Create(log).Error
+	if err := database.DB.Create(log).Error; err != nil {
+		return err
+	}
+
+	// Look up actor name for the toast message.
+	var actor models.User
+	database.DB.Select("name").First(&actor, log.UserID)
+	actorName := actor.Name
+	if actorName == "" {
+		actorName = "Unknown"
+	}
+
+	// Build a product/comment link so the toast has an "Open →" button.
+	var entityURL string
+	switch log.Entity {
+	case "product":
+		entityURL = fmt.Sprintf("/?product=%d", log.EntityID)
+	case "comment":
+		// EntityID for comment logs is the product ID.
+		entityURL = fmt.Sprintf("/?product=%d", log.EntityID)
+	}
+
+	wsMsg, _ := json.Marshal(map[string]interface{}{
+		"type": "activity_updated",
+		"payload": map[string]interface{}{
+			"actor_id":   log.UserID,
+			"actor_name": actorName,
+			"message":    log.Details,
+			"entity":     log.Entity,
+			"entity_id":  log.EntityID,
+			"entity_url": entityURL,
+		},
+	})
+	// Exclude the actor — they know what they did.
+	database.EmitBroadcastExcept(log.UserID, wsMsg)
+	return nil
 }
 
 func GetActivityLogs(entityType string, entityID uint) ([]models.ActivityLog, error) {
@@ -19,7 +57,6 @@ func GetActivityLogs(entityType string, entityID uint) ([]models.ActivityLog, er
 func GetAllRecentActivityLogs(limit int) ([]models.ActivityLog, error) {
 	var logs []models.ActivityLog
 	err := database.DB.Preload("User").
-		Where("entity != ?", "comment").
 		Order("created_at DESC").Limit(limit).Find(&logs).Error
 	return logs, err
 }

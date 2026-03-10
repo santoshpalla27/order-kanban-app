@@ -144,6 +144,14 @@ func (h *CommentHandler) Update(c *gin.Context) {
 		return
 	}
 
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   userID,
+		Action:   "edited",
+		Entity:   "comment",
+		EntityID: comment.ProductID,
+		Details:  fmt.Sprintf("Edited a comment on product #%d", comment.ProductID),
+	})
+
 	c.JSON(http.StatusOK, gin.H{"message": "Comment updated"})
 }
 
@@ -171,6 +179,14 @@ func (h *CommentHandler) Delete(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete comment"})
 		return
 	}
+
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   userID,
+		Action:   "deleted",
+		Entity:   "comment",
+		EntityID: comment.ProductID,
+		Details:  fmt.Sprintf("Deleted a comment on product #%d", comment.ProductID),
+	})
 
 	c.JSON(http.StatusOK, gin.H{"message": "Comment deleted"})
 }

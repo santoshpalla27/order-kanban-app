@@ -101,8 +101,6 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	}
 
 	userID := c.GetUint("user_id")
-	userName, _ := c.Get("user_name")
-	senderName := userName.(string)
 
 	product := &models.Product{
 		ProductID:     req.ProductID,
@@ -127,9 +125,6 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		EntityID: product.ID,
 		Details:  fmt.Sprintf("Created product %s", product.ProductID),
 	})
-
-	message := fmt.Sprintf("%s created new product: %s", senderName, product.ProductID)
-	services.CreateNotificationForAllExcept(userID, nil, message, "product_created", "product", product.ID, "", senderName)
 
 	wsMsg, _ := json.Marshal(WSMessage{Type: "product_created", Payload: product})
 	database.EmitBroadcast(wsMsg)
@@ -186,6 +181,10 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		EntityID: product.ID,
 		Details:  fmt.Sprintf("Updated product %s", product.ProductID),
 	})
+
+	wsMsg, _ := json.Marshal(WSMessage{Type: "product_update", Payload: product})
+	database.EmitBroadcast(wsMsg)
+
 	c.JSON(http.StatusOK, product)
 }
 

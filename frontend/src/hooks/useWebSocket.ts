@@ -7,6 +7,7 @@ import { playNotificationSound } from '../utils/sound';
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const token = useAuthStore((s) => s.token);
+  const currentUserId = useAuthStore((s) => s.user?.id);
   const queryClient = useQueryClient();
   const addToast = useToastStore((s) => s.addToast);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -48,6 +49,24 @@ export function useWebSocket() {
           case 'chat_message':
             queryClient.invalidateQueries({ queryKey: ['chat'] });
             break;
+          case 'activity_updated':
+            queryClient.invalidateQueries({ queryKey: ['activity-full'] });
+            if (data.payload?.actor_name && data.payload?.actor_id !== currentUserId) {
+              const actorName = (data.payload.actor_name as string) || '';
+              const actMsg = (data.payload.message as string) || 'Activity updated';
+              const actEntityId = (data.payload.entity_id as number) || 0;
+              const actLink = (data.payload.entity_url as string) || null;
+              addToast({
+                message: actMsg,
+                content: '',
+                type: 'activity',
+                link: actLink,
+                entityType: 'activity',
+                entityId: actEntityId,
+                senderName: actorName,
+              });
+            }
+            break;
           case 'notification': {
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
             queryClient.invalidateQueries({ queryKey: ['unread-count'] });
@@ -78,7 +97,7 @@ export function useWebSocket() {
     ws.onerror = () => {
       ws.close();
     };
-  }, [token, queryClient, addToast]);
+  }, [token, currentUserId, queryClient, addToast]);
 
   useEffect(() => {
     connect();

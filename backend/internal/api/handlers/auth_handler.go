@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -188,11 +187,8 @@ func (h *AuthHandler) generateTokenPair(user *models.User) (string, string, erro
 	return accessToken, refreshToken, nil
 }
 
-// NotifyStatusChange broadcasts a product_update WS event and persists toast notifications
-// for all users except the mover — all delivered via LISTEN/NOTIFY (multi-instance safe).
+// NotifyStatusChange broadcasts a product_update WS event so all clients refresh their board.
 func NotifyStatusChange(userID uint, userName string, product *models.Product, oldStatus, newStatus string) {
-	message := fmt.Sprintf("%s moved '%s' from %s to %s", userName, product.ProductID, oldStatus, newStatus)
-
 	wsMsg, _ := json.Marshal(WSMessage{
 		Type: "product_update",
 		Payload: gin.H{
@@ -204,6 +200,4 @@ func NotifyStatusChange(userID uint, userName string, product *models.Product, o
 		},
 	})
 	database.EmitBroadcast(wsMsg)
-
-	services.CreateNotificationForAllExcept(userID, nil, message, "status_change", "product", product.ID, "", userName)
 }

@@ -207,6 +207,15 @@ func (h *AttachmentHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	userID := c.GetUint("user_id")
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   userID,
+		Action:   "deleted",
+		Entity:   "attachment",
+		EntityID: attachment.ID,
+		Details:  fmt.Sprintf("Deleted attachment '%s'", attachment.FileName),
+	})
+
 	c.JSON(http.StatusOK, gin.H{"message": "Attachment deleted"})
 }
 

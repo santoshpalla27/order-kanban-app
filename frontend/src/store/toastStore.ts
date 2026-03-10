@@ -20,7 +20,7 @@ interface ToastState {
 export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
   addToast: (toast) => {
-    if (get().toasts.some((t) => t.message === toast.message)) return;
+    if (get().toasts.some((t) => t.message === toast.message && t.senderName === toast.senderName)) return;
     const id = Math.random().toString(36).slice(2);
     set((s) => ({ toasts: [...s.toasts, { id, ...toast }] }));
     setTimeout(() => {
