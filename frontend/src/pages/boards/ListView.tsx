@@ -8,13 +8,13 @@ import { Product, STATUS_LABELS, STATUS_ORDER, ProductStatus } from '../../types
 import SearchFilters from '../../components/SearchFilters';
 import ProductDetailModal from '../../components/ProductDetailModal';
 import CreateProductModal from '../../components/CreateProductModal';
-import { Plus, Eye, Trash2, Loader2 } from 'lucide-react';
+import { Plus, Eye, Trash2, Loader2, Search } from 'lucide-react';
 
 const PAGE_SIZE = 50;
-const VIRTUAL_THRESHOLD = 15;
 const ROW_HEIGHT = 53;
+const SECTION_HEIGHT = ROW_HEIGHT * 6; // ~6 rows visible before scroll
 
-// ─── Virtual table for one status group ─────────────────────────────────────
+// ─── Scrollable virtual table for one status group ───────────────────────────
 
 function StatusTable({
   items,
@@ -22,15 +22,16 @@ function StatusTable({
   onView,
   onDelete,
   canDelete,
+  onScrollEnd,
 }: {
   items: Product[];
   onStatusChange: (id: number, status: string) => void;
   onView: (id: number) => void;
   onDelete: (id: number) => void;
   canDelete: boolean;
+  onScrollEnd: () => void;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
-  const shouldVirtualize = items.length > VIRTUAL_THRESHOLD;
 
   const virtualizer = useVirtualizer({
     count: items.length,
@@ -40,92 +41,85 @@ function StatusTable({
   });
 
   const virtualItems = virtualizer.getVirtualItems();
-  const paddingTop = shouldVirtualize && virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
   const paddingBottom =
-    shouldVirtualize && virtualItems.length > 0
+    virtualItems.length > 0
       ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
       : 0;
 
-  const rows = shouldVirtualize ? virtualItems.map((vr) => items[vr.index]) : items;
-
-  const tableHead = (
-    <thead className={shouldVirtualize ? 'sticky top-0 z-10 bg-surface-900/95 backdrop-blur-sm' : ''}>
-      <tr className="border-b border-surface-700/50">
-        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Product ID</th>
-        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Customer</th>
-        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Phone</th>
-        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Description</th>
-        <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</th>
-        <th className="text-right text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Actions</th>
-      </tr>
-    </thead>
-  );
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight < 120) {
+      onScrollEnd();
+    }
+  };
 
   return (
     <div
       ref={parentRef}
-      className="glass rounded-xl overflow-hidden"
-      style={
-        shouldVirtualize
-          ? { maxHeight: `${VIRTUAL_THRESHOLD * ROW_HEIGHT + ROW_HEIGHT}px`, overflowY: 'auto' }
-          : {}
-      }
+      className="glass rounded-xl overflow-y-auto"
+      style={{ height: `${SECTION_HEIGHT}px` }}
+      onScroll={handleScroll}
     >
       <table className="w-full">
-        {tableHead}
+        <thead className="sticky top-0 z-10 bg-surface-900/95 backdrop-blur-sm">
+          <tr className="border-b border-surface-700/50">
+            <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Product ID</th>
+            <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Customer</th>
+            <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden md:table-cell">Phone</th>
+            <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:table-cell">Description</th>
+            <th className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</th>
+            <th className="text-right text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Actions</th>
+          </tr>
+        </thead>
         <tbody>
-          {shouldVirtualize && paddingTop > 0 && (
+          {paddingTop > 0 && (
             <tr><td colSpan={6} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} /></tr>
           )}
-          {rows.map((product) => (
-            <tr
-              key={product.id}
-              className="border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors"
-            >
-              <td className="px-4 py-3">
-                <span className="text-sm font-medium text-brand-400">{product.product_id}</span>
-              </td>
-              <td className="px-4 py-3 text-sm">{product.customer_name}</td>
-              <td className="px-4 py-3 text-sm text-surface-400 hidden md:table-cell">
-                {product.customer_phone || '—'}
-              </td>
-              <td className="px-4 py-3 text-sm text-surface-400 hidden lg:table-cell max-w-[200px] truncate">
-                {product.description || '—'}
-              </td>
-              <td className="px-4 py-3">
-                <select
-                  value={product.status}
-                  onChange={(e) => onStatusChange(product.id, e.target.value)}
-                  className={`text-xs px-2 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer`}
-                >
-                  {STATUS_ORDER.map((s) => (
-                    <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                  ))}
-                </select>
-              </td>
-              <td className="px-4 py-3 text-right">
-                <div className="flex items-center justify-end gap-1">
-                  <button
-                    onClick={() => onView(product.id)}
-                    className="btn-ghost p-1.5 rounded-lg"
-                    title="View details"
+          {virtualItems.map((vr) => {
+            const product = items[vr.index];
+            return (
+              <tr
+                key={product.id}
+                className="border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors"
+              >
+                <td className="px-4 py-3">
+                  <span className="text-sm font-medium text-brand-400">{product.product_id}</span>
+                </td>
+                <td className="px-4 py-3 text-sm">{product.customer_name}</td>
+                <td className="px-4 py-3 text-sm text-surface-400 hidden md:table-cell">
+                  {product.customer_phone || '—'}
+                </td>
+                <td className="px-4 py-3 text-sm text-surface-400 hidden lg:table-cell max-w-[200px] truncate">
+                  {product.description || '—'}
+                </td>
+                <td className="px-4 py-3">
+                  <select
+                    value={product.status}
+                    onChange={(e) => onStatusChange(product.id, e.target.value)}
+                    className={`text-xs px-2 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer`}
                   >
-                    <Eye className="w-4 h-4" />
-                  </button>
-                  {canDelete && (
-                    <button
-                      onClick={() => onDelete(product.id)}
-                      className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
+                    {STATUS_ORDER.map((s) => (
+                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <button onClick={() => onView(product.id)} className="btn-ghost p-1.5 rounded-lg" title="View details">
+                      <Eye className="w-4 h-4" />
                     </button>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-          {shouldVirtualize && paddingBottom > 0 && (
+                    {canDelete && (
+                      <button onClick={() => onDelete(product.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+          {paddingBottom > 0 && (
             <tr><td colSpan={6} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} /></tr>
           )}
         </tbody>
@@ -152,16 +146,10 @@ function StatusSection({
   canDelete: boolean;
 }) {
   const queryClient = useQueryClient();
+  const [sectionSearch, setSectionSearch] = useState('');
 
-  // Each status has its own infinite query — independent cursors
   const queryKey = ['products', 'paged', status, filters];
-  const {
-    data,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
+  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam }) =>
       productsApi.getPaged({ ...filters, status }, PAGE_SIZE, pageParam as number | undefined),
@@ -169,8 +157,19 @@ function StatusSection({
     initialPageParam: undefined as number | undefined,
   });
 
-  const items: Product[] = data?.pages.flatMap((p) => p.data.data) ?? [];
-  const total: number = data?.pages[0]?.data.total ?? items.length;
+  const allItems: Product[] = data?.pages.flatMap((p) => p.data.data) ?? [];
+  const total: number = data?.pages[0]?.data.total ?? allItems.length;
+
+  const q = sectionSearch.trim().toLowerCase();
+  const filtered = q
+    ? allItems.filter(
+        (p) =>
+          p.product_id.toLowerCase().includes(q) ||
+          p.customer_name.toLowerCase().includes(q) ||
+          (p.customer_phone || '').toLowerCase().includes(q) ||
+          (p.description || '').toLowerCase().includes(q),
+      )
+    : allItems;
 
   const statusColors: Record<ProductStatus, string> = {
     yet_to_start: 'from-gray-500 to-gray-600',
@@ -179,65 +178,65 @@ function StatusSection({
     done: 'from-emerald-500 to-emerald-600',
   };
 
-  // Optimistic status change within the per-status cache
   const handleStatusChange = (id: number, newStatus: string) => {
     onStatusChange(id, newStatus);
-    // Remove product from this group optimistically (it moved to another status)
     queryClient.setQueryData(queryKey, (old: any) => {
       if (!old) return old;
       return {
         ...old,
         pages: old.pages.map((page: any) => ({
           ...page,
-          data: {
-            ...page.data,
-            data: page.data.data.filter((p: Product) => p.id !== id),
-          },
+          data: { ...page.data, data: page.data.data.filter((p: Product) => p.id !== id) },
         })),
       };
     });
   };
 
+  const handleScrollEnd = () => {
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  };
+
   return (
     <div>
-      <div className="flex items-center gap-3 mb-3">
-        <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${statusColors[status]}`} />
+      <div className="flex items-center gap-3 mb-3 flex-wrap">
+        <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${statusColors[status]} flex-shrink-0`} />
         <h2 className="text-lg font-semibold">{STATUS_LABELS[status]}</h2>
-        <span className="text-sm text-surface-500">
-          ({total})
-        </span>
+        <span className="text-sm text-surface-500">({total})</span>
+        <div className="ml-auto flex items-center gap-1.5 bg-surface-800/60 border border-surface-700/40 rounded-lg px-2.5 py-1.5">
+          <Search className="w-3.5 h-3.5 text-surface-500 flex-shrink-0" />
+          <input
+            value={sectionSearch}
+            onChange={(e) => setSectionSearch(e.target.value)}
+            placeholder="Filter this section…"
+            className="bg-transparent border-0 outline-none text-xs text-surface-200 placeholder-surface-500 w-36"
+          />
+          {sectionSearch && (
+            <button onClick={() => setSectionSearch('')} className="text-surface-500 hover:text-surface-300 text-xs">✕</button>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
         <div className="glass rounded-xl p-6 flex justify-center">
           <div className="w-6 h-6 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
         </div>
-      ) : items.length === 0 ? (
-        <div className="glass rounded-xl p-6 text-center text-surface-500 text-sm">
-          No products
+      ) : filtered.length === 0 ? (
+        <div className="glass rounded-xl p-6 text-center text-surface-500 text-sm" style={{ height: `${SECTION_HEIGHT}px` }}>
+          {sectionSearch ? 'No matches in this section' : 'No products'}
         </div>
       ) : (
         <>
           <StatusTable
-            items={items}
+            items={filtered}
             onStatusChange={handleStatusChange}
             onView={onView}
             onDelete={onDelete}
             canDelete={canDelete}
+            onScrollEnd={handleScrollEnd}
           />
-          {hasNextPage && (
-            <div className="flex justify-center mt-2">
-              <button
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-                className="btn-ghost flex items-center gap-2 px-4 py-2 text-sm"
-              >
-                {isFetchingNextPage ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</>
-                ) : (
-                  'Load more'
-                )}
-              </button>
+          {isFetchingNextPage && (
+            <div className="flex justify-center items-center gap-2 py-1.5 text-xs text-surface-500">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-brand-400" /> Loading more…
             </div>
           )}
         </>
