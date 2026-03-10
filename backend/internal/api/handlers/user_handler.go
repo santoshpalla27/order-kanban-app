@@ -136,6 +136,11 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	}
 
 	targetUser, _ := services.GetUserByID(uint(id))
+
+	// Kick active session before deleting
+	forceMsg, _ := json.Marshal(map[string]string{"type": "force_logout"})
+	database.EmitToUser(uint(id), forceMsg)
+
 	if err := services.DeleteUser(uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
 		return

@@ -32,6 +32,8 @@ func UpdateUserRole(id uint, roleID uint) error {
 }
 
 func DeleteUser(id uint) error {
+	// Revoke sessions first so the user is immediately logged out
+	_ = RevokeUserRefreshTokens(id)
 	return database.DB.Delete(&models.User{}, id).Error
 }
 
