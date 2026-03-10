@@ -58,7 +58,7 @@ function StatusTable({
     <div
       ref={parentRef}
       className="glass rounded-xl overflow-y-auto"
-      style={{ height: `${SECTION_HEIGHT}px` }}
+      style={{ height: `${SECTION_HEIGHT}px`, overscrollBehavior: 'contain' }}
       onScroll={handleScroll}
     >
       <table className="w-full">
