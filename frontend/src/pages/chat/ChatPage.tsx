@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chatApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { ChatMessage } from '../../types';
-import { Send, Smile, Users, Hash } from 'lucide-react';
+import { Send, Smile, Users, Hash, ChevronUp } from 'lucide-react';
 import MentionInput, { renderWithMentions, MentionInputHandle } from '../../components/MentionInput';
 
 const EMOJIS = ['👍', '👎', '😄', '😢', '🎉', '🔥', '❤️', '🚀', '👏', '✅', '❌', '💡', '⭐', '🙏', '😂'];
@@ -25,20 +25,78 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+const PAGE_SIZE = 50;
+
 export default function ChatPage() {
   const [message, setMessage] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<MentionInputHandle>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
 
+  // Older history loaded via "Load older" button
+  const [olderMessages, setOlderMessages] = useState<ChatMessage[]>([]);
+  const [olderCursor, setOlderCursor] = useState<number | null>(null);
+  const [hasOlderHistory, setHasOlderHistory] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [olderInitialised, setOlderInitialised] = useState(false);
+
   const { data, isLoading } = useQuery({
     queryKey: ['chat'],
-    queryFn: () => chatApi.getMessages(100),
+    queryFn: () => chatApi.getMessages(PAGE_SIZE),
     refetchInterval: 5000,
   });
-  const messages: ChatMessage[] = data?.data || [];
+
+  const latestMessages: ChatMessage[] = data?.data?.data ?? [];
+
+  // On first load, initialise older-history cursor from the latest page
+  useEffect(() => {
+    if (!olderInitialised && data?.data) {
+      const page = data.data;
+      if (page.has_more && page.next_cursor != null) {
+        setOlderCursor(page.next_cursor);
+        setHasOlderHistory(true);
+      }
+      setOlderInitialised(true);
+    }
+  }, [data, olderInitialised]);
+
+  // De-duplicate: olderMessages may overlap with latestMessages after a refetch
+  const allMessages = (() => {
+    const latestIds = new Set(latestMessages.map(m => m.id));
+    const unique = olderMessages.filter(m => !latestIds.has(m.id));
+    return [...unique, ...latestMessages];
+  })();
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!olderCursor || loadingOlder) return;
+    const container = messagesContainerRef.current;
+    const prevScrollHeight = container?.scrollHeight ?? 0;
+
+    setLoadingOlder(true);
+    try {
+      const res = await chatApi.getMessages(PAGE_SIZE, olderCursor);
+      const page = res.data;
+      setOlderMessages(prev => [...page.data, ...prev]);
+      if (page.has_more && page.next_cursor != null) {
+        setOlderCursor(page.next_cursor);
+        setHasOlderHistory(true);
+      } else {
+        setOlderCursor(null);
+        setHasOlderHistory(false);
+      }
+      // Restore scroll position after prepend
+      requestAnimationFrame(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight - prevScrollHeight;
+        }
+      });
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [olderCursor, loadingOlder]);
 
   const sendMutation = useMutation({
     mutationFn: (msg: string) => chatApi.sendMessage(msg),
@@ -50,7 +108,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+  }, [latestMessages.length]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -78,14 +136,14 @@ export default function ChatPage() {
 
   // Pre-process messages: compute grouping info
   let lastDate = '';
-  const processed = messages.map((msg, idx) => {
+  const processed = allMessages.map((msg, idx) => {
     const isOwn = msg.user_id === user?.id;
     const senderName = msg.user?.name || msg.user_name || 'Unknown';
     const msgDate = formatDateSep(msg.created_at);
     const showDate = msgDate !== lastDate;
     lastDate = msgDate;
-    const prev = messages[idx - 1];
-    const next = messages[idx + 1];
+    const prev = allMessages[idx - 1];
+    const next = allMessages[idx + 1];
     const sameDay = (a: ChatMessage, b: ChatMessage) =>
       formatDateSep(a.created_at) === formatDateSep(b.created_at);
     const isFirst = !prev || prev.user_id !== msg.user_id || !sameDay(prev, msg);
@@ -107,12 +165,15 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto rounded-2xl px-4 py-3 mb-3 bg-surface-900/50 border border-surface-700/30">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto rounded-2xl px-4 py-3 mb-3 bg-surface-900/50 border border-surface-700/30"
+      >
         {isLoading ? (
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
           </div>
-        ) : messages.length === 0 ? (
+        ) : allMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-surface-500 gap-4">
             <div className="w-20 h-20 rounded-full bg-surface-800/80 border border-surface-700/50 flex items-center justify-center">
               <Users className="w-9 h-9 opacity-30" />
@@ -124,6 +185,24 @@ export default function ChatPage() {
           </div>
         ) : (
           <div className="space-y-0.5">
+            {/* Load older button */}
+            {hasOlderHistory && (
+              <div className="flex justify-center pb-4">
+                <button
+                  onClick={loadOlderMessages}
+                  disabled={loadingOlder}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-surface-800/80 border border-surface-700/50 text-surface-400 hover:text-surface-200 hover:border-surface-600 transition-colors disabled:opacity-50"
+                >
+                  {loadingOlder ? (
+                    <div className="w-3 h-3 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                  ) : (
+                    <ChevronUp className="w-3 h-3" />
+                  )}
+                  {loadingOlder ? 'Loading…' : 'Load older messages'}
+                </button>
+              </div>
+            )}
+
             {processed.map(({ msg, isOwn, senderName, showDate, isFirst, isLast }, idx) => (
               <div key={msg.id || idx}>
                 {/* Date separator */}
@@ -151,14 +230,14 @@ export default function ChatPage() {
                           {senderName.charAt(0).toUpperCase()}
                         </div>
                       ) : (
-                        <div className="w-7 h-7" /> // alignment placeholder
+                        <div className="w-7 h-7" />
                       )}
                     </div>
                   )}
 
                   {/* Bubble Container */}
                   <div className={`flex flex-col max-w-[85%] lg:max-w-[65%] ${isOwn ? 'items-end' : 'items-start'}`}>
-                    
+
                     {/* Sender name (others, first in group only) */}
                     {!isOwn && isFirst && (
                       <span className={`text-[11px] font-medium mb-1 px-1 bg-gradient-to-r ${getAvatarColor(senderName)} bg-clip-text text-transparent`}>

@@ -1,15 +1,25 @@
 package database
 
 import (
+	"embed"
+	"errors"
 	"log"
+	"net/url"
+	"strings"
 	"time"
 
 	"kanban-app/internal/models"
 
+	migrate "github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 var DB *gorm.DB
 
@@ -37,21 +47,53 @@ func Init(dsn string) {
 		log.Fatalf("PostgreSQL ping failed: %v", err)
 	}
 
-	if err := DB.AutoMigrate(
-		&models.Role{},
-		&models.User{},
-		&models.Product{},
-		&models.Attachment{},
-		&models.Comment{},
-		&models.ChatMessage{},
-		&models.Notification{},
-		&models.ActivityLog{},
-	); err != nil {
-		log.Fatalf("AutoMigrate failed: %v", err)
-	}
-
+	runMigrations(dsn)
 	seedRoles()
 	log.Println("PostgreSQL connected and migrated (pool: 25 open / 5 idle)")
+}
+
+// migrationDSN ensures the DSN passed to golang-migrate contains sslmode=disable.
+// GORM's pgx driver falls back to no-SSL silently; lib/pq (used by migrate) defaults
+// to sslmode=require and will fail against a local server without SSL.
+func migrationDSN(dsn string) string {
+	// URL format: postgres://...
+	if strings.HasPrefix(dsn, "postgres://") || strings.HasPrefix(dsn, "postgresql://") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return dsn
+		}
+		q := u.Query()
+		if q.Get("sslmode") == "" {
+			q.Set("sslmode", "disable")
+			u.RawQuery = q.Encode()
+		}
+		return u.String()
+	}
+	// Key=value format: host=... sslmode=...
+	if !strings.Contains(dsn, "sslmode=") {
+		return dsn + " sslmode=disable"
+	}
+	return dsn
+}
+
+// runMigrations applies pending versioned SQL migrations embedded in the binary.
+// IF NOT EXISTS guards in migration 001 make it safe to run against databases
+// previously managed by GORM AutoMigrate — existing tables are silently skipped.
+func runMigrations(dsn string) {
+	src, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		log.Fatalf("Migration source error: %v", err)
+	}
+
+	m, err := migrate.NewWithSourceInstance("iofs", src, migrationDSN(dsn))
+	if err != nil {
+		log.Fatalf("Failed to create migration runner: %v", err)
+	}
+	defer m.Close()
+
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		log.Fatalf("Migration failed: %v", err)
+	}
 }
 
 func seedRoles() {

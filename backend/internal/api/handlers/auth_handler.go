@@ -56,15 +56,17 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	user, _ = services.GetUserByID(user.ID)
-	token, err := h.generateToken(user)
+	accessToken, refreshToken, err := h.generateTokenPair(user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
 
 	c.JSON(http.StatusCreated, gin.H{
-		"token": token,
-		"user":  user.ToResponse(),
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"token":         accessToken, // backward-compat alias consumed by existing frontend
+		"user":          user.ToResponse(),
 	})
 }
 
@@ -86,16 +88,70 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := h.generateToken(user)
+	accessToken, refreshToken, err := h.generateTokenPair(user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"token": token,
-		"user":  user.ToResponse(),
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"token":         accessToken,
+		"user":          user.ToResponse(),
 	})
+}
+
+// Refresh validates a refresh token, revokes it (rotation), and issues a new pair.
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh_token required"})
+		return
+	}
+
+	rt, err := services.ValidateRefreshToken(req.RefreshToken)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired refresh token"})
+		return
+	}
+
+	user, err := services.GetUserByID(rt.UserID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Revoke old token before issuing new pair (rotation prevents replay attacks)
+	if err := services.RevokeRefreshToken(req.RefreshToken); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to rotate token"})
+		return
+	}
+
+	accessToken, newRefreshToken, err := h.generateTokenPair(user)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"access_token":  accessToken,
+		"refresh_token": newRefreshToken,
+		"token":         accessToken,
+	})
+}
+
+// Logout revokes the provided refresh token, ending this device's session.
+func (h *AuthHandler) Logout(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := c.ShouldBindJSON(&req); err == nil && req.RefreshToken != "" {
+		_ = services.RevokeRefreshToken(req.RefreshToken)
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out"})
 }
 
 func (h *AuthHandler) GetMe(c *gin.Context) {
@@ -108,17 +164,28 @@ func (h *AuthHandler) GetMe(c *gin.Context) {
 	c.JSON(http.StatusOK, services.GetUserResponseWithAvatar(user))
 }
 
-func (h *AuthHandler) generateToken(user *models.User) (string, error) {
+// generateTokenPair issues a short-lived access token (15 min) and a long-lived
+// refresh token (30 days, stored in DB). Returns (accessToken, refreshToken, error).
+func (h *AuthHandler) generateTokenPair(user *models.User) (string, string, error) {
 	claims := jwt.MapClaims{
 		"user_id": user.ID,
 		"email":   user.Email,
 		"name":    user.Name,
 		"role_id": user.RoleID,
 		"role":    user.Role.Name,
-		"exp":     time.Now().Add(72 * time.Hour).Unix(),
+		"exp":     time.Now().Add(15 * time.Minute).Unix(),
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(h.Config.JWTSecret))
+	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(h.Config.JWTSecret))
+	if err != nil {
+		return "", "", err
+	}
+
+	refreshToken, err := services.IssueRefreshToken(user.ID)
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
 }
 
 // NotifyStatusChange broadcasts a product_update WS event and persists toast notifications

@@ -52,7 +52,11 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		{
 			auth.POST("/register", authHandler.Register)
 			auth.POST("/login", authHandler.Login)
+			auth.POST("/refresh", authHandler.Refresh)
 		}
+
+		// Logout — no auth middleware so expired-access-token clients can still call it
+		api.POST("/auth/logout", authHandler.Logout)
 
 		// Protected routes
 		protected := api.Group("")

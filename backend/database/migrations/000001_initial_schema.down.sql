@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS activity_logs;
+DROP TABLE IF EXISTS notifications;
+DROP TABLE IF EXISTS chat_messages;
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS attachments;
+DROP TABLE IF EXISTS products;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS roles;

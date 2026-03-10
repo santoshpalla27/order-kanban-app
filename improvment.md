@@ -1,30 +1,17 @@
 Backend
 
-Proper DB migrations — AutoMigrate is risky in production (can't drop columns, alter types safely). Switch to golang-migrate with versioned SQL files
-Graceful shutdown — no signal.NotifyContext / drain period; a deploy restarts the server and cuts open WebSocket connections
-Structured logging — replace log.Printf with zerolog or zap for JSON logs (searchable in CloudWatch, Loki, etc.)
-Rate limiting — no rate limiter on auth endpoints (/login, /register), making brute-force trivial
-Refresh tokens — current JWT appears to be single long-lived token; add short-lived access + long-lived refresh token pair
-Pagination — verify all list endpoints (products, notifications, chat) paginate; unbounded queries will hurt at scale
 Audit log table — track who changed what and when (useful for compliance and debugging)
 Frontend
 
-Error boundaries — a single React component crash currently takes down the whole UI
-Optimistic updates — dragging a card could update UI instantly, then reconcile on WS confirmation (currently likely waits for server round-trip)
-Keyboard shortcuts — power users expect n for new card, / for search, Esc to close modals
-Virtualized lists — if a board has 200+ cards, rendering all DOM nodes will lag; use @tanstack/virtual
 Infrastructure / DevOps
 
-CI/CD pipeline — no GitHub Actions; currently deploy = SSH + git pull + docker compose up. A pipeline would run tests, build images, push to registry, then deploy
-Container registry — images are built on the EC2 instance itself; building on a tiny instance is slow and risky. Build in CI, push to GHCR/ECR, pull on server
 Database backups — no automated pg_dump schedule; one corrupt volume = total data loss
-Monitoring — no health alerting; Prometheus + Grafana (or Grafana Cloud free tier) with uptime alerts would catch outages before users do
-Security
 
 Security headers — no CSP, X-Frame-Options, X-Content-Type-Options etc. on the Traefik/Nginx layer
+
 CSRF protection — WebSocket upgrade uses JWT in query param (common pattern but worth double-checking origin validation)
+
 Secrets rotation — R2 keys and JWT secret are in .env flat file; a secrets manager (AWS SSM / Doppler) would allow rotation without redeployment
-Highest impact picks: DB migrations tool, rate limiting on auth, CI/CD pipeline, and automated DB backups.
 
 Kanban App: Improvement Recommendations
 Based on a detailed analysis of the architecture, data flows, and code structure, here are the key areas where the current application can be stabilized, optimized, and secured for production readiness.

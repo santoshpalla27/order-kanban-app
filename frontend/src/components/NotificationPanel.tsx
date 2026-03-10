@@ -22,7 +22,7 @@ export default function NotificationPanel({ onClose }: Props) {
     queryKey: ['notifications'],
     queryFn: () => notificationsApi.getAll(),
   });
-  const notifications: Notification[] = data?.data || [];
+  const notifications: Notification[] = data?.data?.data || [];
 
   const markRead = useMutation({
     mutationFn: (id: number) => notificationsApi.markAsRead(id),

@@ -85,11 +85,41 @@ func NotifyMentions(senderID uint, text, notifMessage, entityType string, entity
 	}
 }
 
-func GetNotifications(userID uint) ([]models.Notification, error) {
+// NotificationPage is the cursor-paginated response for the notifications list.
+type NotificationPage struct {
+	Data       []models.Notification `json:"data"`
+	NextCursor *uint                 `json:"next_cursor"`
+	HasMore    bool                  `json:"has_more"`
+}
+
+// GetNotifications returns a cursor-paginated page of notifications for a user,
+// ordered newest-first. Pass cursor=0 for the first page.
+func GetNotifications(userID uint, limit int, cursor uint) (NotificationPage, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	query := database.DB.Where("user_id = ?", userID)
+	if cursor > 0 {
+		query = query.Where("id < ?", cursor)
+	}
+
 	var notifications []models.Notification
-	err := database.DB.Where("user_id = ?", userID).Order("created_at DESC").
-		Limit(50).Find(&notifications).Error
-	return notifications, err
+	if err := query.Order("id DESC").Limit(limit + 1).Find(&notifications).Error; err != nil {
+		return NotificationPage{}, err
+	}
+
+	hasMore := len(notifications) > limit
+	if hasMore {
+		notifications = notifications[:limit]
+	}
+
+	var nextCursor *uint
+	if hasMore && len(notifications) > 0 {
+		last := notifications[len(notifications)-1].ID
+		nextCursor = &last
+	}
+
+	return NotificationPage{Data: notifications, NextCursor: nextCursor, HasMore: hasMore}, nil
 }
 
 func GetUnreadCount(userID uint) (int64, error) {

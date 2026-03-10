@@ -16,12 +16,45 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Track a single in-flight refresh to avoid parallel /auth/refresh races
+let refreshPromise: Promise<string> | null = null;
+
+async function doTokenRefresh(): Promise<string> {
+  const { refreshToken, setToken, logout } = useAuthStore.getState();
+  if (!refreshToken) {
+    logout();
+    window.location.href = '/login';
+    throw new Error('No refresh token');
+  }
+  try {
+    const res = await axios.post(`${API_BASE}/auth/refresh`, { refresh_token: refreshToken });
+    const { access_token, refresh_token: newRefresh } = res.data;
+    setToken(access_token, newRefresh);
+    return access_token;
+  } catch {
+    logout();
+    window.location.href = '/login';
+    throw new Error('Token refresh failed');
+  }
+}
+
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+  async (error) => {
+    const original = error.config;
+    // Retry once after refreshing; avoid retrying the refresh call itself
+    if (error.response?.status === 401 && !original._retry && !original.url?.includes('/auth/refresh')) {
+      original._retry = true;
+      if (!refreshPromise) {
+        refreshPromise = doTokenRefresh().finally(() => { refreshPromise = null; });
+      }
+      try {
+        const newToken = await refreshPromise;
+        original.headers.Authorization = `Bearer ${newToken}`;
+        return api(original);
+      } catch {
+        return Promise.reject(error);
+      }
     }
     return Promise.reject(error);
   }
@@ -124,15 +157,20 @@ export const commentsApi = {
 
 // Chat
 export const chatApi = {
-  getMessages: (limit?: number) =>
-    api.get('/chat/messages', { params: { limit } }),
+  getMessages: (limit = 50, cursor?: number) =>
+    api.get<{ data: any[]; next_cursor: number | null; has_more: boolean }>('/chat/messages', {
+      params: { limit, ...(cursor != null ? { cursor } : {}) },
+    }),
   sendMessage: (message: string) =>
     api.post('/chat/messages', { message }),
 };
 
 // Notifications
 export const notificationsApi = {
-  getAll: () => api.get('/notifications'),
+  getAll: (limit = 50, cursor?: number) =>
+    api.get<{ data: any[]; next_cursor: number | null; has_more: boolean }>('/notifications', {
+      params: { limit, ...(cursor != null ? { cursor } : {}) },
+    }),
   getUnreadCount: () => api.get('/notifications/unread-count'),
   markAsRead: (id: number) => api.patch(`/notifications/${id}/read`),
   markAllAsRead: () => api.post('/notifications/read-all'),

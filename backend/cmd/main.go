@@ -1,8 +1,14 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"kanban-app/config"
@@ -25,7 +31,7 @@ func main() {
 		log.Fatal("DATABASE_URL is required")
 	}
 
-	// Initialize PostgreSQL (AutoMigrate + seed roles)
+	// Initialize PostgreSQL (versioned migrations + seed roles)
 	database.Init(cfg.DatabaseURL)
 
 	// Initialize R2 storage
@@ -58,11 +64,42 @@ func main() {
 		}
 	}()
 
+	// Purge expired refresh tokens — runs every hour
+	go func() {
+		for {
+			time.Sleep(1 * time.Hour)
+			if err := services.PurgeExpiredRefreshTokens(); err != nil {
+				log.Printf("Refresh token purge error: %v", err)
+			}
+		}
+	}()
+
 	router := api.SetupRouter(cfg)
 
-	addr := fmt.Sprintf(":%s", cfg.Port)
-	log.Printf("Server starting on %s", addr)
-	if err := router.Run(addr); err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	srv := &http.Server{
+		Addr:    fmt.Sprintf(":%s", cfg.Port),
+		Handler: router,
 	}
+
+	// Start server in background goroutine
+	go func() {
+		log.Printf("Server starting on %s", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("Failed to start server: %v", err)
+		}
+	}()
+
+	// Block until SIGINT or SIGTERM
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("Shutdown signal received — draining connections (30s)…")
+
+	// Give in-flight requests and WS connections 30s to finish
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
+	}
+	log.Println("Server exited cleanly")
 }

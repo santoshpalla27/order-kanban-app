@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationsApi } from '../../api/client';
 import { Notification } from '../../types';
 import { useThemeStore } from '../../store/themeStore';
@@ -26,6 +26,8 @@ function formatFull(dateStr: string) {
   });
 }
 
+const PAGE_SIZE = 50;
+
 export default function NotificationsPage() {
   const { theme } = useThemeStore();
   const isDark = theme === 'dark';
@@ -37,12 +39,26 @@ export default function NotificationsPage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
-  const { data, isLoading, refetch } = useQuery({
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+  } = useInfiniteQuery({
     queryKey: ['notifications-full'],
-    queryFn: () => notificationsApi.getAll(),
+    queryFn: ({ pageParam }) =>
+      notificationsApi.getAll(PAGE_SIZE, pageParam as number | undefined),
+    initialPageParam: undefined as number | undefined,
+    getNextPageParam: (lastPage) =>
+      lastPage.data.has_more ? lastPage.data.next_cursor ?? undefined : undefined,
   });
 
-  const notifications: Notification[] = data?.data || [];
+  const notifications: Notification[] = useMemo(
+    () => data?.pages.flatMap(p => p.data.data) ?? [],
+    [data],
+  );
 
   const markRead = useMutation({
     mutationFn: (id: number) => notificationsApi.markAsRead(id),
@@ -62,7 +78,10 @@ export default function NotificationsPage() {
     },
   });
 
-  const uniqueTypes = useMemo(() => [...new Set(notifications.map(n => n.type).filter(Boolean))], [notifications]);
+  const uniqueTypes = useMemo(
+    () => [...new Set(notifications.map(n => n.type).filter(Boolean))],
+    [notifications],
+  );
 
   const filtered = useMemo(() => {
     return notifications.filter(n => {
@@ -70,9 +89,7 @@ export default function NotificationsPage() {
       if (statusFilter === 'unread' && n.is_read) return false;
       if (typeFilter !== 'all' && n.type !== typeFilter) return false;
       if (search && !n.message.toLowerCase().includes(search.toLowerCase())) return false;
-      if (dateFrom) {
-        if (new Date(n.created_at).getTime() < new Date(dateFrom).getTime()) return false;
-      }
+      if (dateFrom && new Date(n.created_at).getTime() < new Date(dateFrom).getTime()) return false;
       if (dateTo) {
         const to = new Date(dateTo);
         to.setHours(23, 59, 59, 999);
@@ -117,7 +134,8 @@ export default function NotificationsPage() {
           </h1>
           <p className={`text-sm mt-1 ${isDark ? 'text-surface-400' : 'text-surface-500'}`}>
             {filtered.length} {filtered.length === 1 ? 'notification' : 'notifications'}
-            {hasFilters ? ' matching filters' : ' total'}
+            {hasFilters ? ' matching filters' : ' loaded'}
+            {hasNextPage && ' · more available'}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -238,72 +256,96 @@ export default function NotificationsPage() {
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-surface-700/20">
-            {filtered.map(n => (
-              <div
-                key={n.id}
-                className={`flex items-start gap-4 px-5 py-4 transition-colors ${
-                  !n.is_read
-                    ? isDark ? 'bg-brand-600/5 hover:bg-brand-600/10' : 'bg-brand-50 hover:bg-brand-100/50'
-                    : isDark ? 'hover:bg-surface-800/50' : 'hover:bg-surface-50'
-                }`}
-              >
-                {/* Unread dot */}
-                <div className="mt-1.5 flex-shrink-0">
-                  {!n.is_read ? (
-                    <div className="w-2.5 h-2.5 rounded-full bg-brand-500" />
-                  ) : (
-                    <div className="w-2.5 h-2.5" />
+          <>
+            <div className="divide-y divide-surface-700/20">
+              {filtered.map(n => (
+                <div
+                  key={n.id}
+                  className={`flex items-start gap-4 px-5 py-4 transition-colors ${
+                    !n.is_read
+                      ? isDark ? 'bg-brand-600/5 hover:bg-brand-600/10' : 'bg-brand-50 hover:bg-brand-100/50'
+                      : isDark ? 'hover:bg-surface-800/50' : 'hover:bg-surface-50'
+                  }`}
+                >
+                  {/* Unread dot */}
+                  <div className="mt-1.5 flex-shrink-0">
+                    {!n.is_read ? (
+                      <div className="w-2.5 h-2.5 rounded-full bg-brand-500" />
+                    ) : (
+                      <div className="w-2.5 h-2.5" />
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm leading-relaxed ${
+                      isDark
+                        ? n.is_read ? 'text-surface-400' : 'text-surface-200'
+                        : n.is_read ? 'text-surface-500' : 'text-surface-800'
+                    }`}>
+                      {n.message}
+                    </p>
+                    <div className="flex items-center gap-3 mt-1.5">
+                      {n.type && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-md capitalize ${
+                          isDark ? 'bg-surface-800 text-surface-500' : 'bg-surface-100 text-surface-400'
+                        }`}>
+                          {n.type}
+                        </span>
+                      )}
+                      <span
+                        className={`text-xs ${isDark ? 'text-surface-500' : 'text-surface-400'}`}
+                        title={formatFull(n.created_at)}
+                      >
+                        {formatRelative(n.created_at)}
+                      </span>
+                      <span className={`text-xs ${isDark ? 'text-surface-600' : 'text-surface-300'}`}>
+                        {formatFull(n.created_at)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mark read button */}
+                  {!n.is_read && (
+                    <button
+                      onClick={() => markRead.mutate(n.id)}
+                      disabled={markRead.isPending}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors flex-shrink-0 ${
+                        isDark
+                          ? 'border-surface-700 hover:border-brand-500 hover:text-brand-400 text-surface-400'
+                          : 'border-surface-300 hover:border-brand-400 hover:text-brand-600 text-surface-500'
+                      } disabled:opacity-50`}
+                      title="Mark as read"
+                    >
+                      <Check className="w-3 h-3" /> Mark read
+                    </button>
                   )}
                 </div>
+              ))}
+            </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm leading-relaxed ${
+            {/* Load more */}
+            {hasNextPage && (
+              <div className={`flex justify-center py-4 border-t ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
+                <button
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm border transition-colors ${
                     isDark
-                      ? n.is_read ? 'text-surface-400' : 'text-surface-200'
-                      : n.is_read ? 'text-surface-500' : 'text-surface-800'
-                  }`}>
-                    {n.message}
-                  </p>
-                  <div className="flex items-center gap-3 mt-1.5">
-                    {n.type && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded-md capitalize ${
-                        isDark ? 'bg-surface-800 text-surface-500' : 'bg-surface-100 text-surface-400'
-                      }`}>
-                        {n.type}
-                      </span>
-                    )}
-                    <span
-                      className={`text-xs ${isDark ? 'text-surface-500' : 'text-surface-400'}`}
-                      title={formatFull(n.created_at)}
-                    >
-                      {formatRelative(n.created_at)}
-                    </span>
-                    <span className={`text-xs ${isDark ? 'text-surface-600' : 'text-surface-300'}`}>
-                      {formatFull(n.created_at)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Mark read button */}
-                {!n.is_read && (
-                  <button
-                    onClick={() => markRead.mutate(n.id)}
-                    disabled={markRead.isPending}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors flex-shrink-0 ${
-                      isDark
-                        ? 'border-surface-700 hover:border-brand-500 hover:text-brand-400 text-surface-400'
-                        : 'border-surface-300 hover:border-brand-400 hover:text-brand-600 text-surface-500'
-                    } disabled:opacity-50`}
-                    title="Mark as read"
-                  >
-                    <Check className="w-3 h-3" /> Mark read
-                  </button>
-                )}
+                      ? 'border-surface-700 hover:bg-surface-800 text-surface-300'
+                      : 'border-surface-300 hover:bg-surface-100 text-surface-600'
+                  } disabled:opacity-50`}
+                >
+                  {isFetchingNextPage ? (
+                    <div className="w-4 h-4 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                  {isFetchingNextPage ? 'Loading…' : 'Load more'}
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

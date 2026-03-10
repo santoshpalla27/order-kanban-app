@@ -17,12 +17,26 @@ func NewNotificationHandler() *NotificationHandler {
 
 func (h *NotificationHandler) GetNotifications(c *gin.Context) {
 	userID := c.GetUint("user_id")
-	notifications, err := services.GetNotifications(userID)
+
+	limit := 50
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil {
+			limit = parsed
+		}
+	}
+	var cursor uint
+	if cur := c.Query("cursor"); cur != "" {
+		if parsed, err := strconv.ParseUint(cur, 10, 32); err == nil {
+			cursor = uint(parsed)
+		}
+	}
+
+	page, err := services.GetNotifications(userID, limit, cursor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notifications"})
 		return
 	}
-	c.JSON(http.StatusOK, notifications)
+	c.JSON(http.StatusOK, page)
 }
 
 func (h *NotificationHandler) GetUnreadCount(c *gin.Context) {

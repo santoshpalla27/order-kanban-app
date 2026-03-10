@@ -19,20 +19,26 @@ func NewChatHandler() *ChatHandler {
 }
 
 func (h *ChatHandler) GetMessages(c *gin.Context) {
-	limit := 100
+	limit := 50
 	if l := c.Query("limit"); l != "" {
 		if parsed, err := strconv.Atoi(l); err == nil {
 			limit = parsed
 		}
 	}
+	var cursor uint
+	if cur := c.Query("cursor"); cur != "" {
+		if parsed, err := strconv.ParseUint(cur, 10, 32); err == nil {
+			cursor = uint(parsed)
+		}
+	}
 
-	messages, err := services.GetChatMessages(limit)
+	page, err := services.GetChatMessages(limit, cursor)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch messages"})
 		return
 	}
 
-	c.JSON(http.StatusOK, messages)
+	c.JSON(http.StatusOK, page)
 }
 
 func (h *ChatHandler) SendMessage(c *gin.Context) {
