@@ -1,6 +1,8 @@
 package services
 
 import (
+	"log/slog"
+
 	"kanban-app/database"
 	"kanban-app/internal/models"
 )
@@ -23,5 +25,14 @@ func CreateAttachment(attachment *models.Attachment) error {
 }
 
 func DeleteAttachment(id uint) error {
+	attachment, err := GetAttachmentByID(id)
+	if err != nil {
+		return err
+	}
+	if R2 != nil && attachment.FilePath != "" {
+		if r2Err := R2.DeleteObject(attachment.FilePath); r2Err != nil {
+			slog.Error("failed to delete R2 object", "key", attachment.FilePath, "error", r2Err)
+		}
+	}
 	return database.DB.Delete(&models.Attachment{}, id).Error
 }

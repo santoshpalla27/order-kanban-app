@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"kanban-app/database"
@@ -188,9 +189,37 @@ func RestoreProduct(id uint) error {
 	}).Error
 }
 
-// PurgeExpiredDeletedProducts hard-deletes products whose grace period has elapsed.
+// PurgeExpiredDeletedProducts hard-deletes products whose grace period has elapsed,
+// cleaning up their R2 attachments first to prevent orphaned files.
 func PurgeExpiredDeletedProducts() error {
 	graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
+
+	// Collect IDs of products about to be purged
+	var productIDs []uint
+	if err := database.DB.Unscoped().Model(&models.Product{}).
+		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
+		Pluck("id", &productIDs).Error; err != nil {
+		return err
+	}
+	if len(productIDs) == 0 {
+		return nil
+	}
+
+	// Delete R2 files for all attachments belonging to these products
+	if R2 != nil {
+		var attachments []models.Attachment
+		if err := database.DB.Where("product_id IN ?", productIDs).Find(&attachments).Error; err == nil {
+			for _, a := range attachments {
+				if a.FilePath != "" {
+					if r2Err := R2.DeleteObject(a.FilePath); r2Err != nil {
+						slog.Error("purge: failed to delete R2 object", "key", a.FilePath, "error", r2Err)
+					}
+				}
+			}
+		}
+	}
+
+	// Hard-delete products (DB cascades to attachments, comments via FK ON DELETE CASCADE)
 	return database.DB.Unscoped().
 		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
 		Delete(&models.Product{}).Error
