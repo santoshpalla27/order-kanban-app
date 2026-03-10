@@ -11,9 +11,8 @@ import CreateProductModal from '../../components/CreateProductModal';
 import { Plus, Eye, Trash2, Loader2 } from 'lucide-react';
 
 const PAGE_SIZE = 50;
-// Number of rows per status group before switching to a scrollable virtual window
 const VIRTUAL_THRESHOLD = 15;
-const ROW_HEIGHT = 53; // px — matches the rendered tr height
+const ROW_HEIGHT = 53;
 
 // ─── Virtual table for one status group ─────────────────────────────────────
 
@@ -47,9 +46,7 @@ function StatusTable({
       ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
       : 0;
 
-  const rows = shouldVirtualize
-    ? virtualItems.map((vr) => items[vr.index])
-    : items;
+  const rows = shouldVirtualize ? virtualItems.map((vr) => items[vr.index]) : items;
 
   const tableHead = (
     <thead className={shouldVirtualize ? 'sticky top-0 z-10 bg-surface-900/95 backdrop-blur-sm' : ''}>
@@ -137,6 +134,117 @@ function StatusTable({
   );
 }
 
+// ─── Per-status paginated section ────────────────────────────────────────────
+
+function StatusSection({
+  status,
+  filters,
+  onStatusChange,
+  onView,
+  onDelete,
+  canDelete,
+}: {
+  status: ProductStatus;
+  filters: Record<string, string>;
+  onStatusChange: (id: number, status: string) => void;
+  onView: (id: number) => void;
+  onDelete: (id: number) => void;
+  canDelete: boolean;
+}) {
+  const queryClient = useQueryClient();
+
+  // Each status has its own infinite query — independent cursors
+  const queryKey = ['products', 'paged', status, filters];
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey,
+    queryFn: ({ pageParam }) =>
+      productsApi.getPaged({ ...filters, status }, PAGE_SIZE, pageParam as number | undefined),
+    getNextPageParam: (lastPage) => lastPage.data.next_cursor ?? undefined,
+    initialPageParam: undefined as number | undefined,
+  });
+
+  const items: Product[] = data?.pages.flatMap((p) => p.data.data) ?? [];
+
+  const statusColors: Record<ProductStatus, string> = {
+    yet_to_start: 'from-gray-500 to-gray-600',
+    working: 'from-blue-500 to-blue-600',
+    review: 'from-amber-500 to-amber-600',
+    done: 'from-emerald-500 to-emerald-600',
+  };
+
+  // Optimistic status change within the per-status cache
+  const handleStatusChange = (id: number, newStatus: string) => {
+    onStatusChange(id, newStatus);
+    // Remove product from this group optimistically (it moved to another status)
+    queryClient.setQueryData(queryKey, (old: any) => {
+      if (!old) return old;
+      return {
+        ...old,
+        pages: old.pages.map((page: any) => ({
+          ...page,
+          data: {
+            ...page.data,
+            data: page.data.data.filter((p: Product) => p.id !== id),
+          },
+        })),
+      };
+    });
+  };
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${statusColors[status]}`} />
+        <h2 className="text-lg font-semibold">{STATUS_LABELS[status]}</h2>
+        <span className="text-sm text-surface-500">
+          ({items.length}{hasNextPage ? '+' : ''})
+        </span>
+      </div>
+
+      {isLoading ? (
+        <div className="glass rounded-xl p-6 flex justify-center">
+          <div className="w-6 h-6 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
+        </div>
+      ) : items.length === 0 ? (
+        <div className="glass rounded-xl p-6 text-center text-surface-500 text-sm">
+          No products
+        </div>
+      ) : (
+        <>
+          <StatusTable
+            items={items}
+            onStatusChange={handleStatusChange}
+            onView={onView}
+            onDelete={onDelete}
+            canDelete={canDelete}
+          />
+          {hasNextPage && (
+            <div className="flex justify-center mt-2">
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="btn-ghost flex items-center gap-2 px-4 py-2 text-sm"
+              >
+                {isFetchingNextPage ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</>
+                ) : (
+                  'Load more'
+                )}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main ListView ───────────────────────────────────────────────────────────
 
 export default function ListView() {
@@ -147,64 +255,14 @@ export default function ListView() {
   const { canCreateProduct, canDeleteProduct } = useAuthStore();
   const queryClient = useQueryClient();
 
-  const filterParams = Object.fromEntries(
-    Object.entries(filters).filter(([_, v]) => v !== '')
+  // Strip empty values; also strip `status` since StatusSection injects it per-group
+  const baseFilters = Object.fromEntries(
+    Object.entries(filters).filter(([k, v]) => v !== '' && k !== 'status')
   ) as Record<string, string>;
-
-  const {
-    data,
-    isLoading,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['products', 'paged', filters],
-    queryFn: ({ pageParam }) =>
-      productsApi.getPaged(filterParams, PAGE_SIZE, pageParam as number | undefined),
-    getNextPageParam: (lastPage) => lastPage.data.next_cursor ?? undefined,
-    initialPageParam: undefined as number | undefined,
-  });
-
-  // Flatten all pages into one list then group by status client-side
-  const allProducts: Product[] = data?.pages.flatMap((p) => p.data.data) ?? [];
-
-  const groupedProducts = STATUS_ORDER.reduce((acc, status) => {
-    acc[status] = allProducts.filter((p) => p.status === status);
-    return acc;
-  }, {} as Record<ProductStatus, Product[]>);
-
-  const statusColors: Record<ProductStatus, string> = {
-    yet_to_start: 'from-gray-500 to-gray-600',
-    working: 'from-blue-500 to-blue-600',
-    review: 'from-amber-500 to-amber-600',
-    done: 'from-emerald-500 to-emerald-600',
-  };
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       productsApi.updateStatus(id, status),
-    onMutate: async ({ id, status }) => {
-      await queryClient.cancelQueries({ queryKey: ['products', 'paged', filters] });
-      const previous = queryClient.getQueryData(['products', 'paged', filters]);
-      queryClient.setQueryData(['products', 'paged', filters], (old: any) => ({
-        ...old,
-        pages: old?.pages?.map((page: any) => ({
-          ...page,
-          data: {
-            ...page.data,
-            data: page.data.data.map((p: Product) =>
-              p.id === id ? { ...p, status } : p
-            ),
-          },
-        })),
-      }));
-      return { previous };
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(['products', 'paged', filters], context.previous);
-      }
-    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 
@@ -215,6 +273,9 @@ export default function ListView() {
       setDeleteConfirmId(null);
     },
   });
+
+  // Statuses to render: if a status filter is active, show only that one
+  const visibleStatuses = (filters.status ? [filters.status as ProductStatus] : STATUS_ORDER);
 
   return (
     <div className="space-y-6">
@@ -229,59 +290,19 @@ export default function ListView() {
 
       <SearchFilters filters={filters} onChange={setFilters} />
 
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <div className="w-8 h-8 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {STATUS_ORDER.map((status) => {
-            if (filters.status && filters.status !== status) return null;
-            const items = groupedProducts[status];
-
-            return (
-              <div key={status}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${statusColors[status]}`} />
-                  <h2 className="text-lg font-semibold">{STATUS_LABELS[status]}</h2>
-                  <span className="text-sm text-surface-500">({items.length})</span>
-                </div>
-
-                {items.length === 0 ? (
-                  <div className="glass rounded-xl p-6 text-center text-surface-500 text-sm">
-                    No products
-                  </div>
-                ) : (
-                  <StatusTable
-                    items={items}
-                    onStatusChange={(id, s) => statusMutation.mutate({ id, status: s })}
-                    onView={setSelectedProduct}
-                    onDelete={setDeleteConfirmId}
-                    canDelete={canDeleteProduct()}
-                  />
-                )}
-              </div>
-            );
-          })}
-
-          {/* Load more / pagination controls */}
-          {hasNextPage && (
-            <div className="flex justify-center pt-2">
-              <button
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-                className="btn-ghost flex items-center gap-2 px-6 py-2.5"
-              >
-                {isFetchingNextPage ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Loading…</>
-                ) : (
-                  'Load more'
-                )}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
+      <div className="space-y-8">
+        {visibleStatuses.map((status) => (
+          <StatusSection
+            key={status}
+            status={status}
+            filters={baseFilters}
+            onStatusChange={(id, s) => statusMutation.mutate({ id, status: s })}
+            onView={setSelectedProduct}
+            onDelete={setDeleteConfirmId}
+            canDelete={canDeleteProduct()}
+          />
+        ))}
+      </div>
 
       {selectedProduct && (
         <ProductDetailModal productId={selectedProduct} onClose={() => setSelectedProduct(null)} />
@@ -290,7 +311,6 @@ export default function ListView() {
         <CreateProductModal onClose={() => setShowCreate(false)} />
       )}
 
-      {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"

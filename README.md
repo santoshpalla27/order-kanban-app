@@ -119,3 +119,5 @@ kanban-app/
 ├── docker-compose.yml
 └── README.md
 ```
+
+go run ./cmd/seed/main.go
