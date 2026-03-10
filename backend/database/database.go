@@ -105,6 +105,7 @@ func seedRoles() {
 		{ID: 5, Name: "view_only"},
 	}
 	for _, role := range roles {
-		DB.FirstOrCreate(&role, models.Role{Name: role.Name})
+		// Save upserts by primary key — renames existing roles (e.g. "worker" → "organiser")
+		DB.Save(&role)
 	}
 }

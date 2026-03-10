@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '../../api/client';
 import { User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { Users, UserPlus, Trash2, Shield, X } from 'lucide-react';
+import { Users, UserPlus, Trash2, Shield, X, AlertTriangle } from 'lucide-react';
 
 const ROLES = [
   { id: 1, name: 'admin', label: 'Admin', color: 'text-red-400 bg-red-500/10' },
@@ -13,8 +13,50 @@ const ROLES = [
   { id: 5, name: 'view_only', label: 'View Only', color: 'text-surface-400 bg-surface-500/10' },
 ];
 
+function ConfirmDeleteModal({ userName, onConfirm, onCancel, isPending }: {
+  userName: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onCancel}>
+      <div className="w-full max-w-sm glass rounded-2xl animate-scale-in shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 flex flex-col items-center text-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-red-500/15 flex items-center justify-center">
+            <AlertTriangle className="w-7 h-7 text-red-400" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold mb-1">Delete User</h2>
+            <p className="text-sm text-surface-400">
+              Are you sure you want to delete <span className="font-semibold text-surface-200">{userName}</span>? This action cannot be undone.
+            </p>
+          </div>
+          <div className="flex gap-3 w-full pt-1">
+            <button
+              onClick={onCancel}
+              className="btn-secondary flex-1"
+              disabled={isPending}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={isPending}
+              className="flex-1 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+            >
+              {isPending ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const [showCreate, setShowCreate] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
 
@@ -31,7 +73,10 @@ export default function AdminPanel() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => usersApi.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['users'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setDeleteTarget(null);
+    },
   });
 
   return (
@@ -99,9 +144,7 @@ export default function AdminPanel() {
                     <td className="px-6 py-4 text-right">
                       {u.id !== currentUser?.id ? (
                         <button
-                          onClick={() => {
-                            if (confirm(`Delete user ${u.name}?`)) deleteMutation.mutate(u.id);
-                          }}
+                          onClick={() => setDeleteTarget(u)}
                           className="btn-ghost p-2 rounded-lg text-red-400 hover:text-red-300"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -119,6 +162,15 @@ export default function AdminPanel() {
       )}
 
       {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} />}
+
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          userName={deleteTarget.name}
+          isPending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
+          onCancel={() => setDeleteTarget(null)}
+        />
+      )}
     </div>
   );
 }

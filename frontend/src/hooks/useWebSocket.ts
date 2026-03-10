@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../store/toastStore';
@@ -8,8 +9,10 @@ export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const token = useAuthStore((s) => s.token);
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const logout = useAuthStore((s) => s.logout);
   const queryClient = useQueryClient();
   const addToast = useToastStore((s) => s.addToast);
+  const navigate = useNavigate();
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const connect = useCallback(() => {
@@ -32,6 +35,12 @@ export function useWebSocket() {
         const data = JSON.parse(event.data);
 
         switch (data.type) {
+          case 'force_logout':
+            clearTimeout(reconnectTimer.current);
+            wsRef.current?.close();
+            logout();
+            navigate('/login');
+            break;
           case 'product_update':
           case 'product_created':
           case 'product_deleted':
@@ -98,7 +107,7 @@ export function useWebSocket() {
     ws.onerror = () => {
       ws.close();
     };
-  }, [token, currentUserId, queryClient, addToast]);
+  }, [token, currentUserId, logout, navigate, queryClient, addToast]);
 
   useEffect(() => {
     connect();

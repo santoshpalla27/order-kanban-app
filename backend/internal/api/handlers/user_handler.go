@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"kanban-app/database"
 	"kanban-app/internal/models"
 	"kanban-app/internal/services"
 
@@ -99,6 +101,13 @@ func (h *UserHandler) UpdateRole(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update role"})
 		return
 	}
+
+	// Revoke all active refresh tokens so the user must re-login
+	_ = services.RevokeUserRefreshTokens(uint(id))
+
+	// Tell the user's active session to log out immediately
+	forceMsg, _ := json.Marshal(map[string]string{"type": "force_logout"})
+	database.EmitToUser(uint(id), forceMsg)
 
 	user, _ := services.GetUserByID(uint(id))
 	adminID := c.GetUint("user_id")
