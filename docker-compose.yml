@@ -40,11 +40,15 @@ services:
       - POSTGRES_USER=${POSTGRES_USER:-kanban}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - kanban-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kanban} -d ${POSTGRES_DB:-kanban}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-kanban} -d ${POSTGRES_DB:-kanban}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,6 +62,7 @@ services:
     restart: unless-stopped
     environment:
       - PORT=8080
+      - LOG_FORMAT=json
       - DATABASE_URL=postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kanban}?sslmode=disable
       - JWT_SECRET=${JWT_SECRET}
       - CORS_ORIGINS=https://app.santoshdevops.cloud
@@ -100,7 +105,7 @@ services:
       - traefik.http.services.frontend.loadbalancer.server.port=80
 
 volumes:
-  postgres-data:
+  postgres_data:
   letsencrypt-data:
 
 networks:
