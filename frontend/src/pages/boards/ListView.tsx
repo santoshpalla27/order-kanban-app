@@ -170,6 +170,7 @@ function StatusSection({
   });
 
   const items: Product[] = data?.pages.flatMap((p) => p.data.data) ?? [];
+  const total: number = data?.pages[0]?.data.total ?? items.length;
 
   const statusColors: Record<ProductStatus, string> = {
     yet_to_start: 'from-gray-500 to-gray-600',
@@ -203,7 +204,7 @@ function StatusSection({
         <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${statusColors[status]}`} />
         <h2 className="text-lg font-semibold">{STATUS_LABELS[status]}</h2>
         <span className="text-sm text-surface-500">
-          ({items.length}{hasNextPage ? '+' : ''})
+          ({total})
         </span>
       </div>
 

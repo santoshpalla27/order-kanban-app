@@ -77,7 +77,7 @@ export const productsApi = {
     api.get('/products', { params }),
   // Cursor-paginated fetch for list views — returns { data, next_cursor, has_more }
   getPaged: (params?: Record<string, string>, limit = 50, cursor?: number) =>
-    api.get<{ data: any[]; next_cursor: number | null; has_more: boolean }>('/products', {
+    api.get<{ data: any[]; next_cursor: number | null; has_more: boolean; total: number }>('/products', {
       params: {
         ...params,
         limit: String(limit),

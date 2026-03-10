@@ -223,6 +223,8 @@ function KanbanColumn({
   });
 
   const items: Product[] = data?.pages.flatMap((p) => p.data.data) ?? [];
+  // Total comes from the first page's COUNT query — accurate regardless of how many are loaded
+  const total: number = data?.pages[0]?.data.total ?? items.length;
 
   // Keep the drag-source column as a flat list so @dnd-kit can measure all DOM nodes
   const isDragSource = activeProductId !== null && items.some((p) => p.id === activeProductId);
@@ -247,7 +249,7 @@ function KanbanColumn({
           <div className={`w-2.5 h-2.5 rounded-full ${colors.dot}`} />
           <h3 className="font-semibold text-sm">{label}</h3>
           <span className="ml-auto text-xs text-surface-500 bg-surface-800/50 px-2 py-0.5 rounded-full">
-            {items.length}{hasNextPage ? '+' : ''}
+            {total}
           </span>
         </div>
       </div>

@@ -25,6 +25,7 @@ type ProductCursorPage struct {
 	Data       []models.Product `json:"data"`
 	NextCursor *uint            `json:"next_cursor"`
 	HasMore    bool             `json:"has_more"`
+	Total      int64            `json:"total"` // total matching records (ignores cursor)
 }
 
 // applyProductFilters builds WHERE clauses shared by GetProducts and GetProductsCursor.
@@ -90,7 +91,11 @@ func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCur
 		nextCursor = &last
 	}
 
-	return ProductCursorPage{Data: products, NextCursor: nextCursor, HasMore: hasMore}, nil
+	// Total count for this filter set (no cursor applied — shows real column size)
+	var total int64
+	applyProductFilters(database.DB.Model(&models.Product{}), filter).Count(&total)
+
+	return ProductCursorPage{Data: products, NextCursor: nextCursor, HasMore: hasMore, Total: total}, nil
 }
 
 func GetProductByID(id uint) (*models.Product, error) {
