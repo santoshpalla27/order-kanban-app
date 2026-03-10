@@ -23,3 +23,11 @@ func GetAllRecentActivityLogs(limit int) ([]models.ActivityLog, error) {
 		Order("created_at DESC").Limit(limit).Find(&logs).Error
 	return logs, err
 }
+
+// PurgeOldActivityLogs hard-deletes activity logs older than the given number of days.
+// Called on a background goroutine every 24 hours.
+func PurgeOldActivityLogs(days int) error {
+	return database.DB.
+		Where("created_at < NOW() - INTERVAL '1 day' * ?", days).
+		Delete(&models.ActivityLog{}).Error
+}

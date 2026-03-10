@@ -142,3 +142,11 @@ func MarkAllAsRead(userID uint) error {
 	return database.DB.Model(&models.Notification{}).
 		Where("user_id = ? AND is_read = ?", userID, false).Update("is_read", true).Error
 }
+
+// PurgeOldNotifications hard-deletes notifications older than the given number of days.
+// Called on a background goroutine every 24 hours.
+func PurgeOldNotifications(days int) error {
+	return database.DB.
+		Where("created_at < NOW() - INTERVAL '1 day' * ?", days).
+		Delete(&models.Notification{}).Error
+}

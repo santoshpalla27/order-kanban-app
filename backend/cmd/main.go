@@ -74,6 +74,26 @@ func main() {
 		}
 	}()
 
+	// Purge notifications older than 5 days — runs every 24 hours
+	go func() {
+		for {
+			time.Sleep(24 * time.Hour)
+			if err := services.PurgeOldNotifications(5); err != nil {
+				log.Printf("Notification purge error: %v", err)
+			}
+		}
+	}()
+
+	// Purge activity logs older than 10 days — runs every 24 hours
+	go func() {
+		for {
+			time.Sleep(24 * time.Hour)
+			if err := services.PurgeOldActivityLogs(10); err != nil {
+				log.Printf("Activity log purge error: %v", err)
+			}
+		}
+	}()
+
 	router := api.SetupRouter(cfg)
 
 	srv := &http.Server{
