@@ -44,26 +44,26 @@ Results land in `tests/results/<timestamp>/` with an HTML report per suite and a
 
 ### Output files per run
 
-| File | Content |
-|------|---------|
+| File               | Content                              |
+| ------------------ | ------------------------------------ |
 | `api-results.html` | Newman HTML report (open in browser) |
-| `api-results.json` | Newman JSON (CI-parseable) |
-| `e2e-report/` | Playwright HTML report |
-| `e2e-results.json` | Playwright JSON |
-| `k6-results.json` | k6 per-request metrics |
-| `k6-summary.json` | k6 threshold pass/fail |
-| `security-all.log` | Combined security script output |
-| `summary.md` | Overall pass/fail per suite |
+| `api-results.json` | Newman JSON (CI-parseable)           |
+| `e2e-report/`      | Playwright HTML report               |
+| `e2e-results.json` | Playwright JSON                      |
+| `k6-results.json`  | k6 per-request metrics               |
+| `k6-summary.json`  | k6 threshold pass/fail               |
+| `security-all.log` | Combined security script output      |
+| `summary.md`       | Overall pass/fail per suite          |
 
 ---
 
 ## Prerequisites (local runs without Docker)
 
-| Tool | Install |
-|------|---------|
-| Postman | https://www.postman.com/downloads |
-| Node.js ≥ 18 | For Playwright |
-| k6 | `brew install k6` |
+| Tool           | Install                                             |
+| -------------- | --------------------------------------------------- |
+| Postman        | https://www.postman.com/downloads                   |
+| Node.js ≥ 18   | For Playwright                                      |
+| k6             | `brew install k6`                                   |
 | curl + python3 | For security shell scripts (pre-installed on macOS) |
 
 ---
@@ -71,17 +71,20 @@ Results land in `tests/results/<timestamp>/` with an HTML report per suite and a
 ## 1. API Tests — Postman
 
 ### Files
-| File | Purpose |
-|------|---------|
-| `tests/api/kanban-app.postman_collection.json` | All requests + test scripts |
+
+| File                                            | Purpose                     |
+| ----------------------------------------------- | --------------------------- |
+| `tests/api/kanban-app.postman_collection.json`  | All requests + test scripts |
 | `tests/api/kanban-app.postman_environment.json` | Local environment variables |
 
 ### Setup (GUI)
+
 1. Open Postman → **Import** → select both JSON files
 2. Top-right dropdown → select **Kanban App — Local** environment
 3. Update credentials in the environment if needed
 
 ### Setup (CLI with Newman)
+
 ```bash
 npm install -g newman newman-reporter-htmlextra
 newman run tests/api/kanban-app.postman_collection.json \
@@ -91,18 +94,21 @@ newman run tests/api/kanban-app.postman_collection.json \
 ```
 
 ### Test accounts (create these before running)
+
 Use the admin panel (`/admin`) or seed script to create:
 
-| Email | Password | Role |
-|-------|----------|------|
-| admin@test.com | password123 | admin |
-| manager@test.com | password123 | manager |
+| Email              | Password    | Role      |
+| ------------------ | ----------- | --------- |
+| admin@test.com     | password123 | admin     |
+| manager@test.com   | password123 | manager   |
 | organiser@test.com | password123 | organiser |
-| employee@test.com | password123 | employee |
-| viewonly@test.com | password123 | view_only |
+| employee@test.com  | password123 | employee  |
+| viewonly@test.com  | password123 | view_only |
 
 ### Run order
+
 Run folders in this order (each builds on previous token/id variables):
+
 1. **Auth → Login (Admin)** — sets `accessToken`, `refreshToken`
 2. **Products** — sets `productId`, `newProductId`
 3. **Comments** — uses `productId`, sets `commentId`
@@ -114,6 +120,7 @@ Run folders in this order (each builds on previous token/id variables):
 ## 2. E2E Tests — Playwright
 
 ### Setup
+
 ```bash
 cd tests/e2e
 npm install
@@ -121,7 +128,9 @@ npx playwright install chromium
 ```
 
 ### Configure
+
 Set environment variables or use defaults:
+
 ```bash
 export BASE_URL=http://localhost:5173   # frontend dev server
 export API_URL=http://localhost:8080/api
@@ -131,6 +140,7 @@ export ADMIN_PASSWORD=password123
 ```
 
 ### Run
+
 ```bash
 # Run all tests (setup runs first automatically)
 npm test
@@ -152,17 +162,18 @@ npm run test:report
 
 ### Test files
 
-| File | What it tests |
-|------|---------------|
-| `specs/auth.spec.ts` | Login, logout, redirects, error states |
-| `specs/kanban.spec.ts` | Board columns, drag-drop, filters, card modal |
-| `specs/product.spec.ts` | Create, edit, delete, trash, restore |
-| `specs/comments.spec.ts` | Post, edit, delete, ownership enforcement |
-| `specs/notifications.spec.ts` | Bell count, panel, mark read, real-time WS |
-| `specs/admin.spec.ts` | User CRUD, role change, confirm-delete modal |
-| `specs/rbac.spec.ts` | UI elements per role, protected route access |
+| File                          | What it tests                                 |
+| ----------------------------- | --------------------------------------------- |
+| `specs/auth.spec.ts`          | Login, logout, redirects, error states        |
+| `specs/kanban.spec.ts`        | Board columns, drag-drop, filters, card modal |
+| `specs/product.spec.ts`       | Create, edit, delete, trash, restore          |
+| `specs/comments.spec.ts`      | Post, edit, delete, ownership enforcement     |
+| `specs/notifications.spec.ts` | Bell count, panel, mark read, real-time WS    |
+| `specs/admin.spec.ts`         | User CRUD, role change, confirm-delete modal  |
+| `specs/rbac.spec.ts`          | UI elements per role, protected route access  |
 
 ### Notes
+
 - Auth state is saved per-role in `tests/e2e/.auth/` (git-ignored)
 - Tests run serially (not parallel) to avoid race conditions on shared data
 - Drag-and-drop tests require Chromium (Firefox doesn't support HTML5 drag in Playwright)
@@ -172,6 +183,7 @@ npm run test:report
 ## 3. Load Tests — k6
 
 ### Install
+
 ```bash
 brew install k6          # macOS
 # or
@@ -204,6 +216,7 @@ k6 run soak.js
 ```
 
 ### Custom options
+
 ```bash
 # Custom base URL and credentials
 k6 run --env BASE_URL=http://myserver:8080/api \
@@ -220,12 +233,12 @@ k6 run --out influxdb=http://localhost:8086/k6 load.js
 
 ### Thresholds
 
-| Test | p95 latency | Error rate |
-|------|-------------|------------|
-| Smoke | < 1000ms | < 1% |
-| Load | < 500ms | < 1% |
-| Spike | < 2000ms | < 5% |
-| Soak | < 600ms | < 1% |
+| Test  | p95 latency | Error rate |
+| ----- | ----------- | ---------- |
+| Smoke | < 1000ms    | < 1%       |
+| Load  | < 500ms     | < 1%       |
+| Spike | < 2000ms    | < 5%       |
+| Soak  | < 600ms     | < 1%       |
 
 ---
 
@@ -252,6 +265,7 @@ ADMIN_EMAIL=admin@prod.com ADMIN_PASSWORD=secret ./auth-security.sh https://myap
 ## Recommended test execution order
 
 ### Before every deploy
+
 ```
 1. API tests (Bruno or CLI) — fast, catches contract regressions
 2. E2E smoke (auth + kanban specs) — catches UI regressions
@@ -259,6 +273,7 @@ ADMIN_EMAIL=admin@prod.com ADMIN_PASSWORD=secret ./auth-security.sh https://myap
 ```
 
 ### Weekly / staging
+
 ```
 4. Full E2E suite
 5. k6 smoke → load
@@ -266,6 +281,7 @@ ADMIN_EMAIL=admin@prod.com ADMIN_PASSWORD=secret ./auth-security.sh https://myap
 ```
 
 ### Before major releases
+
 ```
 7. k6 spike test
 8. k6 soak test (30 min)
@@ -290,3 +306,24 @@ ADMIN_EMAIL=admin@prod.com ADMIN_PASSWORD=secret ./auth-security.sh https://myap
 
 **Security scripts: python3 not found**
 → Install Python 3 or replace `python3 -c ...` with `jq` commands.
+
+# General test run (Smoke load test + API + Security scripts)
+
+./run-all.sh
+
+# Run specific load profiles (defaults to overriding the API and Security scripts)
+
+./run-all.sh --load smoke # Default: Quick 1 VU sanity check
+./run-all.sh --load load # Standard load (ramps to 30 VUs, holds, drops)
+./run-all.sh --load spike # Sudden surge (0 -> 100 VUs instantly, holds 1 min)
+./run-all.sh --load soak # Endurance test (holds 20 VUs for hours to find leaks)
+./run-all.sh --load ratelimit # DDoS simulation (hammers login to hit 429 status)
+
+# Modify peak concurrent Virtual Users (VUs) for the 'load' profile
+
+./run-all.sh --load load --peak-vus 100
+./run-all.sh --load load --peak-vus 500
+
+# Run a heavy load test WITHOUT API and Security tests to save time
+
+./run-all.sh --load load --peak-vus 100 --api false --security false

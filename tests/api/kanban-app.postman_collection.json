@@ -1301,7 +1301,10 @@
               "script": {
                 "exec": [
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('returns updated user', () => pm.expect(pm.response.json().avatar_key).to.equal(pm.environment.get('avatarS3Key')));"
+                  "pm.test('returns updated user', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.avatar_url).to.be.a('string').and.not.empty;",
+                  "});"
                 ]
               }
             }
@@ -1436,7 +1439,11 @@
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('status is 307', () => pm.response.to.have.status(307));"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns download url', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.url).to.be.a('string').and.not.empty;",
+                  "});"
                 ]
               }
             }
