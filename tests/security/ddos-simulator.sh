@@ -44,9 +44,9 @@ wait
 PASS_BURST=0; FAIL_BURST=0; RATE_LIMITED=0
 for i in $(seq 1 $BURST); do
   S=$(cat "$TMPDIR_BURST/$i" 2>/dev/null || echo "000")
-  if   [[ "$S" = "200" ]]; then ((PASS_BURST++))
-  elif [[ "$S" = "429" ]]; then ((RATE_LIMITED++))
-  else ((FAIL_BURST++))
+  if   [[ "$S" = "200" ]]; then ((PASS_BURST++)) || true
+  elif [[ "$S" = "429" ]]; then ((RATE_LIMITED++)) || true
+  else ((FAIL_BURST++)) || true
   fi
 done
 rm -rf "$TMPDIR_BURST"
@@ -73,9 +73,9 @@ wait
 P2=0; F2=0; RL2=0
 for i in $(seq 1 $BURST2); do
   S=$(cat "$TMPDIR_BURST2/$i" 2>/dev/null || echo "000")
-  if   [[ "$S" = "200" ]]; then ((P2++))
-  elif [[ "$S" = "429" ]]; then ((RL2++))
-  else ((F2++))
+  if   [[ "$S" = "200" ]]; then ((P2++)) || true
+  elif [[ "$S" = "429" ]]; then ((RL2++)) || true
+  else ((F2++)) || true
   fi
 done
 rm -rf "$TMPDIR_BURST2"
@@ -96,9 +96,9 @@ for i in $(seq 1 15); do
   S=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"email\":\"nonexistent-${i}@test.com\",\"password\":\"wrong\"}")
-  if   [[ "$S" = "401" ]]; then ((RL_PASS++))
-  elif [[ "$S" = "429" ]]; then ((RL_429++)); break   # rate limit kicked in — good
-  elif [[ "$S" = "500" ]]; then ((RL_FAIL++))
+  if   [[ "$S" = "401" ]]; then ((RL_PASS++)) || true
+  elif [[ "$S" = "429" ]]; then ((RL_429++)) || true; break   # rate limit kicked in — good
+  elif [[ "$S" = "500" ]]; then ((RL_FAIL++)) || true
   fi
 done
 

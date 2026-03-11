@@ -43,7 +43,11 @@ for i in $(seq 1 10); do
   S=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"email\":\"${ADMIN_EMAIL:-admin@test.com}\",\"password\":\"wrong-$i\"}")
-  [[ "$S" = "401" || "$S" = "429" || "$S" = "423" ]] && ((BF_PASS++)) || ((BF_FAIL++))
+  if [[ "$S" = "401" || "$S" = "429" || "$S" = "423" ]]; then
+    ((BF_PASS++)) || true
+  else
+    ((BF_FAIL++)) || true
+  fi
 done
 
 if [ "$BF_FAIL" -eq 0 ]; then

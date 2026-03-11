@@ -137,8 +137,8 @@ fi
 
 PASS_COUNT=0; FAIL_COUNT=0
 if [ -f "$ALL_LOG" ]; then
-  PASS_COUNT=$(grep -c '✓ PASS' "$ALL_LOG" 2>/dev/null || echo 0)
-  FAIL_COUNT=$(grep -c '✗ FAIL' "$ALL_LOG" 2>/dev/null || echo 0)
+  PASS_COUNT=$(grep -c '✓ PASS' "$ALL_LOG" 2>/dev/null) || PASS_COUNT=0
+  FAIL_COUNT=$(grep -c '✗ FAIL' "$ALL_LOG" 2>/dev/null) || FAIL_COUNT=0
 fi
 TOTAL_CHECKS=$((PASS_COUNT + FAIL_COUNT))
 
