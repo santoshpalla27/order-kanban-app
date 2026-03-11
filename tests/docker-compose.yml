@@ -168,4 +168,4 @@ services:
 networks:
   kanban-net:
     external: true   # attach to the running app's network
-    name: kanban-net
+    name: ${DOCKER_NETWORK:-order-kanban-app_kanban-net}

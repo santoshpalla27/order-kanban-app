@@ -91,13 +91,17 @@ if ! curl -sf --max-time 5 "$HOST_CHECK/health" > /dev/null 2>&1; then
 fi
 success "Backend is healthy"
 
-# ── Verify kanban-net Docker network exists ───────────────────────────────────
-if ! docker network inspect kanban-net > /dev/null 2>&1; then
-  echo -e "\n${RED}ERROR: Docker network 'kanban-net' not found${NC}"
-  echo "  The app must be running via docker compose (creates kanban-net)"
+# ── Detect Docker network (handles prefix from compose project name) ──────────
+DOCKER_NETWORK=$(docker network ls --format '{{.Name}}' | grep 'kanban-net' | head -1)
+if [ -z "$DOCKER_NETWORK" ]; then
+  echo -e "\n${RED}ERROR: No Docker network matching 'kanban-net' found${NC}"
+  echo "  The app must be running via docker compose."
+  echo "  Available networks:"
+  docker network ls --format '  {{.Name}}'
   exit 1
 fi
-success "Docker network kanban-net found"
+export DOCKER_NETWORK
+success "Docker network found: $DOCKER_NETWORK"
 
 # ── Track results ─────────────────────────────────────────────────────────────
 declare -A EXIT_CODES
