@@ -56,25 +56,28 @@ for payload in "${SQL_PAYLOADS[@]}"; do
   fi
 done
 
-# Try in product creation
+# Try in product creation — use millisecond timestamp for unique product_id per run
+INJ_TS=$(date +%s%3N)
 for payload in "${SQL_PAYLOADS[@]}"; do
+  PID="SAFE-INJ-${INJ_TS}"
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/products" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
-    -d "{\"product_id\":\"SAFE-$$\",\"customer_name\":\"$payload\"}")
-  # Should succeed (201) or fail gracefully (400), never 500
-  if [[ "$STATUS" = "201" || "$STATUS" = "400" || "$STATUS" = "422" ]]; then
+    -d "{\"product_id\":\"$PID\",\"customer_name\":\"$(echo "$payload" | sed 's/"/\\"/g')\"}")
+  # Should succeed (201) or fail gracefully (400/409/422), never 500
+  if [[ "$STATUS" = "201" || "$STATUS" = "400" || "$STATUS" = "409" || "$STATUS" = "422" ]]; then
     pass "SQL injection in customer_name '$payload' → $STATUS (handled safely)"
     # Cleanup if created
     if [ "$STATUS" = "201" ]; then
-      ID=$(curl -sf "$BASE/products?search=SAFE-$$" \
+      ID=$(curl -sf "$BASE/products?search=$PID" \
         -H "Authorization: Bearer $TOKEN" \
         | python3 -c "import sys,json; d=json.load(sys.stdin).get('data',[]); print(d[0]['id'] if d else '')" 2>/dev/null || echo "")
       [ -n "$ID" ] && curl -sf -X DELETE "$BASE/products/$ID" -H "Authorization: Bearer $TOKEN" > /dev/null 2>&1 || true
     fi
   else
-    fail "SQL injection in customer_name → $STATUS (check for 500)"
+    fail "SQL injection in customer_name → $STATUS (expected 201/400/409/422, not 500)"
   fi
+  INJ_TS=$((INJ_TS + 1))
 done
 
 # ─── XSS Payloads ─────────────────────────────────────────────────────────────

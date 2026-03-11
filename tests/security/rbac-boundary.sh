@@ -65,14 +65,24 @@ fi
 # ─── Create product ───────────────────────────────────────────────────────────
 section "POST /products — who can create?"
 
+TS=$(date +%s%3N)   # millisecond timestamp — unique per run inside Docker
 for role in admin manager organiser; do
   eval "TOKEN=\${${role^^}_TOKEN}"
+  PID="RBAC-CRE-${role}-${TS}"
   STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/products" \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
-    -d "{\"product_id\":\"RBAC-CRE-${role}-$$\",\"customer_name\":\"test\"}")
+    -d "{\"product_id\":\"$PID\",\"customer_name\":\"RBAC test\"}")
   check_status "$role can create product" "201" "$STATUS"
-  # Optionally cleanup if 201: not done here to keep script simple
+  # Cleanup created product
+  if [ "$STATUS" = "201" ]; then
+    NEW_ID=$(curl -sf "$BASE/products?limit=1" \
+      -H "Authorization: Bearer $ADMIN_TOKEN" \
+      | python3 -c "import sys,json; d=json.load(sys.stdin).get('data',[]); print(d[0]['id'] if d else '')" 2>/dev/null || echo "")
+    [ -n "$NEW_ID" ] && curl -sf -X DELETE "$BASE/products/$NEW_ID" \
+      -H "Authorization: Bearer $ADMIN_TOKEN" > /dev/null 2>&1 || true
+  fi
+  TS=$((TS + 1))   # ensure each ID is unique even if loop is fast
 done
 
 for role in employee viewonly; do
