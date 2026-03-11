@@ -140,63 +140,173 @@ docker compose --env-file "$ENV_FILE" -f docker-compose.yml run --rm wait-for-ba
 [ "$RUN_LOAD"     = true ] && run_service "Load Test (k6 $K6_SCENARIO)" "k6"
 [ "$RUN_SECURITY" = true ] && run_service "Security Tests"         "security"
 
-# ── Generate summary report ───────────────────────────────────────────────────
+# ── Parse result files for detailed stats ─────────────────────────────────────
+
+# Helper: run python3 snippet, return stdout or fallback
+py3() { python3 -c "$1" 2>/dev/null || echo "${2:--}"; }
+
+# Newman: assertions passed/failed
+parse_newman() {
+  py3 "
+import json, sys
+d = json.load(open('$RESULTS_DIR/api-results.json'))
+a = d.get('run',{}).get('stats',{}).get('assertions',{})
+total  = a.get('total',  0)
+failed = a.get('failed', 0)
+passed = total - failed
+req    = d.get('run',{}).get('stats',{}).get('requests',{}).get('total', 0)
+print(f'{passed}/{total} assertions  ({req} requests)')
+" "?"
+}
+
+# Playwright: passed/failed tests
+parse_playwright() {
+  py3 "
+import json, sys
+d = json.load(open('$RESULTS_DIR/e2e-results.json'))
+s = d.get('stats', {})
+expected   = s.get('expected',   0)
+unexpected = s.get('unexpected', 0)
+flaky      = s.get('flaky',      0)
+skipped    = s.get('skipped',    0)
+total = expected + unexpected + flaky + skipped
+print(f'{expected}/{total} tests  ({unexpected} failed{(\", \"+str(flaky)+\" flaky\") if flaky else \"\"})')
+" "?"
+}
+
+# k6: thresholds passed/failed
+parse_k6() {
+  py3 "
+import json, sys
+d = json.load(open('$RESULTS_DIR/k6-summary.json'))
+metrics = d.get('metrics', {})
+total_thr = 0; pass_thr = 0
+for m in metrics.values():
+    for thresh, result in (m.get('thresholds') or {}).items():
+        total_thr += 1
+        if result.get('ok', False):
+            pass_thr += 1
+failed_thr = total_thr - pass_thr
+p95 = metrics.get('http_req_duration',{}).get('values',{}).get('p(95)',0)
+rps = round(metrics.get('http_reqs',{}).get('values',{}).get('rate',0),1)
+print(f'{pass_thr}/{total_thr} thresholds  (p95={p95:.0f}ms  {rps} req/s)')
+" "?"
+}
+
+# Security: count PASS / FAIL lines across all logs
+parse_security() {
+  local log="$RESULTS_DIR/security-all.log"
+  if [ ! -f "$log" ]; then echo "?"; return; fi
+  local p f
+  p=$(grep -c '✓ PASS' "$log" 2>/dev/null || echo 0)
+  f=$(grep -c '✗ FAIL' "$log" 2>/dev/null || echo 0)
+  local total=$((p + f))
+  echo "${p}/${total} checks"
+}
+
+# ── Build summary table ────────────────────────────────────────────────────────
 banner "Summary Report"
 
 TOTAL_PASS=0; TOTAL_FAIL=0
 REPORT="$RESULTS_DIR/summary.md"
 
+# Column widths
+W1=22; W2=8; W3=34; W4=10
+
+pad()  { printf "%-${1}s" "$2"; }
+padr() { printf "%${1}s"  "$2"; }
+
+hline() { printf '─%.0s' $(seq 1 $((W1+W2+W3+W4+7))); echo; }
+dline() { printf '═%.0s' $(seq 1 $((W1+W2+W3+W4+7))); echo; }
+
+echo ""
+dline
+echo -e "${BOLD} TEST RUN SUMMARY  —  $TIMESTAMP${NC}"
+echo -e " API: $HOST_CHECK"
+dline
+printf " ${BOLD}%-${W1}s  %-${W2}s  %-${W3}s  %-${W4}s${NC}\n" "Suite" "Status" "Details" "Duration"
+hline
+
+declare -A DETAILS
+DETAILS["newman"]="$(parse_newman)"
+DETAILS["playwright"]="$(parse_playwright)"
+DETAILS["k6"]="$(parse_k6)"
+DETAILS["security"]="$(parse_security)"
+
+SUITE_NAMES=("newman:API (Newman)" "playwright:E2E (Playwright)" "k6:Load (k6 $K6_SCENARIO)" "security:Security")
+
+for entry in "${SUITE_NAMES[@]}"; do
+  svc="${entry%%:*}"; label="${entry#*:}"
+  [[ -v EXIT_CODES[$svc] ]] || continue
+
+  code="${EXIT_CODES[$svc]}"
+  dur="${DURATIONS[$svc]}"
+  det="${DETAILS[$svc]}"
+
+  if [ "$code" -eq 0 ]; then
+    status="${GREEN}✅ PASS${NC}"
+    ((TOTAL_PASS++))
+  else
+    status="${RED}❌ FAIL${NC}"
+    ((TOTAL_FAIL++))
+  fi
+
+  printf " %-${W1}s  " "$label"
+  echo -ne "$status"
+  printf "  %-${W3}s  %-${W4}s\n" "$det" "$dur"
+done
+
+hline
+
+if [ "$TOTAL_FAIL" -eq 0 ]; then
+  echo -e " ${GREEN}${BOLD}RESULT: ALL $TOTAL_PASS SUITE(S) PASSED${NC}"
+else
+  echo -e " ${RED}${BOLD}RESULT: $TOTAL_FAIL FAILED  /  $TOTAL_PASS PASSED${NC}"
+fi
+dline
+echo ""
+
+# ── Write markdown summary ────────────────────────────────────────────────────
 {
   echo "# Test Run Summary"
   echo ""
-  echo "**Date:** $TIMESTAMP"
-  echo "**API URL:** $HOST_CHECK"
+  echo "**Date:** $TIMESTAMP  |  **API:** $HOST_CHECK"
   echo ""
-  echo "| Suite | Status | Duration |"
-  echo "|-------|--------|----------|"
-} > "$REPORT"
+  echo "| Suite | Status | Details | Duration |"
+  echo "|-------|--------|---------|----------|"
 
-for service in newman playwright k6 security; do
-  if [[ -v EXIT_CODES[$service] ]]; then
-    code="${EXIT_CODES[$service]}"
-    dur="${DURATIONS[$service]}"
-    if [ "$code" -eq 0 ]; then
-      echo "| $service | ✅ PASS | $dur |" >> "$REPORT"
-      ((TOTAL_PASS++))
-    else
-      echo "| $service | ❌ FAIL (exit $code) | $dur |" >> "$REPORT"
-      ((TOTAL_FAIL++))
-    fi
-  fi
-done
+  for entry in "${SUITE_NAMES[@]}"; do
+    svc="${entry%%:*}"; label="${entry#*:}"
+    [[ -v EXIT_CODES[$svc] ]] || continue
+    code="${EXIT_CODES[$svc]}"
+    icon=$([ "$code" -eq 0 ] && echo "✅ PASS" || echo "❌ FAIL")
+    echo "| $label | $icon | ${DETAILS[$svc]} | ${DURATIONS[$svc]} |"
+  done
 
-{
   echo ""
   echo "---"
   echo "**Total: $TOTAL_PASS passed, $TOTAL_FAIL failed**"
   echo ""
-  echo "## Output Files"
+  echo "## Result Files"
   echo ""
   echo "| File | Description |"
   echo "|------|-------------|"
-  echo "| api-results.html | Newman HTML report |"
-  echo "| api-results.json | Newman JSON (CI-parseable) |"
-  echo "| e2e-report/ | Playwright HTML report |"
-  echo "| e2e-results.json | Playwright JSON |"
-  echo "| k6-results.json | k6 metrics (per-request) |"
-  echo "| k6-summary.json | k6 thresholds summary |"
-  echo "| security-all.log | Combined security output |"
-} >> "$REPORT"
-
-cat "$REPORT"
+  echo "| \`api-results.html\` | Newman HTML report (open in browser) |"
+  echo "| \`api-results.json\` | Newman JSON (CI-parseable) |"
+  echo "| \`e2e-output.log\` | Playwright raw output |"
+  echo "| \`e2e-results.json\` | Playwright JSON (tests + failures) |"
+  echo "| \`e2e-report/\` | Playwright HTML report |"
+  echo "| \`k6-results.json\` | k6 per-request metrics |"
+  echo "| \`k6-summary.json\` | k6 threshold summary |"
+  echo "| \`security-all.log\` | Combined security output |"
+} > "$REPORT"
 
 # ── Print file tree ───────────────────────────────────────────────────────────
-echo ""
-info "Result files in $RESULTS_DIR:"
+info "Results saved to: $RESULTS_DIR"
 ls -lh "$RESULTS_DIR" 2>/dev/null || true
+echo ""
 
 # ── Final exit code ───────────────────────────────────────────────────────────
-echo ""
 if [ "$TOTAL_FAIL" -eq 0 ]; then
   echo -e "${GREEN}${BOLD}All test suites passed!${NC}"
   exit 0

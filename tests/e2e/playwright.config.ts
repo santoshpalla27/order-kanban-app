@@ -7,8 +7,12 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: [
-    ['list'],
-    ['html', { outputFolder: '../reports/e2e', open: 'never' }],
+    // 'line' shows one line per test — compact, easy to read in CI logs
+    ['line'],
+    // JSON written to working dir; docker command copies to /results
+    ['json', { outputFile: 'test-results.json' }],
+    // HTML report for deep-dive (opened manually)
+    ['html', { outputFolder: 'playwright-report', open: 'never' }],
   ],
   use: {
     baseURL: process.env.BASE_URL || 'http://localhost:5173',

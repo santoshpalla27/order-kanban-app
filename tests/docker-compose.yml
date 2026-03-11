@@ -113,11 +113,11 @@ services:
       - >-
         npm ci --prefer-offline 2>/dev/null || npm install &&
         npx playwright install chromium &&
-        npx playwright test --reporter=list,json,html --output=/results/e2e-artifacts
-        2>&1 | tee /results/e2e-output.log;
+        npx playwright test 2>&1 | tee /results/e2e-output.log;
         EXIT=$$?;
-        cp -r playwright-report /results/e2e-report 2>/dev/null || true;
         cp test-results.json /results/e2e-results.json 2>/dev/null || true;
+        cp -r playwright-report /results/e2e-report 2>/dev/null || true;
+        node /app/summarize.js /results/e2e-results.json;
         exit $$EXIT
 
   # ── 4. k6 — Load test (smoke by default, configurable via K6_SCENARIO) ────
