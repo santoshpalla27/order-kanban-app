@@ -128,3 +128,22 @@ docker compose stop frontend backend
 docker compose rm -f frontend backend
 docker compose build --no-cache frontend backend
 docker compose up -d frontend backend
+
+./run-load.sh # smoke — 1 VU, 2 min (default)
+./run-load.sh smoke # same
+./run-load.sh load # load — ramps 30→50 VUs, 5 min
+./run-load.sh spike # spike — 0 → 100 → 0 VUs, burst test
+./run-load.sh soak # soak — 30 VUs sustained for 30 min
+./run-load.sh ratelimit # rate-limit — verifies 429 enforcement
+
+./run-load.sh load --peak-vus 80 # override the VU ceiling for any scenario
+
+smoke - 1 user, 2 min — confirms the API works at all under zero load
+
+load - 30–50 concurrent users, 5 min — normal day-to-day traffic behaviour
+
+spike - 0 → 100 → 0 users instantly — how the API survives a sudden traffic burst
+
+soak - 30 users sustained for 30 min — memory leaks, connection pool exhaustion over time
+
+ratelimit - Hammers auth endpoints to confirm 429s are returned before the server buckles

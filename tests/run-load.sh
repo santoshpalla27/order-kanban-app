@@ -91,6 +91,8 @@ docker compose \
   --env-file "$ENV_FILE" \
   -f docker-compose.yml \
   run --rm \
+  -e K6_SCENARIO="$SCENARIO" \
+  -e K6_PEAK_VUS="$PEAK_VUS" \
   -v "$RESULTS_DIR:/results" \
   k6 2>&1 | tee "$RESULTS_DIR/k6.log"
 
