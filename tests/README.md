@@ -4,7 +4,7 @@ Three independent test layers, each with a different scope and tool.
 
 ```
 tests/
-├── api/          Bruno collection — API contract + RBAC tests
+├── api/          Postman collection — API contract + RBAC tests
 ├── e2e/          Playwright — full UI workflow tests
 ├── load/         k6 — performance and load tests
 ├── security/     Shell scripts — auth + injection + RBAC boundary
@@ -17,20 +17,34 @@ tests/
 
 | Tool | Install |
 |------|---------|
-| Bruno (GUI) | https://www.usebruno.com — open `tests/api/` as collection |
+| Postman | https://www.postman.com/downloads |
 | Node.js ≥ 18 | For Playwright |
 | k6 | `brew install k6` |
 | curl + python3 | For security shell scripts (pre-installed on macOS) |
 
 ---
 
-## 1. API Tests — Bruno
+## 1. API Tests — Postman
 
-### Setup
-1. Install Bruno: https://www.usebruno.com
-2. Open Bruno → **Open Collection** → select `tests/api/`
-3. Switch to the **local** environment (top-right dropdown)
-4. Update credentials in `tests/api/environments/local.bru` if needed
+### Files
+| File | Purpose |
+|------|---------|
+| `tests/api/kanban-app.postman_collection.json` | All requests + test scripts |
+| `tests/api/kanban-app.postman_environment.json` | Local environment variables |
+
+### Setup (GUI)
+1. Open Postman → **Import** → select both JSON files
+2. Top-right dropdown → select **Kanban App — Local** environment
+3. Update credentials in the environment if needed
+
+### Setup (CLI with Newman)
+```bash
+npm install -g newman newman-reporter-htmlextra
+newman run tests/api/kanban-app.postman_collection.json \
+  -e tests/api/kanban-app.postman_environment.json \
+  --reporters cli,htmlextra \
+  --reporter-htmlextra-export tests/reports/api-report.html
+```
 
 ### Test accounts (create these before running)
 Use the admin panel (`/admin`) or seed script to create:
@@ -44,19 +58,12 @@ Use the admin panel (`/admin`) or seed script to create:
 | viewonly@test.com | password123 | view_only |
 
 ### Run order
-Run folders in this order (each builds on the previous):
-1. `auth/login.bru` — sets `accessToken`
-2. `products/` — uses `accessToken`, sets `productId`, `newProductId`
-3. `comments/` — uses `productId`
-4. `chat/`, `notifications/`, `users/`
-5. `rbac/` — run each `*-login.bru` first, then the forbidden tests
-
-### CLI (optional)
-```bash
-npm install -g @usebruno/cli
-cd tests/api
-bru run --env local
-```
+Run folders in this order (each builds on previous token/id variables):
+1. **Auth → Login (Admin)** — sets `accessToken`, `refreshToken`
+2. **Products** — sets `productId`, `newProductId`
+3. **Comments** — uses `productId`, sets `commentId`
+4. **Chat**, **Notifications**, **Users (Admin only)**
+5. **RBAC** — run the three Setup requests first, then all forbidden tests
 
 ---
 
@@ -225,8 +232,11 @@ ADMIN_EMAIL=admin@prod.com ADMIN_PASSWORD=secret ./auth-security.sh https://myap
 
 ## Troubleshooting
 
-**Bruno: "connection refused"**
+**Postman / Newman: "connection refused"**
 → Backend not running. Start with `docker compose up` or `go run ./cmd/main.go`
+
+**Postman: variables empty (productId, commentId etc.)**
+→ Run requests in the documented order — each request sets variables used by the next.
 
 **Playwright: auth state missing**
 → Delete `.auth/` folder and re-run setup: `npx playwright test --project setup`
