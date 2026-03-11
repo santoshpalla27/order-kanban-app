@@ -1,19 +1,63 @@
 # Kanban App — Test Suite
 
-Three independent test layers, each with a different scope and tool.
+Four test layers, all containerised — run individually or all at once.
 
 ```
 tests/
-├── api/          Postman collection — API contract + RBAC tests
-├── e2e/          Playwright — full UI workflow tests
-├── load/         k6 — performance and load tests
-├── security/     Shell scripts — auth + injection + RBAC boundary
-└── README.md     This file
+├── api/               Postman collection — API contract + RBAC tests
+├── e2e/               Playwright — full UI workflow tests
+├── load/              k6 — performance and load tests
+├── security/          Shell scripts — auth + injection + RBAC boundary
+├── results/           Test output (gitignored, timestamped per run)
+├── docker-compose.yml Orchestrates all test containers
+├── run-all.sh         One-command runner with summary report
+├── .env.test          Test environment variables
+└── README.md          This file
 ```
 
 ---
 
-## Prerequisites
+## Run Everything in Docker (Recommended)
+
+```bash
+# 1. Start the app first
+docker compose up -d
+
+# 2. Run the full test suite
+cd tests
+./run-all.sh
+```
+
+Results land in `tests/results/<timestamp>/` with an HTML report per suite and a `summary.md`.
+
+### Selective runs
+
+```bash
+./run-all.sh --api              # API tests only (fastest, ~30s)
+./run-all.sh --e2e              # E2E only
+./run-all.sh --load smoke       # k6 smoke (1 user, 2 min)
+./run-all.sh --load load        # k6 load (30-50 VUs, 5 min)
+./run-all.sh --security         # security scripts only
+./run-all.sh --skip-e2e         # all except E2E (fast CI mode)
+./run-all.sh --peak-vus 50      # override k6 VU count
+```
+
+### Output files per run
+
+| File | Content |
+|------|---------|
+| `api-results.html` | Newman HTML report (open in browser) |
+| `api-results.json` | Newman JSON (CI-parseable) |
+| `e2e-report/` | Playwright HTML report |
+| `e2e-results.json` | Playwright JSON |
+| `k6-results.json` | k6 per-request metrics |
+| `k6-summary.json` | k6 threshold pass/fail |
+| `security-all.log` | Combined security script output |
+| `summary.md` | Overall pass/fail per suite |
+
+---
+
+## Prerequisites (local runs without Docker)
 
 | Tool | Install |
 |------|---------|

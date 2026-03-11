@@ -1,0 +1,171 @@
+##
+## Kanban App — Test Suite Orchestration
+##
+## Runs all four test layers against the running app stack (kanban-net).
+## Results land in ./results/<timestamp>/ on the host.
+##
+## Usage:
+##   cd tests
+##   ./run-all.sh                  # run everything (recommended)
+##   docker compose run newman     # run API tests only
+##   docker compose run playwright # run E2E only
+##   docker compose run k6         # run load test only
+##   docker compose run security   # run security scripts only
+##
+
+name: kanban-tests
+
+x-common: &common
+  networks:
+    - kanban-net
+  env_file: .env.test
+  restart: "no"
+
+services:
+
+  # ── 1. Healthcheck — wait for backend before anything runs ─────────────────
+  wait-for-backend:
+    <<: *common
+    image: curlimages/curl:latest
+    container_name: test-wait-backend
+    command: >
+      sh -c "
+        echo 'Waiting for backend...';
+        until curl -sf $$API_URL/health; do
+          echo '  backend not ready, retrying in 3s...';
+          sleep 3;
+        done;
+        echo 'Backend is up!';
+      "
+
+  # ── 2. Newman — Postman API tests ─────────────────────────────────────────
+  newman:
+    <<: *common
+    image: postman/newman:latest
+    container_name: test-newman
+    depends_on:
+      wait-for-backend:
+        condition: service_completed_successfully
+    volumes:
+      - ./api:/etc/newman:ro
+      - ./results:/results
+    command: >
+      run kanban-app.postman_collection.json
+      --environment kanban-app.postman_environment.json
+      --env-var "baseUrl=$$API_URL"
+      --env-var "adminEmail=$$ADMIN_EMAIL"
+      --env-var "adminPassword=$$ADMIN_PASSWORD"
+      --env-var "managerEmail=$$MANAGER_EMAIL"
+      --env-var "managerPassword=$$MANAGER_PASSWORD"
+      --env-var "organiserEmail=$$ORGANISER_EMAIL"
+      --env-var "organiserPassword=$$ORGANISER_PASSWORD"
+      --env-var "employeeEmail=$$EMPLOYEE_EMAIL"
+      --env-var "employeePassword=$$EMPLOYEE_PASSWORD"
+      --env-var "viewonlyEmail=$$VIEWONLY_EMAIL"
+      --env-var "viewonlyPassword=$$VIEWONLY_PASSWORD"
+      --reporters cli,json,htmlextra
+      --reporter-json-export /results/api-results.json
+      --reporter-htmlextra-export /results/api-results.html
+      --reporter-htmlextra-title "Kanban API Tests"
+      --color on
+
+  # ── 3. Playwright — E2E UI tests ───────────────────────────────────────────
+  playwright:
+    <<: *common
+    image: mcr.microsoft.com/playwright:v1.49.0-jammy
+    container_name: test-playwright
+    depends_on:
+      wait-for-backend:
+        condition: service_completed_successfully
+    environment:
+      BASE_URL: "${FRONTEND_URL}"
+      API_URL: "${API_URL}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      MANAGER_EMAIL: "${MANAGER_EMAIL}"
+      MANAGER_PASSWORD: "${MANAGER_PASSWORD}"
+      ORGANISER_EMAIL: "${ORGANISER_EMAIL}"
+      ORGANISER_PASSWORD: "${ORGANISER_PASSWORD}"
+      EMPLOYEE_EMAIL: "${EMPLOYEE_EMAIL}"
+      EMPLOYEE_PASSWORD: "${EMPLOYEE_PASSWORD}"
+      VIEWONLY_EMAIL: "${VIEWONLY_EMAIL}"
+      VIEWONLY_PASSWORD: "${VIEWONLY_PASSWORD}"
+      CI: "true"
+    volumes:
+      - ./e2e:/app:ro
+      - ./results:/results
+    working_dir: /app
+    command: >
+      bash -c "
+        npm ci --prefer-offline 2>/dev/null || npm install &&
+        npx playwright install chromium &&
+        npx playwright test
+          --reporter=list,json,html
+          --output=/results/e2e-artifacts
+        2>&1 | tee /results/e2e-output.log;
+        EXIT=$$?;
+        cp -r playwright-report /results/e2e-report 2>/dev/null || true;
+        cp test-results.json /results/e2e-results.json 2>/dev/null || true;
+        exit $$EXIT
+      "
+
+  # ── 4. k6 — Load test (smoke by default, configurable via K6_SCENARIO) ────
+  k6:
+    <<: *common
+    image: grafana/k6:latest
+    container_name: test-k6
+    depends_on:
+      wait-for-backend:
+        condition: service_completed_successfully
+    environment:
+      BASE_URL: "${API_URL}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      PEAK_VUS: "${K6_PEAK_VUS:-30}"
+    volumes:
+      - ./load:/scripts:ro
+      - ./results:/results
+    command: >
+      run
+      --out json=/results/k6-results.json
+      --summary-export=/results/k6-summary.json
+      /scripts/${K6_SCENARIO:-smoke}.js
+
+  # ── 5. Security — auth + RBAC + injection shell scripts ───────────────────
+  security:
+    <<: *common
+    image: python:3.12-alpine
+    container_name: test-security
+    depends_on:
+      wait-for-backend:
+        condition: service_completed_successfully
+    environment:
+      ADMIN_EMAIL: "${ADMIN_EMAIL}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
+      MANAGER_EMAIL: "${MANAGER_EMAIL}"
+      MANAGER_PASSWORD: "${MANAGER_PASSWORD}"
+      ORGANISER_EMAIL: "${ORGANISER_EMAIL}"
+      ORGANISER_PASSWORD: "${ORGANISER_PASSWORD}"
+      EMPLOYEE_EMAIL: "${EMPLOYEE_EMAIL}"
+      EMPLOYEE_PASSWORD: "${EMPLOYEE_PASSWORD}"
+      VIEWONLY_EMAIL: "${VIEWONLY_EMAIL}"
+      VIEWONLY_PASSWORD: "${VIEWONLY_PASSWORD}"
+    volumes:
+      - ./security:/security:ro
+      - ./results:/results
+    command: >
+      sh -c "
+        apk add --no-cache curl bash > /dev/null 2>&1 &&
+        echo '=== Auth Security ===' | tee /results/security-auth.log &&
+        bash /security/auth-security.sh $$API_URL 2>&1 | tee -a /results/security-auth.log;
+        echo '=== RBAC Boundary ===' | tee /results/security-rbac.log &&
+        bash /security/rbac-boundary.sh $$API_URL 2>&1 | tee -a /results/security-rbac.log;
+        echo '=== Injection Tests ===' | tee /results/security-injection.log &&
+        bash /security/injection-tests.sh $$API_URL 2>&1 | tee -a /results/security-injection.log;
+        cat /results/security-auth.log /results/security-rbac.log /results/security-injection.log > /results/security-all.log
+      "
+
+networks:
+  kanban-net:
+    external: true   # attach to the running app's network
+    name: kanban-net
