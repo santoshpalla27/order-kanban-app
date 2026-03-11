@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chatApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
+import { useChatStore } from '../../store/chatStore';
 import { ChatMessage } from '../../types';
 import { Send, Smile, Users, Hash, ChevronUp } from 'lucide-react';
 import MentionInput, { renderWithMentions, MentionInputHandle } from '../../components/MentionInput';
@@ -36,6 +37,10 @@ export default function ChatPage() {
   const inputRef = useRef<MentionInputHandle>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const clearUnreadChat = useChatStore((s) => s.clear);
+
+  // Clear the unread badge the moment the user opens this page.
+  useEffect(() => { clearUnreadChat(); }, [clearUnreadChat]);
 
   // Older history loaded via "Load older" button
   const [olderMessages, setOlderMessages] = useState<ChatMessage[]>([]);

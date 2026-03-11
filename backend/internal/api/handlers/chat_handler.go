@@ -72,7 +72,11 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 
 	// If no @mentions, notify everyone — it's a general team message.
 	if len(mentionedIDs) == 0 {
-		generalMsg := fmt.Sprintf("%s sent a message in Team Chat", senderName)
+		preview := req.Message
+		if len([]rune(preview)) > 60 {
+			preview = string([]rune(preview)[:57]) + "..."
+		}
+		generalMsg := fmt.Sprintf("%s: %s", senderName, preview)
 		services.CreateNotificationForAllExcept(userID, nil, generalMsg, "chat_message", "chat", 0, req.Message, senderName)
 	}
 

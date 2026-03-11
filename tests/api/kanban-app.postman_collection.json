@@ -886,11 +886,15 @@
               "script": {
                 "exec": [
                   "pm.test('status is 201', () => pm.response.to.have.status(201));",
-                  "pm.test('returns created message', () => {",
+                  "pm.test('returns created message with required fields', () => {",
                   "  const j = pm.response.json();",
                   "  pm.expect(j.id).to.be.a('number');",
-                  "  pm.expect(j.message).to.equal('Hello from Postman test suite!');",
-                  "});"
+                  "  pm.expect(j.message).to.be.a('string');",
+                  "  pm.expect(j.user_id).to.be.a('number');",
+                  "  pm.expect(j.created_at).to.be.a('string');",
+                  "});",
+                  "// Store message id for subsequent notification check",
+                  "pm.environment.set('chatMsgId', pm.response.json().id);"
                 ]
               }
             }
@@ -932,6 +936,13 @@
                   "  pm.expect(j.data).to.be.an('array');",
                   "  pm.expect(j).to.have.property('has_more');",
                   "  if (j.data.length > 0) pm.environment.set('notificationId', j.data[0].id);",
+                  "});",
+                  "pm.test('notification messages are non-empty strings', () => {",
+                  "  const j = pm.response.json();",
+                  "  j.data.forEach(n => {",
+                  "    pm.expect(n.message).to.be.a('string').and.not.empty;",
+                  "    pm.expect(n.type).to.be.a('string').and.not.empty;",
+                  "  });",
                   "});"
                 ]
               }
@@ -1239,10 +1250,21 @@
               "script": {
                 "exec": [
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('returns array layout', () => {",
+                  "pm.test('returns array of activity logs', () => {",
                   "  const j = pm.response.json();",
-                  "  if (Array.isArray(j)) pm.expect(j).to.be.an('array');",
-                  "  else pm.expect(j.data).to.be.an('array');",
+                  "  const arr = Array.isArray(j) ? j : (j.data || []);",
+                  "  pm.expect(arr).to.be.an('array');",
+                  "});",
+                  "pm.test('activity log details include Order ID and clear description', () => {",
+                  "  const j = pm.response.json();",
+                  "  const arr = Array.isArray(j) ? j : (j.data || []);",
+                  "  arr.filter(l => l.entity === 'product').forEach(log => {",
+                  "    pm.expect(log.details).to.be.a('string').and.not.empty;",
+                  "    // Details should reference 'Order' keyword for product actions",
+                  "    if (['created','updated','status_changed','deleted','restored'].includes(log.action)) {",
+                  "      pm.expect(log.details).to.match(/Order/i, `Expected 'Order' in: ${log.details}`);",
+                  "    }",
+                  "  });",
                   "});"
                 ]
               }

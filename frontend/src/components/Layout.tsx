@@ -5,6 +5,7 @@ import { useThemeStore } from '../store/themeStore';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { useQuery } from '@tanstack/react-query';
 import { notificationsApi } from '../api/client';
+import { useChatStore } from '../store/chatStore';
 import NotificationPanel from './NotificationPanel';
 import ActivityPanel from './ActivityPanel';
 import NotificationToast from './NotificationToast';
@@ -88,6 +89,7 @@ export default function Layout() {
     refetchInterval: 30000,
   });
   const unreadCount = unreadData?.data?.count || 0;
+  const unreadChatCount = useChatStore((s) => s.unreadCount);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -132,27 +134,45 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  isActive
-                    ? isDark
-                      ? 'bg-brand-600/20 text-brand-400'
-                      : 'bg-brand-100 text-brand-700'
-                    : isDark
-                    ? 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
-                    : 'text-surface-500 hover:text-surface-800 hover:bg-surface-100'
-                }`
-              }
-            >
-              <item.icon className="w-5 h-5 flex-shrink-0" />
-              {sidebarOpen && <span className="whitespace-nowrap">{item.label}</span>}
-            </NavLink>
-          ))}
+          {navItems.map((item) => {
+            const isChat = item.to === '/chat';
+            const showChatBadge = isChat && unreadChatCount > 0;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                className={({ isActive }) =>
+                  `relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                    isActive
+                      ? isDark
+                        ? 'bg-brand-600/20 text-brand-400'
+                        : 'bg-brand-100 text-brand-700'
+                      : isDark
+                      ? 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
+                      : 'text-surface-500 hover:text-surface-800 hover:bg-surface-100'
+                  }`
+                }
+              >
+                <div className="relative flex-shrink-0">
+                  <item.icon className="w-5 h-5" />
+                  {showChatBadge && !sidebarOpen && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                </div>
+                {sidebarOpen && (
+                  <span className="flex-1 whitespace-nowrap flex items-center justify-between">
+                    {item.label}
+                    {showChatBadge && (
+                      <span className="ml-auto min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-scale-in">
+                        {unreadChatCount > 9 ? '9+' : unreadChatCount}
+                      </span>
+                    )}
+                  </span>
+                )}
+              </NavLink>
+            );
+          })}
         </nav>
 
         {/* User info at bottom */}

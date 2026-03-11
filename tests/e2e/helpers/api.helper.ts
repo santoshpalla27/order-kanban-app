@@ -24,9 +24,11 @@ export interface User {
 }
 
 export interface Product {
-  product_id: number;
+  id:            number;
+  product_id:    string;
   customer_name: string;
-  description: string;
+  description:   string;
+  status:        string;
 }
 
 export interface Comment {
@@ -154,8 +156,9 @@ export async function changeUserRole(
 // ─── Products ─────────────────────────────────────────────────────────────────
 
 export interface CreateProductPayload {
+  product_id?:   string;
   customer_name: string;
-  description:   string;
+  description?:  string;
 }
 
 export async function createProduct(
@@ -198,4 +201,16 @@ export async function getUnreadNotificationCount(token: string): Promise<number>
 
 export async function markAllNotificationsRead(token: string): Promise<void> {
   await request<unknown>('PATCH', '/notifications/mark-all-read', token);
+}
+
+export async function getNotifications(token: string): Promise<unknown[]> {
+  const res = await request<{ data: unknown[] } | unknown[]>('GET', '/notifications?limit=20', token);
+  if (Array.isArray(res)) return res;
+  return (res as { data: unknown[] }).data || [];
+}
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
+export async function sendChatMessage(token: string, message: string): Promise<{ id: number }> {
+  return request<{ id: number }>('POST', '/chat/messages', token, { message });
 }

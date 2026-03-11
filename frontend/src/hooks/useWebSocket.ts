@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../store/toastStore';
+import { useChatStore } from '../store/chatStore';
 import { playNotificationSound } from '../utils/sound';
 
 export function useWebSocket() {
@@ -57,6 +58,14 @@ export function useWebSocket() {
             break;
           case 'chat_message':
             queryClient.invalidateQueries({ queryKey: ['chat'] });
+            // Show badge on Team Chat nav if the message is from someone else
+            // and the user is not currently on the chat page.
+            if (
+              data.payload?.user_id !== currentUserId &&
+              !window.location.pathname.includes('/chat')
+            ) {
+              useChatStore.getState().increment();
+            }
             break;
           case 'activity_updated':
             queryClient.invalidateQueries({ queryKey: ['activity-full'] });
