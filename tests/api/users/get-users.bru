@@ -1,0 +1,38 @@
+meta {
+  name: Get All Users (Admin only)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/users
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("returns array of users", function() {
+    expect(res.body).to.be.an("array");
+  });
+
+  test("each user has role", function() {
+    if (res.body.length > 0) {
+      expect(res.body[0].role).to.be.an("object");
+      expect(res.body[0].role.name).to.be.a("string");
+    }
+  });
+
+  test("passwords are not exposed", function() {
+    res.body.forEach(function(u) {
+      expect(u.password).to.be.undefined;
+    });
+  });
+}

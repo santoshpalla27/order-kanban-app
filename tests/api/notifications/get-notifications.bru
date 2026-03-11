@@ -1,0 +1,30 @@
+meta {
+  name: Get Notifications
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/notifications?limit=20
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("returns paginated structure", function() {
+    expect(res.body.data).to.be.an("array");
+    expect(res.body).to.have.property("has_more");
+  });
+
+  if (res.body.data && res.body.data.length > 0) {
+    bru.setVar("notificationId", res.body.data[0].id);
+  }
+}

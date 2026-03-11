@@ -1,0 +1,31 @@
+meta {
+  name: RBAC - Employee cannot create product (403)
+  type: http
+  seq: 1
+}
+
+// SETUP: Run auth/login.bru with employeeEmail/employeePassword first
+// and store that token as employeeToken
+
+post {
+  url: {{baseUrl}}/products
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{employeeToken}}
+}
+
+body:json {
+  {
+    "product_id": "RBAC-TEST-EMP",
+    "customer_name": "Should Fail"
+  }
+}
+
+tests {
+  test("employee cannot create product — 403", function() {
+    expect(res.status).to.equal(403);
+  });
+}

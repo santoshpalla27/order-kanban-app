@@ -1,0 +1,22 @@
+meta {
+  name: RBAC - Employee cannot delete another user's comment (403)
+  type: http
+  seq: 8
+}
+
+// Assumes commentId belongs to admin, not the employee
+delete {
+  url: {{baseUrl}}/comments/{{commentId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{employeeToken}}
+}
+
+tests {
+  test("employee cannot delete others comment — 403", function() {
+    expect(res.status).to.equal(403);
+  });
+}

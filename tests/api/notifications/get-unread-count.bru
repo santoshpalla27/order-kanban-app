@@ -1,0 +1,26 @@
+meta {
+  name: Get Unread Notification Count
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/notifications/unread-count
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("returns count as number", function() {
+    expect(res.body.count).to.be.a("number");
+    expect(res.body.count).to.be.at.least(0);
+  });
+}

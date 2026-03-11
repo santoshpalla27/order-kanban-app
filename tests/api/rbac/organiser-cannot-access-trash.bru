@@ -1,0 +1,21 @@
+meta {
+  name: RBAC - Organiser cannot access trash (403)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/products/deleted
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{organiserToken}}
+}
+
+tests {
+  test("organiser cannot access trash — 403", function() {
+    expect(res.status).to.equal(403);
+  });
+}

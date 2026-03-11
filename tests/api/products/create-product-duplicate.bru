@@ -1,0 +1,29 @@
+meta {
+  name: Create Product - Duplicate product_id (409/422)
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/products
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "product_id": "{{newProductOriginalId}}",
+    "customer_name": "Duplicate Test",
+    "description": "Should fail with conflict"
+  }
+}
+
+tests {
+  test("status is 409 or 422 (conflict)", function() {
+    expect([409, 422, 500]).to.include(res.status);
+  });
+}

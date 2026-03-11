@@ -1,0 +1,21 @@
+meta {
+  name: Get Product - Not Found (404)
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/products/99999999
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 404", function() {
+    expect(res.status).to.equal(404);
+  });
+}

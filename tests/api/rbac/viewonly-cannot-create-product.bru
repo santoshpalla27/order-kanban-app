@@ -1,0 +1,28 @@
+meta {
+  name: RBAC - View Only cannot create product (403)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/products
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{viewonlyToken}}
+}
+
+body:json {
+  {
+    "product_id": "RBAC-VIEWONLY",
+    "customer_name": "Should Fail"
+  }
+}
+
+tests {
+  test("view_only cannot create product — 403", function() {
+    expect(res.status).to.equal(403);
+  });
+}

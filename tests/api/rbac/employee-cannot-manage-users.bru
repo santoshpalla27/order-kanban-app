@@ -1,0 +1,21 @@
+meta {
+  name: RBAC - Employee cannot manage users (403)
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/users
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{employeeToken}}
+}
+
+tests {
+  test("employee cannot list users — 403", function() {
+    expect(res.status).to.equal(403);
+  });
+}

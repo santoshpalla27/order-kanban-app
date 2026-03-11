@@ -1,0 +1,27 @@
+meta {
+  name: List Products with Search Filter
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/products?search=test&status=working&limit=10
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  test("filters applied — all results match status", function() {
+    res.body.data.forEach(function(p) {
+      expect(p.status).to.equal("working");
+    });
+  });
+}

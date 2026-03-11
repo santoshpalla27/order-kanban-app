@@ -1,0 +1,32 @@
+meta {
+  name: Send Chat Message
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/chat/messages
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "message": "Hello from API test suite!"
+  }
+}
+
+tests {
+  test("status is 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("returns created message", function() {
+    expect(res.body.id).to.be.a("number");
+    expect(res.body.message).to.equal("Hello from API test suite!");
+  });
+}

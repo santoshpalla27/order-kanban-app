@@ -1,0 +1,21 @@
+{
+  "name": "kanban-e2e-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:debug": "playwright test --debug",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report",
+    "test:auth": "playwright test specs/auth.spec.ts",
+    "test:kanban": "playwright test specs/kanban.spec.ts",
+    "test:admin": "playwright test specs/admin.spec.ts",
+    "test:rbac": "playwright test specs/rbac.spec.ts",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.0.0"
+  }
+}

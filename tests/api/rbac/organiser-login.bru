@@ -1,0 +1,27 @@
+meta {
+  name: RBAC - Login as Organiser (setup)
+  type: http
+  seq: 0
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{organiserEmail}}",
+    "password": "{{organiserPassword}}"
+  }
+}
+
+tests {
+  test("status is 200", function() {
+    expect(res.status).to.equal(200);
+  });
+
+  bru.setVar("organiserToken", res.body.access_token);
+  bru.setVar("organiserId", res.body.user.id);
+}

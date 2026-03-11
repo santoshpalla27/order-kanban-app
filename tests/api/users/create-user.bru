@@ -1,0 +1,41 @@
+meta {
+  name: Create User (Admin only)
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/users
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "name": "Test Employee",
+    "email": "testemployee_{{$timestamp}}@test.com",
+    "password": "password123",
+    "role_id": 4
+  }
+}
+
+tests {
+  test("status is 201", function() {
+    expect(res.status).to.equal(201);
+  });
+
+  test("returns created user with role", function() {
+    expect(res.body.id).to.be.a("number");
+    expect(res.body.role.name).to.equal("employee");
+  });
+
+  test("password not in response", function() {
+    expect(res.body.password).to.be.undefined;
+  });
+
+  bru.setVar("testUserId", res.body.id);
+}
