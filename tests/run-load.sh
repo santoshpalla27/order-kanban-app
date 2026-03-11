@@ -91,10 +91,13 @@ docker compose \
   --env-file "$ENV_FILE" \
   -f docker-compose.yml \
   run --rm \
-  -e K6_SCENARIO="$SCENARIO" \
-  -e K6_PEAK_VUS="$PEAK_VUS" \
+  -e PEAK_VUS="$PEAK_VUS" \
   -v "$RESULTS_DIR:/results" \
-  k6 2>&1 | tee "$RESULTS_DIR/k6.log"
+  k6 \
+  run \
+  --out json=/results/k6-results.json \
+  --summary-export=/results/k6-summary.json \
+  /scripts/"${SCENARIO}".js 2>&1 | tee "$RESULTS_DIR/k6.log"
 
 CODE="${PIPESTATUS[0]}"
 DURATION="$(($(date +%s) - START))s"
