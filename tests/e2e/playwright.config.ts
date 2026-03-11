@@ -22,8 +22,10 @@ export default defineConfig({
   },
   projects: [
     // Setup: create auth state files for each role
+    // testDir overrides the global './specs' for this project only
     {
       name: 'setup',
+      testDir: './fixtures',
       testMatch: /.*\.setup\.ts/,
     },
     // Main test suite (depends on setup)
