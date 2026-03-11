@@ -66,18 +66,19 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	// Persist + deliver mention notifications to @-mentioned users.
+	// Deliver mention toasts to @-mentioned users — transient only, not persisted.
 	mentionMsg := fmt.Sprintf("%s mentioned you in Team Chat", senderName)
-	mentionedIDs := services.NotifyMentions(userID, req.Message, mentionMsg, "chat", 0, req.Message, senderName)
+	mentionedIDs := services.BroadcastChatMentions(userID, req.Message, mentionMsg, req.Message, senderName)
 
-	// If no @mentions, notify everyone — it's a general team message.
+	// If no @mentions, broadcast a transient toast to everyone.
+	// Not persisted to the notifications table — bell panel shows product notifications only.
 	if len(mentionedIDs) == 0 {
 		preview := req.Message
 		if len([]rune(preview)) > 60 {
 			preview = string([]rune(preview)[:57]) + "..."
 		}
 		generalMsg := fmt.Sprintf("%s: %s", senderName, preview)
-		services.CreateNotificationForAllExcept(userID, nil, generalMsg, "chat_message", "chat", 0, req.Message, senderName)
+		services.BroadcastChatToastExcept(userID, generalMsg, "chat_message", req.Message, senderName)
 	}
 
 	c.JSON(http.StatusCreated, gin.H{

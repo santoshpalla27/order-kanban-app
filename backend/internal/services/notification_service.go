@@ -68,6 +68,51 @@ func CreateNotificationForAllExcept(excludeUserID uint, alsoExclude []uint, mess
 	}
 }
 
+// BroadcastChatToastExcept sends a transient WS toast to every user except the sender.
+// Nothing is written to the notifications table, so the bell panel stays clean.
+func BroadcastChatToastExcept(excludeUserID uint, message, notifType, content, senderName string) {
+	wsMsg := buildNotifWSMsg(models.Notification{
+		Message:    message,
+		Type:       notifType,
+		EntityType: "chat",
+		Content:    content,
+		SenderName: senderName,
+	})
+	var users []models.User
+	database.DB.Where("id != ?", excludeUserID).Find(&users)
+	for _, user := range users {
+		database.EmitToUser(user.ID, wsMsg)
+	}
+}
+
+// BroadcastChatMentions parses @[Name] tokens and sends a transient mention toast
+// to each tagged user without writing anything to the notifications table.
+func BroadcastChatMentions(senderID uint, text, notifMessage, content, senderName string) []uint {
+	matches := mentionRe.FindAllStringSubmatch(text, -1)
+	seen := map[uint]bool{}
+	var notified []uint
+	for _, m := range matches {
+		var user models.User
+		if err := database.DB.Where("LOWER(name) = LOWER(?)", m[1]).First(&user).Error; err != nil {
+			continue
+		}
+		if user.ID == senderID || seen[user.ID] {
+			continue
+		}
+		seen[user.ID] = true
+		notified = append(notified, user.ID)
+		wsMsg := buildNotifWSMsg(models.Notification{
+			Message:    notifMessage,
+			Type:       "mention",
+			EntityType: "chat",
+			Content:    content,
+			SenderName: senderName,
+		})
+		database.EmitToUser(user.ID, wsMsg)
+	}
+	return notified
+}
+
 // NotifyMentions parses @[Name] tokens, persists mention notifications, delivers via WS.
 // Returns the list of user IDs that were notified, so callers can exclude them from
 // the broader "comment_added" notification and avoid sending duplicate toasts.
