@@ -18,7 +18,11 @@ name: kanban-tests
 x-common: &common
   networks:
     - kanban-net
-  env_file: .env.test
+  env_file:
+    - path: .env.test
+      required: false
+    - path: .env
+      required: false
   restart: "no"
 
 services:
@@ -43,31 +47,36 @@ services:
     <<: *common
     image: postman/newman:latest
     container_name: test-newman
+    # Override the default "newman" entrypoint so we can use sh for variable expansion
+    entrypoint: ""
     depends_on:
       wait-for-backend:
         condition: service_completed_successfully
     volumes:
       - ./api:/etc/newman:ro
       - ./results:/results
+    # $$VAR → $VAR after docker-compose processing → expanded by sh at runtime
     command: >
-      run kanban-app.postman_collection.json
-      --environment kanban-app.postman_environment.json
-      --env-var "baseUrl=$$API_URL"
-      --env-var "adminEmail=$$ADMIN_EMAIL"
-      --env-var "adminPassword=$$ADMIN_PASSWORD"
-      --env-var "managerEmail=$$MANAGER_EMAIL"
-      --env-var "managerPassword=$$MANAGER_PASSWORD"
-      --env-var "organiserEmail=$$ORGANISER_EMAIL"
-      --env-var "organiserPassword=$$ORGANISER_PASSWORD"
-      --env-var "employeeEmail=$$EMPLOYEE_EMAIL"
-      --env-var "employeePassword=$$EMPLOYEE_PASSWORD"
-      --env-var "viewonlyEmail=$$VIEWONLY_EMAIL"
-      --env-var "viewonlyPassword=$$VIEWONLY_PASSWORD"
-      --reporters cli,json,htmlextra
-      --reporter-json-export /results/api-results.json
-      --reporter-htmlextra-export /results/api-results.html
-      --reporter-htmlextra-title "Kanban API Tests"
-      --color on
+      sh -c "
+        npm install -g newman-reporter-htmlextra --quiet 2>/dev/null &&
+        newman run /etc/newman/kanban-app.postman_collection.json
+          --environment /etc/newman/kanban-app.postman_environment.json
+          --env-var baseUrl=$$API_URL
+          --env-var adminEmail=$$ADMIN_EMAIL
+          --env-var adminPassword=$$ADMIN_PASSWORD
+          --env-var managerEmail=$$MANAGER_EMAIL
+          --env-var managerPassword=$$MANAGER_PASSWORD
+          --env-var organiserEmail=$$ORGANISER_EMAIL
+          --env-var organiserPassword=$$ORGANISER_PASSWORD
+          --env-var employeeEmail=$$EMPLOYEE_EMAIL
+          --env-var employeePassword=$$EMPLOYEE_PASSWORD
+          --env-var viewonlyEmail=$$VIEWONLY_EMAIL
+          --env-var viewonlyPassword=$$VIEWONLY_PASSWORD
+          --reporters cli,json,htmlextra
+          --reporter-json-export /results/api-results.json
+          --reporter-htmlextra-export /results/api-results.html
+          --color on
+      "
 
   # ── 3. Playwright — E2E UI tests ───────────────────────────────────────────
   playwright:
