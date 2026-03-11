@@ -61,20 +61,37 @@ ln -sfn "$RESULTS_DIR" "$SCRIPT_DIR/results/latest"
 banner "Kanban App Test Suite — $TIMESTAMP"
 info "Results: $RESULTS_DIR"
 
-# ── Verify app is reachable ───────────────────────────────────────────────────
-source .env.test 2>/dev/null || true
-API_HOST="${API_URL:-http://localhost:8080/api}"
+# ── Load env file (.env.test or .env, whichever exists) ──────────────────────
+if [ -f ".env.test" ]; then
+  ENV_FILE=".env.test"
+elif [ -f ".env" ]; then
+  ENV_FILE=".env"
+else
+  echo -e "${RED}ERROR: No env file found. Expected .env.test or .env in tests/${NC}"
+  exit 1
+fi
+info "Using env file: $ENV_FILE"
+# shellcheck disable=SC1090
+source "$ENV_FILE"
 
-info "Checking app health at $API_HOST/health ..."
-if ! curl -sf "$API_HOST/health" > /dev/null 2>&1; then
-  echo -e "\n${RED}ERROR: Backend is not reachable at $API_HOST${NC}"
-  echo "  Start the app first:  docker compose up -d"
-  echo "  Or update API_URL in tests/.env.test"
+# HOST_API_URL is for host-level health check (through Traefik/load-balancer).
+# Falls back to localhost/api (Traefik) then localhost:8080/api (direct).
+HOST_CHECK="${HOST_API_URL:-http://localhost/api}"
+
+info "Checking app health at $HOST_CHECK/health ..."
+if ! curl -sf --max-time 5 "$HOST_CHECK/health" > /dev/null 2>&1; then
+  echo -e "\n${RED}ERROR: Backend is not reachable at $HOST_CHECK${NC}"
+  echo ""
+  echo "  Possible fixes:"
+  echo "  1. Start the app:          docker compose up -d"
+  echo "  2. Check HOST_API_URL in $ENV_FILE"
+  echo "     — Use http://localhost/api   if behind Traefik (port 80)"
+  echo "     — Use http://localhost:8080/api  if backend port is mapped directly"
   exit 1
 fi
 success "Backend is healthy"
 
-# ── Verify kanban-net exists ──────────────────────────────────────────────────
+# ── Verify kanban-net Docker network exists ───────────────────────────────────
 if ! docker network inspect kanban-net > /dev/null 2>&1; then
   echo -e "\n${RED}ERROR: Docker network 'kanban-net' not found${NC}"
   echo "  The app must be running via docker compose (creates kanban-net)"
@@ -92,7 +109,7 @@ run_service() {
   local start; start="$(date +%s)"
 
   docker compose \
-    --env-file .env.test \
+    --env-file "$ENV_FILE" \
     -f docker-compose.yml \
     run --rm \
     -v "$RESULTS_DIR:/results" \
@@ -112,7 +129,7 @@ run_service() {
 # ── Run selected test suites ──────────────────────────────────────────────────
 
 # Always start wait-for-backend first
-docker compose --env-file .env.test -f docker-compose.yml run --rm wait-for-backend 2>&1
+docker compose --env-file "$ENV_FILE" -f docker-compose.yml run --rm wait-for-backend 2>&1
 
 [ "$RUN_API"      = true ] && run_service "API Tests (Newman)"     "newman"
 [ "$RUN_E2E"      = true ] && run_service "E2E Tests (Playwright)" "playwright"
@@ -129,7 +146,7 @@ REPORT="$RESULTS_DIR/summary.md"
   echo "# Test Run Summary"
   echo ""
   echo "**Date:** $TIMESTAMP"
-  echo "**API URL:** $API_HOST"
+  echo "**API URL:** $HOST_CHECK"
   echo ""
   echo "| Suite | Status | Duration |"
   echo "|-------|--------|----------|"
