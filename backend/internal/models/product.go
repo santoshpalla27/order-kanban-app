@@ -21,6 +21,7 @@ type Product struct {
 	Comments      []Comment      `json:"comments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
 	DeletedBy     uint           `json:"deleted_by" gorm:"default:0"`
 	CreatedAt     time.Time      `json:"created_at"`
+	UpdatedAt     time.Time      `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `json:"deleted_at" gorm:"index"` // enables GORM soft delete
 }
 

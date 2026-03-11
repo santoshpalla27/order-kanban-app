@@ -77,7 +77,7 @@ func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCur
 
 	// Fetch one extra row to detect whether a next page exists
 	var products []models.Product
-	if err := query.Order("id DESC").Limit(limit + 1).Find(&products).Error; err != nil {
+	if err := query.Order("updated_at DESC, id DESC").Limit(limit + 1).Find(&products).Error; err != nil {
 		return ProductCursorPage{}, err
 	}
 
@@ -155,7 +155,8 @@ func UpdateProduct(id uint, updates map[string]interface{}) error {
 }
 
 func UpdateProductStatus(id uint, status string) error {
-	return database.DB.Model(&models.Product{}).Where("id = ?", id).Update("status", status).Error
+	return database.DB.Model(&models.Product{}).Where("id = ?", id).
+		Updates(map[string]interface{}{"status": status, "updated_at": time.Now()}).Error
 }
 
 // DeleteProduct soft-deletes a product. No ID mangling needed — the Postgres partial unique
