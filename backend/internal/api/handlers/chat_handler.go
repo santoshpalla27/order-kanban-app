@@ -66,9 +66,15 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	// Persist + deliver mention notifications to @-mentioned users
+	// Persist + deliver mention notifications to @-mentioned users.
 	mentionMsg := fmt.Sprintf("%s mentioned you in Team Chat", senderName)
-	services.NotifyMentions(userID, req.Message, mentionMsg, "chat", 0, req.Message, senderName)
+	mentionedIDs := services.NotifyMentions(userID, req.Message, mentionMsg, "chat", 0, req.Message, senderName)
+
+	// If no @mentions, notify everyone — it's a general team message.
+	if len(mentionedIDs) == 0 {
+		generalMsg := fmt.Sprintf("%s sent a message in Team Chat", senderName)
+		services.CreateNotificationForAllExcept(userID, nil, generalMsg, "chat_message", "chat", 0, req.Message, senderName)
+	}
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":         msg.ID,
