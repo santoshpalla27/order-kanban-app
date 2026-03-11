@@ -103,28 +103,29 @@ services:
       VIEWONLY_PASSWORD: "${VIEWONLY_PASSWORD}"
       CI: "true"
     volumes:
-      - ./e2e:/app:ro
+      - ./e2e:/app      # writable: npm writes node_modules, playwright writes .auth/
       - ./results:/results
     working_dir: /app
-    command: >
-      bash -c "
+    # Use list form so Docker uses exec-form (no outer sh -c wrapping).
+    command:
+      - bash
+      - -c
+      - >-
         npm ci --prefer-offline 2>/dev/null || npm install &&
         npx playwright install chromium &&
-        npx playwright test
-          --reporter=list,json,html
-          --output=/results/e2e-artifacts
+        npx playwright test --reporter=list,json,html --output=/results/e2e-artifacts
         2>&1 | tee /results/e2e-output.log;
         EXIT=$$?;
         cp -r playwright-report /results/e2e-report 2>/dev/null || true;
         cp test-results.json /results/e2e-results.json 2>/dev/null || true;
         exit $$EXIT
-      "
 
   # ── 4. k6 — Load test (smoke by default, configurable via K6_SCENARIO) ────
   k6:
     <<: *common
     image: grafana/k6:latest
     container_name: test-k6
+    user: root     # k6 runs as non-root by default; root needed to write to host-owned results dir
     depends_on:
       wait-for-backend:
         condition: service_completed_successfully
