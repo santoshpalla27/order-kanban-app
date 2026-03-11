@@ -80,44 +80,32 @@ services:
         --reporter-htmlextra-export /results/api-results.html
         --color on
 
-  # ── 3. Playwright — E2E UI tests ───────────────────────────────────────────
+  # ── 3. Playwright — E2E UI tests (targets remote deployed app) ────────────
   playwright:
     <<: *common
     image: mcr.microsoft.com/playwright:v1.49.0-jammy
     container_name: test-playwright
-    depends_on:
-      wait-for-backend:
-        condition: service_completed_successfully
     environment:
-      BASE_URL: "${FRONTEND_URL}"
-      API_URL: "${API_URL}"
-      ADMIN_EMAIL: "${ADMIN_EMAIL}"
-      ADMIN_PASSWORD: "${ADMIN_PASSWORD}"
-      MANAGER_EMAIL: "${MANAGER_EMAIL}"
-      MANAGER_PASSWORD: "${MANAGER_PASSWORD}"
-      ORGANISER_EMAIL: "${ORGANISER_EMAIL}"
-      ORGANISER_PASSWORD: "${ORGANISER_PASSWORD}"
-      EMPLOYEE_EMAIL: "${EMPLOYEE_EMAIL}"
-      EMPLOYEE_PASSWORD: "${EMPLOYEE_PASSWORD}"
-      VIEWONLY_EMAIL: "${VIEWONLY_EMAIL}"
-      VIEWONLY_PASSWORD: "${VIEWONLY_PASSWORD}"
+      BASE_URL: "${E2E_BASE_URL:-https://app.santoshdevops.cloud}"
+      API_URL: "${E2E_API_URL:-https://app.santoshdevops.cloud/api}"
+      ADMIN_EMAIL: "${ADMIN_EMAIL:-admin@gmail.com}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-admin123}"
       CI: "true"
     volumes:
-      - ./e2e:/app      # writable: npm writes node_modules, playwright writes .auth/
+      - ./e2e:/app
       - ./results:/results
     working_dir: /app
-    # Use list form so Docker uses exec-form (no outer sh -c wrapping).
     command:
       - bash
       - -c
       - >-
         npm ci --prefer-offline 2>/dev/null || npm install &&
-        npx playwright install chromium &&
+        npx playwright install chromium --with-deps 2>/dev/null | tail -3 &&
         npx playwright test 2>&1 | tee /results/e2e-output.log;
         EXIT=$$?;
         cp test-results.json /results/e2e-results.json 2>/dev/null || true;
         cp -r playwright-report /results/e2e-report 2>/dev/null || true;
-        node /app/summarize.js /results/e2e-results.json;
+        node /app/summarize.js /results/e2e-results.json 2>/dev/null || true;
         exit $$EXIT
 
   # ── 4. k6 — Load test (smoke by default, configurable via K6_SCENARIO) ────
