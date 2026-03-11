@@ -22,10 +22,17 @@ fail()    { echo -e "${RED}✗ FAIL${NC} — $1"; ((FAIL++)) || true; }
 section() { echo -e "\n${YELLOW}▶ $1${NC}"; }
 
 # ─── Auth ─────────────────────────────────────────────────────────────────────
-TOKEN=$(curl -sf -X POST "$BASE/auth/login" \
-  -H "Content-Type: application/json" \
-  -d "{\"email\":\"${ADMIN_EMAIL:-admin@test.com}\",\"password\":\"${ADMIN_PASSWORD:-password123}\"}" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || echo "")
+# Retry login up to 3 times with a short backoff — previous test suites
+# (e.g. brute-force section) may have briefly triggered rate limiting.
+TOKEN=""
+for _attempt in 1 2 3; do
+  TOKEN=$(curl -sf -X POST "$BASE/auth/login" \
+    -H "Content-Type: application/json" \
+    -d "{\"email\":\"${ADMIN_EMAIL:-admin@test.com}\",\"password\":\"${ADMIN_PASSWORD:-password123}\"}" \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || echo "")
+  [ -n "$TOKEN" ] && break
+  sleep 2
+done
 
 if [ -z "$TOKEN" ]; then
   echo "Login failed — check credentials"; exit 1

@@ -22,6 +22,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 	r.Use(middleware.RequestID())       // inject X-Request-ID first
 	r.Use(middleware.StructuredLogger()) // structured access log carrying request_id
+	r.Use(middleware.SecurityHeaders()) // X-Content-Type-Options, X-Frame-Options, etc.
 	r.Use(cors.New(cors.Config{
 		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
