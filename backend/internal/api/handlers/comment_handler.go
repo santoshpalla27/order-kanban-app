@@ -72,30 +72,33 @@ func (h *CommentHandler) Create(c *gin.Context) {
 		}
 	}
 
-	services.CreateActivityLog(&models.ActivityLog{
-		UserID:   userID,
-		Action:   "commented",
-		Entity:   "comment",
-		EntityID: uint(productID),
-		Details:  "Added comment on product",
-	})
-
 	product, _ := services.GetProductByIDSimple(uint(productID))
 	productLabel := fmt.Sprintf("#%d", productID)
 	if product != nil {
 		productLabel = product.ProductID
 	}
 
+	services.CreateActivityLog(&models.ActivityLog{
+		UserID:   userID,
+		Action:   "commented",
+		Entity:   "comment",
+		EntityID: uint(productID),
+		Details:  fmt.Sprintf("Commented on order %s", productLabel),
+	})
+
 	senderName := userName.(string)
 	message := fmt.Sprintf("%s commented on %s", senderName, productLabel)
 
-	// Mention notifications first — returns IDs of users who will receive a mention toast
+	// Mention notifications first — returns IDs of users who will receive a mention toast.
 	mentionMsg := fmt.Sprintf("%s mentioned you in %s", senderName, productLabel)
 	mentionedIDs := services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID), req.Message, senderName)
 
-	// General "commented" notification for all other users, excluding sender and already-mentioned users
-	// so mentioned users don't receive two toasts for the same comment.
-	services.CreateNotificationForAllExcept(userID, mentionedIDs, message, "comment_added", "product", uint(productID), req.Message, senderName)
+	// If the message contains @mentions, only the mentioned users are notified —
+	// the rest of the team did not need a ping.
+	// If there are no @mentions it is a general chat message, so notify everyone.
+	if len(mentionedIDs) == 0 {
+		services.CreateNotificationForAllExcept(userID, nil, message, "comment_added", "product", uint(productID), req.Message, senderName)
+	}
 
 	// Broadcast UI update event (comment panel refresh) via LISTEN/NOTIFY
 	wsMsg, _ := json.Marshal(WSMessage{

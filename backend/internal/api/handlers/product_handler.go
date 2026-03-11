@@ -19,6 +19,22 @@ func NewProductHandler() *ProductHandler {
 	return &ProductHandler{}
 }
 
+// formatStatus converts snake_case status values to human-readable labels.
+func formatStatus(s string) string {
+	switch s {
+	case "yet_to_start":
+		return "Yet to Start"
+	case "working":
+		return "Working"
+	case "review":
+		return "Review"
+	case "done":
+		return "Done"
+	default:
+		return s
+	}
+}
+
 func (h *ProductHandler) GetProducts(c *gin.Context) {
 	filter := services.ProductFilter{
 		Status:   c.Query("status"),
@@ -123,7 +139,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		Action:   "created",
 		Entity:   "product",
 		EntityID: product.ID,
-		Details:  fmt.Sprintf("Created product %s", product.ProductID),
+		Details:  fmt.Sprintf("Order %s created for customer %s", product.ProductID, product.CustomerName),
 	})
 
 	wsMsg, _ := json.Marshal(WSMessage{Type: "product_created", Payload: product})
@@ -179,7 +195,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 		Action:   "updated",
 		Entity:   "product",
 		EntityID: product.ID,
-		Details:  fmt.Sprintf("Updated product %s", product.ProductID),
+		Details:  fmt.Sprintf("Order %s details updated (customer: %s)", product.ProductID, product.CustomerName),
 	})
 
 	wsMsg, _ := json.Marshal(WSMessage{Type: "product_update", Payload: product})
@@ -223,7 +239,7 @@ func (h *ProductHandler) UpdateStatus(c *gin.Context) {
 		Action:   "status_changed",
 		Entity:   "product",
 		EntityID: product.ID,
-		Details:  fmt.Sprintf("Status changed from %s to %s", oldStatus, req.Status),
+		Details:  fmt.Sprintf("Order %s moved from %s to %s", product.ProductID, formatStatus(oldStatus), formatStatus(req.Status)),
 	})
 
 	NotifyStatusChange(userID, userName.(string), product, oldStatus, req.Status)
@@ -254,7 +270,7 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 		Action:   "deleted",
 		Entity:   "product",
 		EntityID: uint(id),
-		Details:  fmt.Sprintf("Deleted product %s", prodName),
+		Details:  fmt.Sprintf("Order %s moved to trash", prodName),
 	})
 
 	wsMsg, _ := json.Marshal(WSMessage{Type: "product_deleted", Payload: gin.H{"id": id}})
@@ -295,7 +311,7 @@ func (h *ProductHandler) RestoreProduct(c *gin.Context) {
 		Action:   "restored",
 		Entity:   "product",
 		EntityID: uint(id),
-		Details:  fmt.Sprintf("Restored product %s from trash", prodName),
+		Details:  fmt.Sprintf("Order %s restored from trash", prodName),
 	})
 
 	wsMsg, _ := json.Marshal(WSMessage{Type: "product_created", Payload: product})
