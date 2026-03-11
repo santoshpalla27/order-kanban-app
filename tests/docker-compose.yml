@@ -174,7 +174,11 @@ services:
         bash /security/rbac-boundary.sh $$API_URL 2>&1 | tee -a /results/security-rbac.log;
         echo '=== Injection Tests ===' | tee /results/security-injection.log &&
         bash /security/injection-tests.sh $$API_URL 2>&1 | tee -a /results/security-injection.log;
-        cat /results/security-auth.log /results/security-rbac.log /results/security-injection.log > /results/security-all.log
+        echo '=== Advanced Security ===' | tee /results/security-advanced.log &&
+        bash /security/advanced-security.sh $$API_URL 2>&1 | tee -a /results/security-advanced.log;
+        echo '=== DDoS / Protocol Hacks ===' | tee /results/security-ddos.log &&
+        bash /security/ddos-simulator.sh $$API_URL 2>&1 | tee -a /results/security-ddos.log;
+        cat /results/security-auth.log /results/security-rbac.log /results/security-injection.log /results/security-advanced.log /results/security-ddos.log > /results/security-all.log
       "
 
 networks:

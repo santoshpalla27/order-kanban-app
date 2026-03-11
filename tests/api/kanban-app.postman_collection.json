@@ -1,102 +1,176 @@
 {
   "info": {
     "name": "Kanban App API",
-    "description": "Full API test suite — Auth, Products, Comments, Chat, Notifications, Users, RBAC.\n\nRun order:\n1. Auth / Login (Admin) — sets accessToken\n2. Products — full CRUD\n3. Comments — requires productId\n4. Chat, Notifications, Users\n5. RBAC — run role logins first, then forbidden tests",
+    "description": "Full API test suite \u2014 Auth, Products, Comments, Chat, Notifications, Users, RBAC.\n\nRun order:\n1. Auth / Login (Admin) \u2014 sets accessToken\n2. Products \u2014 full CRUD\n3. Comments \u2014 requires productId\n4. Chat, Notifications, Users\n5. RBAC \u2014 run role logins first, then forbidden tests",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "{{baseUrl}}" }
+    {
+      "key": "baseUrl",
+      "value": "{{baseUrl}}"
+    }
   ],
   "item": [
-
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "Get Health Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns status ok', () => pm.expect(pm.response.json().status).to.equal('ok'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
+        }
+      ]
+    },
     {
       "name": "Auth",
       "item": [
         {
-          "name": "Login — Admin",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns access_token', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.access_token).to.be.a('string').and.not.empty;",
-              "  pm.environment.set('accessToken', j.access_token);",
-              "  pm.environment.set('refreshToken', j.refresh_token);",
-              "  pm.environment.set('adminUserId', j.user.id);",
-              "});",
-              "pm.test('returns refresh_token', () => pm.expect(pm.response.json().refresh_token).to.be.a('string'));",
-              "pm.test('role is admin', () => pm.expect(pm.response.json().user.role.name).to.equal('admin'));",
-              "pm.test('password not exposed', () => pm.expect(pm.response.json().user.password).to.be.undefined);"
-            ]}
-          }],
+          "name": "Login \u2014 Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns access_token', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.access_token).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('accessToken', j.access_token);",
+                  "  pm.environment.set('refreshToken', j.refresh_token);",
+                  "  pm.environment.set('adminUserId', j.user.id);",
+                  "});",
+                  "pm.test('returns refresh_token', () => pm.expect(pm.response.json().refresh_token).to.be.a('string'));",
+                  "pm.test('role is admin', () => pm.expect(pm.response.json().user.role.name).to.equal('admin'));",
+                  "pm.test('password not exposed', () => pm.expect(pm.response.json().user.password).to.be.undefined);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            }
           }
         },
         {
-          "name": "Login — Wrong Password (401)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 401', () => pm.response.to.have.status(401));",
-              "pm.test('no token returned', () => pm.expect(pm.response.json().access_token).to.be.undefined);"
-            ]}
-          }],
+          "name": "Login \u2014 Wrong Password (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 401', () => pm.response.to.have.status(401));",
+                  "pm.test('no token returned', () => pm.expect(pm.response.json().access_token).to.be.undefined);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"wrongpassword\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"wrongpassword\"\n}"
+            }
           }
         },
         {
-          "name": "Login — Missing Password (400)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 400', () => pm.response.to.have.status(400));"
-            ]}
-          }],
+          "name": "Login \u2014 Missing Password (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\"\n}"
+            }
           }
         },
         {
-          "name": "Get Me — Authenticated",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns user object', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.id).to.be.a('number');",
-              "  pm.expect(j.email).to.be.a('string');",
-              "  pm.expect(j.role).to.be.an('object');",
-              "});",
-              "pm.test('password not exposed', () => pm.expect(pm.response.json().password).to.be.undefined);"
-            ]}
-          }],
+          "name": "Get Me \u2014 Authenticated",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns user object', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.id).to.be.a('number');",
+                  "  pm.expect(j.email).to.be.a('string');",
+                  "  pm.expect(j.role).to.be.an('object');",
+                  "});",
+                  "pm.test('password not exposed', () => pm.expect(pm.response.json().password).to.be.undefined);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/auth/me",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
-          "name": "Get Me — No Token (401)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 401', () => pm.response.to.have.status(401));"
-            ]}
-          }],
+          "name": "Get Me \u2014 No Token (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/auth/me"
@@ -104,913 +178,1686 @@
         },
         {
           "name": "Refresh Token",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns new access_token', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.access_token).to.be.a('string').and.not.empty;",
-              "  pm.environment.set('accessToken', j.access_token);",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns new access_token', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.access_token).to.be.a('string').and.not.empty;",
+                  "  pm.environment.set('accessToken', j.access_token);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/refresh",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+            }
           }
         },
         {
-          "name": "Refresh Token — Invalid (401)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 401', () => pm.response.to.have.status(401));"
-            ]}
-          }],
+          "name": "Refresh Token \u2014 Invalid (401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/refresh",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"invalid.token.here\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"invalid.token.here\"\n}"
+            }
           }
         },
         {
           "name": "Logout",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/logout",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+            }
           }
         }
       ]
     },
-
     {
       "name": "Products",
       "item": [
         {
           "name": "List Products (Paginated)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns paginated structure', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.data).to.be.an('array');",
-              "  pm.expect(j).to.have.property('total');",
-              "  pm.expect(j).to.have.property('has_more');",
-              "});",
-              "pm.test('each product has required fields', () => {",
-              "  const j = pm.response.json();",
-              "  if (j.data.length > 0) {",
-              "    const p = j.data[0];",
-              "    pm.expect(p.id).to.be.a('number');",
-              "    pm.expect(p.product_id).to.be.a('string');",
-              "    pm.expect(p.status).to.be.oneOf(['yet_to_start','working','review','done']);",
-              "    pm.expect(p.creator).to.be.an('object');",
-              "    pm.environment.set('productId', p.id);",
-              "  }",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns paginated structure', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.data).to.be.an('array');",
+                  "  pm.expect(j).to.have.property('total');",
+                  "  pm.expect(j).to.have.property('has_more');",
+                  "});",
+                  "pm.test('each product has required fields', () => {",
+                  "  const j = pm.response.json();",
+                  "  if (j.data.length > 0) {",
+                  "    const p = j.data[0];",
+                  "    pm.expect(p.id).to.be.a('number');",
+                  "    pm.expect(p.product_id).to.be.a('string');",
+                  "    pm.expect(p.status).to.be.oneOf(['yet_to_start','working','review','done']);",
+                  "    pm.expect(p.creator).to.be.an('object');",
+                  "    pm.environment.set('productId', p.id);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/products?limit=20",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "List Products with Status Filter",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('all results match status filter', () => {",
-              "  pm.response.json().data.forEach(p => pm.expect(p.status).to.equal('working'));",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('all results match status filter', () => {",
+                  "  pm.response.json().data.forEach(p => pm.expect(p.status).to.equal('working'));",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/products?status=working&limit=10",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Get Product by ID",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns full product with relations', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.id).to.be.a('number');",
-              "  pm.expect(j.creator).to.be.an('object');",
-              "  if (j.attachments !== undefined) pm.expect(j.attachments).to.be.an('array');",
-              "  if (j.comments !== undefined) pm.expect(j.comments).to.be.an('array');",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns full product with relations', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.id).to.be.a('number');",
+                  "  pm.expect(j.creator).to.be.an('object');",
+                  "  if (j.attachments !== undefined) pm.expect(j.attachments).to.be.an('array');",
+                  "  if (j.comments !== undefined) pm.expect(j.comments).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/products/{{productId}}",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
-          "name": "Get Product — Not Found (404)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 404', () => pm.response.to.have.status(404));"
-            ]}
-          }],
+          "name": "Get Product \u2014 Not Found (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/products/99999999",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Create Product",
-          "event": [{
-            "listen": "prerequest",
-            "script": { "exec": [
-              "pm.environment.set('newProductTestId', 'PROD-TEST-' + Date.now());"
-            ]}
-          }, {
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 201', () => pm.response.to.have.status(201));",
-              "pm.test('returns created product', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.id).to.be.a('number');",
-              "  pm.expect(j.status).to.equal('yet_to_start');",
-              "  pm.expect(j.customer_name).to.equal('Test Customer');",
-              "  pm.environment.set('newProductId', j.id);",
-              "  pm.environment.set('newProductOriginalId', j.product_id);",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('newProductTestId', 'PROD-TEST-' + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('returns created product', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.id).to.be.a('number');",
+                  "  pm.expect(j.status).to.equal('yet_to_start');",
+                  "  pm.expect(j.customer_name).to.equal('Test Customer');",
+                  "  pm.environment.set('newProductId', j.id);",
+                  "  pm.environment.set('newProductOriginalId', j.product_id);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"product_id\": \"{{newProductTestId}}\",\n  \"customer_name\": \"Test Customer\",\n  \"customer_phone\": \"+1234567890\",\n  \"description\": \"Created by Postman test suite\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{newProductTestId}}\",\n  \"customer_name\": \"Test Customer\",\n  \"customer_phone\": \"+1234567890\",\n  \"description\": \"Created by Postman test suite\"\n}"
+            }
           }
         },
         {
-          "name": "Create Product — Duplicate product_id (409/422)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('conflict error returned', () => {",
-              "  pm.expect([409, 422, 500]).to.include(pm.response.code);",
-              "});"
-            ]}
-          }],
+          "name": "Create Product \u2014 Duplicate product_id (409/422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('conflict error returned', () => {",
+                  "  pm.expect([409, 422, 500]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"product_id\": \"{{newProductOriginalId}}\",\n  \"customer_name\": \"Duplicate Test\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"{{newProductOriginalId}}\",\n  \"customer_name\": \"Duplicate Test\"\n}"
+            }
           }
         },
         {
-          "name": "Create Product — Missing Required Fields (400)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 400', () => pm.response.to.have.status(400));"
-            ]}
-          }],
+          "name": "Create Product \u2014 Missing Required Fields (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"customer_name\": \"Missing product_id\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Missing product_id\"\n}"
+            }
           }
         },
         {
           "name": "Update Product",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('customer_name is updated', () => {",
-              "  pm.expect(pm.response.json().customer_name).to.equal('Updated Customer Name');",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('customer_name is updated', () => {",
+                  "  pm.expect(pm.response.json().customer_name).to.equal('Updated Customer Name');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PUT",
             "url": "{{baseUrl}}/products/{{newProductId}}",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"customer_name\": \"Updated Customer Name\",\n  \"customer_phone\": \"+9876543210\",\n  \"description\": \"Updated description\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customer_name\": \"Updated Customer Name\",\n  \"customer_phone\": \"+9876543210\",\n  \"description\": \"Updated description\"\n}"
+            }
           }
         },
         {
-          "name": "Update Status — Valid",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));"
-            ]}
-          }],
+          "name": "Update Status \u2014 Valid",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "url": "{{baseUrl}}/products/{{newProductId}}/status",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"status\": \"working\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"working\"\n}"
+            }
           }
         },
         {
-          "name": "Update Status — Invalid Value (400)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 400', () => pm.response.to.have.status(400));"
-            ]}
-          }],
+          "name": "Update Status \u2014 Invalid Value (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "url": "{{baseUrl}}/products/{{newProductId}}/status",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"status\": \"invalid_status\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"invalid_status\"\n}"
+            }
           }
         },
         {
           "name": "Delete Product (Soft Delete)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/products/{{newProductId}}",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "List Deleted Products (Trash)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('deleted product appears in trash', () => {",
-              "  const id = parseInt(pm.environment.get('newProductId'));",
-              "  const arr = pm.response.json();",
-              "  const list = Array.isArray(arr) ? arr : (arr.data || []);",
-              "  const found = list.find(p => p.id === id);",
-              "  pm.expect(found).to.not.be.undefined;",
-              "  pm.expect(found.deleted_at).to.not.be.null;",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('deleted product appears in trash', () => {",
+                  "  const id = parseInt(pm.environment.get('newProductId'));",
+                  "  const arr = pm.response.json();",
+                  "  const list = Array.isArray(arr) ? arr : (arr.data || []);",
+                  "  const found = list.find(p => p.id === id);",
+                  "  pm.expect(found).to.not.be.undefined;",
+                  "  pm.expect(found.deleted_at).to.not.be.null;",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/products/deleted",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Restore Product from Trash",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('product restored successfully', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.message || j.deleted_at).to.exist;",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('product restored successfully', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.message || j.deleted_at).to.exist;",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products/{{newProductId}}/restore",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         }
       ]
     },
-
     {
       "name": "Comments",
       "item": [
         {
           "name": "List Comments for Product",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns array of comments', () => pm.expect(pm.response.json()).to.be.an('array'));",
-              "pm.test('each comment has required fields', () => {",
-              "  const arr = pm.response.json();",
-              "  if (arr.length > 0) {",
-              "    pm.expect(arr[0].id).to.be.a('number');",
-              "    pm.expect(arr[0].message).to.be.a('string');",
-              "    pm.expect(arr[0].user).to.be.an('object');",
-              "    pm.environment.set('commentId', arr[0].id);",
-              "  }",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns array of comments', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('each comment has required fields', () => {",
+                  "  const arr = pm.response.json();",
+                  "  if (arr.length > 0) {",
+                  "    pm.expect(arr[0].id).to.be.a('number');",
+                  "    pm.expect(arr[0].message).to.be.a('string');",
+                  "    pm.expect(arr[0].user).to.be.an('object');",
+                  "    pm.environment.set('commentId', arr[0].id);",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/products/{{productId}}/comments",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Create Comment",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 201', () => pm.response.to.have.status(201));",
-              "pm.test('returns created comment', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.id).to.be.a('number');",
-              "  pm.expect(j.message).to.equal('Test comment from Postman test suite');",
-              "  pm.expect(j.user).to.be.an('object');",
-              "  pm.environment.set('newCommentId', j.id);",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('returns created comment', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.id).to.be.a('number');",
+                  "  pm.expect(j.message).to.equal('Test comment from Postman test suite');",
+                  "  pm.expect(j.user).to.be.an('object');",
+                  "  pm.environment.set('newCommentId', j.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products/{{productId}}/comments",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Test comment from Postman test suite\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Test comment from Postman test suite\"\n}"
+            }
           }
         },
         {
-          "name": "Create Comment — Empty Message (400)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 400', () => pm.response.to.have.status(400));"
-            ]}
-          }],
+          "name": "Create Comment \u2014 Empty Message (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products/{{productId}}/comments",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"message\": \"\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"\"\n}"
+            }
           }
         },
         {
           "name": "Update Comment",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('message is updated', () => {",
-              "  pm.expect(pm.response.json().message).to.equal('Comment updated');",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('message is updated', () => {",
+                  "  pm.expect(pm.response.json().message).to.equal('Comment updated');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PUT",
             "url": "{{baseUrl}}/comments/{{newCommentId}}",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Updated comment message\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Updated comment message\"\n}"
+            }
           }
         },
         {
           "name": "Delete Comment",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/comments/{{newCommentId}}",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         }
       ]
     },
-
     {
       "name": "Chat",
       "item": [
         {
           "name": "Get Chat Messages",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns paginated structure', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.data).to.be.an('array');",
-              "  pm.expect(j).to.have.property('has_more');",
-              "});",
-              "pm.test('each message has required fields', () => {",
-              "  const j = pm.response.json();",
-              "  if (j.data.length > 0) {",
-              "    pm.expect(j.data[0].id).to.be.a('number');",
-              "    pm.expect(j.data[0].message).to.be.a('string');",
-              "  }",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns paginated structure', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.data).to.be.an('array');",
+                  "  pm.expect(j).to.have.property('has_more');",
+                  "});",
+                  "pm.test('each message has required fields', () => {",
+                  "  const j = pm.response.json();",
+                  "  if (j.data.length > 0) {",
+                  "    pm.expect(j.data[0].id).to.be.a('number');",
+                  "    pm.expect(j.data[0].message).to.be.a('string');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/chat/messages?limit=50",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Send Chat Message",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 201', () => pm.response.to.have.status(201));",
-              "pm.test('returns created message', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.id).to.be.a('number');",
-              "  pm.expect(j.message).to.equal('Hello from Postman test suite!');",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('returns created message', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.id).to.be.a('number');",
+                  "  pm.expect(j.message).to.equal('Hello from Postman test suite!');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/chat/messages",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Hello from Postman test suite!\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Hello from Postman test suite!\"\n}"
+            }
           }
         }
       ]
     },
-
     {
       "name": "Notifications",
       "item": [
         {
           "name": "Get Notifications",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns paginated structure', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.data).to.be.an('array');",
-              "  pm.expect(j).to.have.property('has_more');",
-              "  if (j.data.length > 0) pm.environment.set('notificationId', j.data[0].id);",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns paginated structure', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.data).to.be.an('array');",
+                  "  pm.expect(j).to.have.property('has_more');",
+                  "  if (j.data.length > 0) pm.environment.set('notificationId', j.data[0].id);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/notifications?limit=20",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Get Unread Count",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('count is a non-negative number', () => {",
-              "  pm.expect(pm.response.json().count).to.be.a('number').and.to.be.at.least(0);",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('count is a non-negative number', () => {",
+                  "  pm.expect(pm.response.json().count).to.be.a('number').and.to.be.at.least(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/notifications/unread-count",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Mark Notification as Read",
-          "event": [{
-            "listen": "prerequest",
-            "script": { "exec": [
-              "const id = pm.environment.get('notificationId');",
-              "if (!id) pm.execution.skipRequest();"
-            ]}
-          }, {
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const id = pm.environment.get('notificationId');",
+                  "if (!id) pm.execution.skipRequest();"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "url": "{{baseUrl}}/notifications/{{notificationId}}/read",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Mark All Notifications as Read",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/notifications/read-all",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         }
       ]
     },
-
     {
       "name": "Users (Admin only)",
       "item": [
         {
           "name": "Get All Users",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('returns array of users', () => pm.expect(pm.response.json()).to.be.an('array'));",
-              "pm.test('each user has role', () => {",
-              "  if (pm.response.json().length > 0) {",
-              "    pm.expect(pm.response.json()[0].role).to.be.an('object');",
-              "  }",
-              "});",
-              "pm.test('passwords not exposed', () => {",
-              "  pm.response.json().forEach(u => pm.expect(u.password).to.be.undefined);",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns array of users', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('each user has role', () => {",
+                  "  if (pm.response.json().length > 0) {",
+                  "    pm.expect(pm.response.json()[0].role).to.be.an('object');",
+                  "  }",
+                  "});",
+                  "pm.test('passwords not exposed', () => {",
+                  "  pm.response.json().forEach(u => pm.expect(u.password).to.be.undefined);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/users",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         },
         {
           "name": "Create User",
-          "event": [{
-            "listen": "prerequest",
-            "script": { "exec": [
-              "pm.environment.set('testUserEmail', 'testuser_' + Date.now() + '@test.com');"
-            ]}
-          }, {
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 201', () => pm.response.to.have.status(201));",
-              "pm.test('returns user with correct role', () => {",
-              "  const j = pm.response.json();",
-              "  pm.expect(j.id).to.be.a('number');",
-              "  pm.expect(j.role.name).to.equal('employee');",
-              "  pm.expect(j.password).to.be.undefined;",
-              "  pm.environment.set('testUserId', j.id);",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.environment.set('testUserEmail', 'testuser_' + Date.now() + '@test.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('returns user with correct role', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.id).to.be.a('number');",
+                  "  pm.expect(j.role.name).to.equal('employee');",
+                  "  pm.expect(j.password).to.be.undefined;",
+                  "  pm.environment.set('testUserId', j.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/users",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Employee\",\n  \"email\": \"{{testUserEmail}}\",\n  \"password\": \"password123\",\n  \"role_id\": 4\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test Employee\",\n  \"email\": \"{{testUserEmail}}\",\n  \"password\": \"password123\",\n  \"role_id\": 4\n}"
+            }
           }
         },
         {
-          "name": "Create User — Duplicate Email (409/422)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('conflict returned', () => {",
-              "  pm.expect([409, 422, 500]).to.include(pm.response.code);",
-              "});"
-            ]}
-          }],
+          "name": "Create User \u2014 Duplicate Email (409/422)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('conflict returned', () => {",
+                  "  pm.expect([409, 422, 500]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/users",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Duplicate\",\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"password123\",\n  \"role_id\": 4\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Duplicate\",\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"password123\",\n  \"role_id\": 4\n}"
+            }
           }
         },
         {
           "name": "Update User Role",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.test('role updated to organiser', () => {",
-              "  pm.expect(pm.response.json().role.name).to.equal('organiser');",
-              "});"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('role updated to organiser', () => {",
+                  "  pm.expect(pm.response.json().role.name).to.equal('organiser');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "url": "{{baseUrl}}/users/{{testUserId}}/role",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"role_id\": 3\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": 3\n}"
+            }
           }
         },
         {
           "name": "Delete User",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));"
-            ]}
-          }],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/users/{{testUserId}}",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Get Users Summary List",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/list",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
           }
         }
       ]
     },
-
     {
-      "name": "RBAC — Role Boundary Tests",
+      "name": "Activity",
+      "item": [
+        {
+          "name": "Get Recent Activity",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns array layout', () => {",
+                  "  const j = pm.response.json();",
+                  "  if (Array.isArray(j)) pm.expect(j).to.be.an('array');",
+                  "  else pm.expect(j.data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/activity?limit=100",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Get Avatar Presign URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns presigned data', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.upload_url).to.exist;",
+                  "  pm.expect(j.s3_key).to.exist;",
+                  "  pm.environment.set('avatarS3Key', j.s3_key);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me/avatar-presign?filename=avatar.png",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Update Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns updated user', () => pm.expect(pm.response.json().avatar_key).to.equal(pm.environment.get('avatarS3Key')));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/users/me",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"avatar_key\": \"{{avatarS3Key}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attachments",
+      "item": [
+        {
+          "name": "Get Presigned Upload URL",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.environment.get('productId')) {",
+                  "  console.log('Skipping due to missing productId');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns presigned data', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.upload_url).to.exist;",
+                  "  pm.expect(j.s3_key).to.exist;",
+                  "  pm.environment.set('attachS3Key', j.s3_key);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/products/{{productId}}/attachments/presign?filename=test.pdf",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Confirm Attachment Upload",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('returns created attachment', () => {",
+                  "  const j = pm.response.json();",
+                  "  pm.expect(j.id).to.exist;",
+                  "  pm.environment.set('attachmentId', j.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/products/{{productId}}/attachments/confirm",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"s3_key\": \"{{attachS3Key}}\",\n  \"file_name\": \"test.pdf\",\n  \"file_size\": 1024,\n  \"file_type\": \".pdf\"\n}"
+            }
+          }
+        },
+        {
+          "name": "List Attachments for Product",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('returns array', () => pm.expect(pm.response.json()).to.be.an('array'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/products/{{productId}}/attachments",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Get Attachment Download URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 307', () => pm.response.to.have.status(307));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/attachments/{{attachmentId}}/download",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Delete Attachment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/attachments/{{attachmentId}}",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "RBAC \u2014 Role Boundary Tests",
       "description": "Run the Login requests first to populate role tokens, then run the forbidden tests.\n\nRequired accounts:\n- employee@test.com / password123\n- organiser@test.com / password123\n- viewonly@test.com / password123",
       "item": [
         {
-          "name": "Setup — Login as Employee",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "const j = pm.response.json();",
-              "pm.environment.set('employeeToken', j.access_token);",
-              "pm.environment.set('employeeId', j.user.id);"
-            ]}
-          }],
+          "name": "Setup \u2014 Login as Employee",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.environment.set('employeeToken', j.access_token);",
+                  "pm.environment.set('employeeId', j.user.id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{employeeEmail}}\",\n  \"password\": \"{{employeePassword}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{employeeEmail}}\",\n  \"password\": \"{{employeePassword}}\"\n}"
+            }
           }
         },
         {
-          "name": "Setup — Login as Organiser",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "const j = pm.response.json();",
-              "pm.environment.set('organiserToken', j.access_token);",
-              "pm.environment.set('organiserId', j.user.id);"
-            ]}
-          }],
+          "name": "Setup \u2014 Login as Organiser",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.environment.set('organiserToken', j.access_token);",
+                  "pm.environment.set('organiserId', j.user.id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{organiserEmail}}\",\n  \"password\": \"{{organiserPassword}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{organiserEmail}}\",\n  \"password\": \"{{organiserPassword}}\"\n}"
+            }
           }
         },
         {
-          "name": "Setup — Login as View Only",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('status is 200', () => pm.response.to.have.status(200));",
-              "pm.environment.set('viewonlyToken', pm.response.json().access_token);"
-            ]}
-          }],
+          "name": "Setup \u2014 Login as View Only",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.environment.set('viewonlyToken', pm.response.json().access_token);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/auth/login",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{viewonlyEmail}}\",\n  \"password\": \"{{viewonlyPassword}}\"\n}" }
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{viewonlyEmail}}\",\n  \"password\": \"{{viewonlyPassword}}\"\n}"
+            }
           }
         },
         {
-          "name": "Employee — Cannot Create Product (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('employee cannot create product', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "Employee \u2014 Cannot Create Product (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('employee cannot create product', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{employeeToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employeeToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"product_id\": \"RBAC-EMP-DENY\",\n  \"customer_name\": \"Should Fail\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"RBAC-EMP-DENY\",\n  \"customer_name\": \"Should Fail\"\n}"
+            }
           }
         },
         {
-          "name": "Employee — Cannot Delete Product (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('employee cannot delete product', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "Employee \u2014 Cannot Delete Product (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('employee cannot delete product', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/products/{{productId}}",
-            "header": [{ "key": "Authorization", "value": "Bearer {{employeeToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employeeToken}}"
+              }
+            ]
           }
         },
         {
-          "name": "Employee — Cannot List Users (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('employee cannot list users', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "Employee \u2014 Cannot List Users (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('employee cannot list users', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/users",
-            "header": [{ "key": "Authorization", "value": "Bearer {{employeeToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employeeToken}}"
+              }
+            ]
           }
         },
         {
-          "name": "Employee — Cannot Change Role (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('employee cannot change role', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "Employee \u2014 Cannot Change Role (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('employee cannot change role', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "url": "{{baseUrl}}/users/{{employeeId}}/role",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{employeeToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employeeToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"role_id\": 1\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role_id\": 1\n}"
+            }
           }
         },
         {
-          "name": "Organiser — Cannot Delete Product (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('organiser cannot delete product', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "Organiser \u2014 Cannot Delete Product (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('organiser cannot delete product', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/products/{{productId}}",
-            "header": [{ "key": "Authorization", "value": "Bearer {{organiserToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{organiserToken}}"
+              }
+            ]
           }
         },
         {
-          "name": "Organiser — Cannot Access Trash (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('organiser cannot access trash', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "Organiser \u2014 Cannot Access Trash (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('organiser cannot access trash', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "url": "{{baseUrl}}/products/deleted",
-            "header": [{ "key": "Authorization", "value": "Bearer {{organiserToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{organiserToken}}"
+              }
+            ]
           }
         },
         {
-          "name": "View Only — Cannot Create Product (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('view_only cannot create product', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "View Only \u2014 Cannot Create Product (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('view_only cannot create product', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{viewonlyToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viewonlyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"product_id\": \"RBAC-VO-DENY\",\n  \"customer_name\": \"Should Fail\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": \"RBAC-VO-DENY\",\n  \"customer_name\": \"Should Fail\"\n}"
+            }
           }
         },
         {
-          "name": "View Only — Cannot Comment (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('view_only cannot comment', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "View Only \u2014 Cannot Comment (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('view_only cannot comment', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/products/{{productId}}/comments",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{viewonlyToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viewonlyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Should fail\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Should fail\"\n}"
+            }
           }
         },
         {
-          "name": "View Only — Cannot Send Chat (403)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('view_only cannot send chat', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "View Only \u2014 Cannot Send Chat (403)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('view_only cannot send chat', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": "{{baseUrl}}/chat/messages",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{viewonlyToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viewonlyToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "body": { "mode": "raw", "raw": "{\n  \"message\": \"Should fail\"\n}" }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Should fail\"\n}"
+            }
           }
         },
         {
-          "name": "Ownership — Employee Cannot Delete Admin Comment (403)",
-          "event": [{
-            "listen": "prerequest",
-            "script": { "exec": [
-              "const baseUrl = pm.environment.get('baseUrl');",
-              "const token = pm.environment.get('accessToken');",
-              "const productId = pm.environment.get('productId');",
-              "pm.sendRequest({",
-              "  url: baseUrl + '/products/' + productId + '/comments',",
-              "  method: 'POST',",
-              "  header: {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},",
-              "  body: {mode: 'raw', raw: JSON.stringify({message: 'Admin comment for RBAC test'})}",
-              "}, (err, resp) => {",
-              "  if (!err && resp.code === 201) pm.environment.set('rbacCommentId', resp.json().id);",
-              "});"
-            ]}
-          }, {
-            "listen": "test",
-            "script": { "exec": [
-              "pm.test('employee cannot delete others comment', () => pm.response.to.have.status(403));"
-            ]}
-          }],
+          "name": "Ownership \u2014 Employee Cannot Delete Admin Comment (403)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const baseUrl = pm.environment.get('baseUrl');",
+                  "const token = pm.environment.get('accessToken');",
+                  "const productId = pm.environment.get('productId');",
+                  "pm.sendRequest({",
+                  "  url: baseUrl + '/products/' + productId + '/comments',",
+                  "  method: 'POST',",
+                  "  header: {'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json'},",
+                  "  body: {mode: 'raw', raw: JSON.stringify({message: 'Admin comment for RBAC test'})}",
+                  "}, (err, resp) => {",
+                  "  if (!err && resp.code === 201) pm.environment.set('rbacCommentId', resp.json().id);",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('employee cannot delete others comment', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "url": "{{baseUrl}}/comments/{{rbacCommentId}}",
-            "header": [{ "key": "Authorization", "value": "Bearer {{employeeToken}}" }]
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{employeeToken}}"
+              }
+            ]
           }
         }
       ]
     }
-
   ]
 }

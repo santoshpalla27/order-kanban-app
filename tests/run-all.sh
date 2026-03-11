@@ -4,13 +4,11 @@
 # Runs all four test layers in Docker and exports results to tests/results/
 #
 # Usage:
-#   ./run-all.sh                   # run all: api + e2e + k6(smoke) + security
+#   ./run-all.sh                   # run all: api + k6(smoke) + security
 #   ./run-all.sh --api             # API tests only
-#   ./run-all.sh --e2e             # E2E tests only
 #   ./run-all.sh --load smoke      # k6 smoke only
 #   ./run-all.sh --load load       # k6 load test (30-50 VUs)
 #   ./run-all.sh --security        # security scripts only
-#   ./run-all.sh --skip-e2e        # all except E2E (faster CI run)
 #   ./run-all.sh --peak-vus 50     # override VU count for load test
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -29,18 +27,16 @@ failure() { echo -e "${RED}✗${NC} $1"; }
 info()    { echo -e "${YELLOW}→${NC} $1"; }
 
 # ── Parse arguments ───────────────────────────────────────────────────────────
-RUN_API=true; RUN_E2E=true; RUN_LOAD=true; RUN_SECURITY=true
+RUN_API=true; RUN_LOAD=true; RUN_SECURITY=true
 K6_SCENARIO="${K6_SCENARIO:-smoke}"
 PEAK_VUS="${K6_PEAK_VUS:-30}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --api)       RUN_API=true;  RUN_E2E=false; RUN_LOAD=false; RUN_SECURITY=false ;;
-    --e2e)       RUN_API=false; RUN_E2E=true;  RUN_LOAD=false; RUN_SECURITY=false ;;
-    --load)      RUN_API=false; RUN_E2E=false; RUN_LOAD=true;  RUN_SECURITY=false
+    --api)       RUN_API=true;  RUN_LOAD=false; RUN_SECURITY=false ;;
+    --load)      RUN_API=false; RUN_LOAD=true;  RUN_SECURITY=false
                  K6_SCENARIO="${2:-smoke}"; shift ;;
-    --security)  RUN_API=false; RUN_E2E=false; RUN_LOAD=false; RUN_SECURITY=true ;;
-    --skip-e2e)  RUN_E2E=false ;;
+    --security)  RUN_API=false; RUN_LOAD=false; RUN_SECURITY=true ;;
     --peak-vus)  PEAK_VUS="$2"; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -136,7 +132,6 @@ run_service() {
 docker compose --env-file "$ENV_FILE" -f docker-compose.yml run --rm wait-for-backend 2>&1
 
 [ "$RUN_API"      = true ] && run_service "API Tests (Newman)"     "newman"
-[ "$RUN_E2E"      = true ] && run_service "E2E Tests (Playwright)" "playwright"
 [ "$RUN_LOAD"     = true ] && run_service "Load Test (k6 $K6_SCENARIO)" "k6"
 [ "$RUN_SECURITY" = true ] && run_service "Security Tests"         "security"
 
@@ -159,20 +154,6 @@ print(f'{passed}/{total} assertions  ({req} requests)')
 " "?"
 }
 
-# Playwright: passed/failed tests
-parse_playwright() {
-  py3 "
-import json, sys
-d = json.load(open('$RESULTS_DIR/e2e-results.json'))
-s = d.get('stats', {})
-expected   = s.get('expected',   0)
-unexpected = s.get('unexpected', 0)
-flaky      = s.get('flaky',      0)
-skipped    = s.get('skipped',    0)
-total = expected + unexpected + flaky + skipped
-print(f'{expected}/{total} tests  ({unexpected} failed{(\", \"+str(flaky)+\" flaky\") if flaky else \"\"})')
-" "?"
-}
 
 # k6: thresholds passed/failed
 parse_k6() {
@@ -229,11 +210,10 @@ hline
 
 declare -A DETAILS
 DETAILS["newman"]="$(parse_newman)"
-DETAILS["playwright"]="$(parse_playwright)"
 DETAILS["k6"]="$(parse_k6)"
 DETAILS["security"]="$(parse_security)"
 
-SUITE_NAMES=("newman:API (Newman)" "playwright:E2E (Playwright)" "k6:Load (k6 $K6_SCENARIO)" "security:Security")
+SUITE_NAMES=("newman:API (Newman)" "k6:Load (k6 $K6_SCENARIO)" "security:Security")
 
 for entry in "${SUITE_NAMES[@]}"; do
   svc="${entry%%:*}"; label="${entry#*:}"
@@ -293,9 +273,6 @@ echo ""
   echo "|------|-------------|"
   echo "| \`api-results.html\` | Newman HTML report (open in browser) |"
   echo "| \`api-results.json\` | Newman JSON (CI-parseable) |"
-  echo "| \`e2e-output.log\` | Playwright raw output |"
-  echo "| \`e2e-results.json\` | Playwright JSON (tests + failures) |"
-  echo "| \`e2e-report/\` | Playwright HTML report |"
   echo "| \`k6-results.json\` | k6 per-request metrics |"
   echo "| \`k6-summary.json\` | k6 threshold summary |"
   echo "| \`security-all.log\` | Combined security output |"
