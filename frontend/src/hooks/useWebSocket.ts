@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../store/toastStore';
 import { useChatStore } from '../store/chatStore';
-import { playNotificationSound } from '../utils/sound';
+import { playNotificationSound, playChatSound } from '../utils/sound';
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -100,7 +100,9 @@ export function useWebSocket() {
             if (entityType === 'product' && entityId) link = `/?product=${entityId}`;
             else if (entityType === 'chat') link = '/chat';
             addToast({ message: msg, content, type: ntype, link, entityType, entityId, senderName });
-            playNotificationSound();
+            // Chat notifications get a distinct sound; everything else uses the default.
+            const isChatNotif = entityType === 'chat';
+            if (isChatNotif) playChatSound(); else playNotificationSound();
             break;
           }
         }

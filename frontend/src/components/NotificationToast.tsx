@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToastStore, Toast } from '../store/toastStore';
 import { commentsApi, chatApi } from '../api/client';
-import { X, Send } from 'lucide-react';
+import { X, Send, MessageSquare } from 'lucide-react';
 
 const AVATAR_COLORS = [
   'bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500',
@@ -30,7 +30,8 @@ function ToastCard({ toast }: { toast: Toast }) {
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
 
-  const canReply = toast.entityType === 'product' || toast.entityType === 'chat';
+  const isChat = toast.entityType === 'chat';
+  const canReply = toast.entityType === 'product' || isChat;
   const senderInitials = toast.senderName ? initials(toast.senderName) : '?';
   const colorClass = toast.senderName ? avatarColor(toast.senderName) : 'bg-surface-600';
 
@@ -46,7 +47,7 @@ function ToastCard({ toast }: { toast: Toast }) {
     try {
       if (toast.entityType === 'product' && toast.entityId) {
         await commentsApi.create(toast.entityId, text);
-      } else if (toast.entityType === 'chat') {
+      } else if (isChat) {
         await chatApi.sendMessage(text);
       }
       setReply('');
@@ -57,13 +58,27 @@ function ToastCard({ toast }: { toast: Toast }) {
   };
 
   return (
-    <div className="pointer-events-auto flex flex-col w-[340px] bg-surface-800 border border-surface-700/60 shadow-2xl rounded-xl overflow-hidden animate-scale-in">
+    <div className={`pointer-events-auto flex flex-col w-[340px] bg-surface-800 shadow-2xl rounded-xl overflow-hidden animate-scale-in ${
+      isChat
+        ? 'border border-teal-500/50'
+        : 'border border-surface-700/60'
+    }`}>
+
+      {/* Coloured top stripe — teal for chat, brand for everything else */}
+      <div className={`h-0.5 w-full ${isChat ? 'bg-gradient-to-r from-teal-400 to-emerald-400' : 'bg-gradient-to-r from-brand-500 to-brand-400'}`} />
 
       {/* Header: avatar + sender name + action text + close */}
       <div className="flex items-start gap-2.5 px-3 pt-3 pb-2">
-        {/* Avatar */}
-        <div className={`flex-shrink-0 w-8 h-8 rounded-full ${colorClass} flex items-center justify-center text-white text-xs font-bold`}>
-          {senderInitials}
+        {/* Avatar — chat shows chat icon badge overlay */}
+        <div className="relative flex-shrink-0">
+          <div className={`w-8 h-8 rounded-full ${colorClass} flex items-center justify-center text-white text-xs font-bold`}>
+            {senderInitials}
+          </div>
+          {isChat && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-teal-500 flex items-center justify-center">
+              <MessageSquare className="w-2.5 h-2.5 text-white" />
+            </div>
+          )}
         </div>
 
         {/* Text */}
@@ -71,11 +86,18 @@ function ToastCard({ toast }: { toast: Toast }) {
           className={`flex-1 min-w-0 ${toast.link ? 'cursor-pointer' : ''}`}
           onClick={toast.link ? handleOpen : undefined}
         >
-          {toast.senderName && (
-            <p className="text-xs font-semibold text-surface-100 leading-tight truncate">
-              {toast.senderName}
-            </p>
-          )}
+          <div className="flex items-center gap-1.5">
+            {toast.senderName && (
+              <p className="text-xs font-semibold text-surface-100 leading-tight truncate">
+                {toast.senderName}
+              </p>
+            )}
+            {isChat && (
+              <span className="flex-shrink-0 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 leading-none">
+                Team Chat
+              </span>
+            )}
+          </div>
           <p className="text-xs text-surface-400 leading-snug mt-0.5 break-words">
             {toast.message}
           </p>
@@ -90,10 +112,14 @@ function ToastCard({ toast }: { toast: Toast }) {
         </button>
       </div>
 
-      {/* Message bubble (comment/chat text) */}
+      {/* Message bubble */}
       {toast.content && (
         <div
-          className={`mx-3 mb-2 px-3 py-2 rounded-lg bg-surface-700/50 border border-surface-700/40 ${toast.link ? 'cursor-pointer' : ''}`}
+          className={`mx-3 mb-2 px-3 py-2 rounded-lg border ${
+            isChat
+              ? 'bg-teal-500/10 border-teal-500/20 cursor-pointer'
+              : `bg-surface-700/50 border-surface-700/40 ${toast.link ? 'cursor-pointer' : ''}`
+          }`}
           onClick={toast.link ? handleOpen : undefined}
         >
           <p className="text-sm text-surface-200 leading-relaxed break-words">{toast.content}</p>
@@ -109,12 +135,18 @@ function ToastCard({ toast }: { toast: Toast }) {
             onChange={(e) => setReply(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Reply…"
-            className="flex-1 text-sm bg-surface-700/60 border border-surface-600/50 rounded-lg px-3 py-1.5 text-surface-200 placeholder-surface-500 outline-none focus:border-brand-500/60 transition-colors"
+            className={`flex-1 text-sm bg-surface-700/60 border rounded-lg px-3 py-1.5 text-surface-200 placeholder-surface-500 outline-none transition-colors ${
+              isChat
+                ? 'border-surface-600/50 focus:border-teal-500/60'
+                : 'border-surface-600/50 focus:border-brand-500/60'
+            }`}
           />
           <button
             onClick={handleSend}
             disabled={!reply.trim() || sending}
-            className="flex-shrink-0 p-1.5 rounded-lg bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors"
+            className={`flex-shrink-0 p-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed text-white transition-colors ${
+              isChat ? 'bg-teal-600 hover:bg-teal-500' : 'bg-brand-600 hover:bg-brand-500'
+            }`}
           >
             <Send className="w-3.5 h-3.5" />
           </button>
