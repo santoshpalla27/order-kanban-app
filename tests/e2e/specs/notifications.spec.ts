@@ -105,11 +105,16 @@ test.describe('Notifications', () => {
 
   test('bell panel contains product comment notifications, not chat messages', async () => {
     // Send a chat message — should NOT appear in bell panel
-    await sendChatMessage(adminToken, `Test chat ${Date.now()} — should not appear in bell`);
+    const sentAt = Date.now();
+    await sendChatMessage(adminToken, `Test chat ${sentAt} — should not appear in bell`);
     await new Promise((r) => setTimeout(r, 1_500));
 
-    const notifications = await getNotifications(adminToken) as Array<{ type: string; entity_type: string }>;
-    const chatNotifs = notifications.filter(
+    // Only check notifications created after we sent the chat message
+    // (older records may pre-date the backend fix that made chat notifications transient-only)
+    const cutoff = new Date(sentAt - 5_000).toISOString(); // 5 s buffer
+    const notifications = await getNotifications(adminToken) as Array<{ type: string; entity_type: string; created_at: string }>;
+    const recentNotifs = notifications.filter((n) => n.created_at >= cutoff);
+    const chatNotifs = recentNotifs.filter(
       (n) => n.type === 'chat_message' || n.entity_type === 'chat',
     );
     expect(chatNotifs).toHaveLength(0);
@@ -181,15 +186,19 @@ test.describe('Notifications', () => {
   // ── Activity log format ───────────────────────────────────────────────────
 
   test('activity log entries include Order ID and human-readable descriptions', async () => {
-    const res = await fetch(`${API_URL}/activity?limit=50`, {
+    const res = await fetch(`${API_URL}/activity?limit=100`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     expect(res.status).toBe(200);
     const body = await res.json();
-    const logs: Array<{ action: string; entity: string; details: string }> =
+    const allLogs: Array<{ action: string; entity: string; details: string; created_at: string }> =
       Array.isArray(body) ? body : (body.data ?? []);
 
-    for (const log of logs.filter((l) => l.entity === 'product')) {
+    // Only assert on records created in the last 24 h — older entries may pre-date the format fix
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1_000).toISOString();
+    const logs = allLogs.filter((l) => l.entity === 'product' && l.created_at >= cutoff);
+
+    for (const log of logs) {
       expect(log.details).toBeTruthy();
       if (['created', 'updated', 'status_changed', 'deleted', 'restored'].includes(log.action)) {
         expect(log.details).toMatch(/Order/i);
