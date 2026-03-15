@@ -147,3 +147,11 @@ spike - 0 → 100 → 0 users instantly — how the API survives a sudden traffi
 soak - 30 users sustained for 30 min — memory leaks, connection pool exhaustion over time
 
 ratelimit - Hammers auth endpoints to confirm 429s are returned before the server buckles
+
+React Native App — mobile/
+How to run
+
+cd mobile
+npm install
+npx expo start # scan QR with Expo Go app
+npx expo run:android # build native Android APK
