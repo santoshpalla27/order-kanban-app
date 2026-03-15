@@ -15,6 +15,7 @@ interface ChatState {
   prependMessage:  (msg: ChatMessage) => void
   pollMessages:    () => Promise<void>
   markRead:        () => void
+  increment:       () => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -82,5 +83,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch {}
   },
 
-  markRead: () => set({ unreadCount: 0 }),
+  markRead:  () => set({ unreadCount: 0 }),
+  increment: () => set(s => ({ unreadCount: s.unreadCount + 1 })),
 }))

@@ -1,287 +1,336 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  TextInput, ActivityIndicator, Alert, KeyboardAvoidingView,
+  Platform,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native'
-
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { productApi } from '../api/services'
 import { useBoardStore } from '../store/boardStore'
-import { statusLabel, STATUS_HDR, ALL_STATUSES } from '../utils/helpers'
-import type { RootStackParams, ProductStatus } from '../types'
+import type { RootStackParams } from '../types'
 
-type Route = RouteProp<RootStackParams, 'CreateEditProduct'>
+type NavProp    = NativeStackNavigationProp<RootStackParams>
+type RouteProp_ = RouteProp<RootStackParams, 'CreateEditProduct'>
+
+const STATUSES = [
+  { value: 'yet_to_start', label: 'Yet to Start', color: '#94A3B8', bg: '#F1F5F9' },
+  { value: 'working',      label: 'In Progress',  color: '#1A56D6', bg: '#EFF6FF' },
+  { value: 'review',       label: 'In Review',    color: '#D97706', bg: '#FFFBEB' },
+  { value: 'done',         label: 'Done',         color: '#16A34A', bg: '#F0FDF4' },
+]
+
+interface FormState {
+  product_id:     string
+  customer_name:  string
+  customer_phone: string
+  description:    string
+  status:         string
+}
+
+const EMPTY: FormState = {
+  product_id: '', customer_name: '', customer_phone: '', description: '', status: 'yet_to_start',
+}
 
 export default function CreateEditProductScreen() {
   const insets = useSafeAreaInsets()
-  const nav    = useNavigation()
-  const route  = useRoute<Route>()
+  const nav    = useNavigation<NavProp>()
+  const route  = useRoute<RouteProp_>()
+  const isEdit = !!route.params?.id
   const id     = route.params?.id
-  const isEdit = !!id
 
   const { addProductLocally, updateProductLocally } = useBoardStore()
 
-  const [productId,     setProductId]     = useState('')
-  const [customerName,  setCustomerName]  = useState('')
-  const [customerPhone, setCustomerPhone] = useState('')
-  const [description,   setDescription]  = useState('')
-  const [status, setStatus] = useState<ProductStatus>('yet_to_start')
-  const [loading, setLoading] = useState(isEdit)
-  const [saving,  setSaving]  = useState(false)
-  const [errors,  setErrors]  = useState<Record<string, string>>({})
+  const [form,        setForm]        = useState<FormState>(EMPTY)
+  const [loading,     setLoading]     = useState(isEdit)
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
+  const [statusOpen,  setStatusOpen]  = useState(false)
 
+  // Load existing product when editing
   useEffect(() => {
-    if (!id) return
+    if (!isEdit || !id) return
     productApi.get(id).then(p => {
-      setProductId(p.product_id)
-      setCustomerName(p.customer_name)
-      setCustomerPhone(p.customer_phone)
-      setDescription(p.description)
-      setStatus(p.status)
+      setForm({
+        product_id:     p.product_id,
+        customer_name:  p.customer_name,
+        customer_phone: p.customer_phone,
+        description:    p.description,
+        status:         p.status,
+      })
       setLoading(false)
+    }).catch(() => {
+      Alert.alert('Error', 'Failed to load order.')
+      nav.goBack()
     })
   }, [id])
 
-  const validate = () => {
-    const e: Record<string, string> = {}
-    if (!isEdit && !productId.trim()) e.productId = 'Order ID is required'
-    if (!customerName.trim())  e.customerName  = 'Customer name is required'
-    if (!customerPhone.trim()) e.customerPhone = 'Phone number is required'
-    setErrors(e)
-    return Object.keys(e).length === 0
+  const set = (key: keyof FormState) => (val: string) =>
+    setForm(f => ({ ...f, [key]: val }))
+
+  const validate = (): string => {
+    if (!form.product_id.trim())    return 'Order ID is required.'
+    if (!form.customer_name.trim()) return 'Customer name is required.'
+    return ''
   }
 
-  const handleSave = async () => {
-    if (!validate() || saving) return
+  const save = async () => {
+    const err = validate()
+    if (err) { setError(err); return }
+    setError('')
     setSaving(true)
     try {
       if (isEdit && id) {
         const updated = await productApi.update(id, {
-          customer_name:  customerName.trim(),
-          customer_phone: customerPhone.trim(),
-          description:    description.trim(),
+          customer_name:  form.customer_name.trim(),
+          customer_phone: form.customer_phone.trim(),
+          description:    form.description.trim(),
         })
-        updateProductLocally(updated)
+        // Also update status if changed
+        const fresh = await productApi.get(id)
+        if (fresh.status !== form.status) {
+          await productApi.updateStatus(id, form.status)
+        }
+        updateProductLocally({ ...updated, status: form.status as any })
+        nav.goBack()
       } else {
         const created = await productApi.create({
-          product_id:     productId.trim(),
-          customer_name:  customerName.trim(),
-          customer_phone: customerPhone.trim(),
-          description:    description.trim(),
-          status,
+          product_id:     form.product_id.trim(),
+          customer_name:  form.customer_name.trim(),
+          customer_phone: form.customer_phone.trim(),
+          description:    form.description.trim(),
+          status:         form.status as any,
         })
         addProductLocally(created)
+        nav.goBack()
       }
-      nav.goBack()
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.error ?? 'Failed to save')
+      setError(e?.response?.data?.error ?? 'Failed to save. Please try again.')
     } finally {
       setSaving(false)
     }
   }
 
-  if (loading) return <ActivityIndicator color="#1A73E8" style={{ flex: 1, marginTop: 60 }} />
+  const selectedStatus = STATUSES.find(s => s.value === form.status) ?? STATUSES[0]
+
+  if (loading) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => nav.goBack()}>
+            <Ionicons name="close" size={22} color="#0F172A" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Order</Text>
+          <View style={{ width: 34 }} />
+        </View>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#1A56D6" />
+        </View>
+      </View>
+    )
+  }
 
   return (
     <KeyboardAvoidingView
       style={[styles.root, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => nav.goBack()}>
-          <Ionicons name="close" size={24} color="#212121" />
+        <TouchableOpacity onPress={() => nav.goBack()} style={styles.iconBtn}>
+          <Ionicons name="close" size={22} color="#0F172A" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isEdit ? 'Edit Order' : 'New Order'}</Text>
         <TouchableOpacity
           style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-          onPress={handleSave}
+          onPress={save}
           disabled={saving}
         >
           {saving
-            ? <ActivityIndicator color="#FFF" size="small" />
-            : <Text style={styles.saveBtnText}>Save</Text>
+            ? <ActivityIndicator size="small" color="#FFFFFF" />
+            : <Text style={styles.saveBtnText}>{isEdit ? 'Save' : 'Create'}</Text>
           }
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-
-        {/* Order ID (only on create) */}
-        {!isEdit && (
-          <Field
-            label="Order ID *"
-            value={productId}
-            onChange={setProductId}
-            error={errors.productId}
-            placeholder="e.g. ORD-001"
-            icon="barcode-outline"
-          />
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Error banner */}
+        {!!error && (
+          <View style={styles.errorBanner}>
+            <Ionicons name="alert-circle-outline" size={16} color="#EF4444" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
         )}
 
-        {/* Customer Name */}
-        <Field
-          label="Customer Name *"
-          value={customerName}
-          onChange={setCustomerName}
-          error={errors.customerName}
-          placeholder="Enter customer full name"
-          icon="person-outline"
-        />
+        {/* Order ID (create only) */}
+        {!isEdit && (
+          <View style={styles.fieldGroup}>
+            <Text style={styles.label}>Order ID <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. ORD-001"
+              placeholderTextColor="#CBD5E1"
+              value={form.product_id}
+              onChangeText={set('product_id')}
+              autoCapitalize="characters"
+              returnKeyType="next"
+            />
+          </View>
+        )}
+
+        {/* Customer name */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Customer Name <Text style={styles.required}>*</Text></Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Full name"
+            placeholderTextColor="#CBD5E1"
+            value={form.customer_name}
+            onChangeText={set('customer_name')}
+            returnKeyType="next"
+          />
+        </View>
 
         {/* Phone */}
-        <Field
-          label="Phone Number *"
-          value={customerPhone}
-          onChange={setCustomerPhone}
-          error={errors.customerPhone}
-          placeholder="555-0199"
-          icon="call-outline"
-          keyboardType="phone-pad"
-        />
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Phone Number</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="+1 234 567 8900"
+            placeholderTextColor="#CBD5E1"
+            value={form.customer_phone}
+            onChangeText={set('customer_phone')}
+            keyboardType="phone-pad"
+            returnKeyType="next"
+          />
+        </View>
 
-        {/* Description */}
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          style={[styles.textarea]}
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Describe the order…"
-          placeholderTextColor="#BDBDBD"
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-
-        {/* Status (only on create) */}
-        {!isEdit && (
-          <>
-            <Text style={styles.label}>Initial Status</Text>
-            <View style={styles.statusGrid}>
-              {ALL_STATUSES.map(s => (
+        {/* Status */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Status</Text>
+          <TouchableOpacity
+            style={styles.statusSelector}
+            onPress={() => setStatusOpen(o => !o)}
+          >
+            <View style={[styles.statusDot, { backgroundColor: selectedStatus.color }]} />
+            <Text style={[styles.statusLabel, { color: selectedStatus.color }]}>
+              {selectedStatus.label}
+            </Text>
+            <Ionicons
+              name={statusOpen ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color="#94A3B8"
+            />
+          </TouchableOpacity>
+          {statusOpen && (
+            <View style={styles.statusDropdown}>
+              {STATUSES.map(s => (
                 <TouchableOpacity
-                  key={s}
+                  key={s.value}
                   style={[
                     styles.statusOption,
-                    status === s && {
-                      borderColor: STATUS_HDR[s],
-                      backgroundColor: STATUS_HDR[s] + '15',
-                    },
+                    form.status === s.value && { backgroundColor: s.bg },
                   ]}
-                  onPress={() => setStatus(s)}
+                  onPress={() => { set('status')(s.value); setStatusOpen(false) }}
                 >
-                  <View style={[styles.statusDot, { backgroundColor: STATUS_HDR[s] }]} />
-                  <Text style={[
-                    styles.statusOptionText,
-                    status === s && { color: STATUS_HDR[s], fontWeight: '700' },
-                  ]}>
-                    {statusLabel(s)}
-                  </Text>
-                  {status === s && (
-                    <Ionicons name="checkmark-circle" size={16} color={STATUS_HDR[s]} />
+                  <View style={[styles.statusDot, { backgroundColor: s.color }]} />
+                  <Text style={[styles.statusOptionText, { color: s.color }]}>{s.label}</Text>
+                  {form.status === s.value && (
+                    <Ionicons name="checkmark" size={16} color={s.color} style={{ marginLeft: 'auto' }} />
                   )}
                 </TouchableOpacity>
               ))}
             </View>
-          </>
-        )}
+          )}
+        </View>
 
-        <View style={{ height: 40 }} />
+        {/* Description */}
+        <View style={styles.fieldGroup}>
+          <Text style={styles.label}>Description</Text>
+          <TextInput
+            style={[styles.input, styles.textarea]}
+            placeholder="Order details, notes…"
+            placeholderTextColor="#CBD5E1"
+            value={form.description}
+            onChangeText={set('description')}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   )
 }
 
-function Field({
-  label, value, onChange, error, placeholder, icon, keyboardType
-}: {
-  label: string; value: string; onChange: (t: string) => void;
-  error?: string; placeholder?: string; icon: string; keyboardType?: any
-}) {
-  return (
-    <View style={styles.fieldWrapper}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputRow, error ? styles.inputError : null]}>
-        <Ionicons name={icon as any} size={17} color="#9E9E9E" style={{ marginRight: 8 }} />
-        <TextInput
-          style={styles.input}
-          value={value}
-          onChangeText={onChange}
-          placeholder={placeholder}
-          placeholderTextColor="#BDBDBD"
-          keyboardType={keyboardType}
-        />
-      </View>
-      {error ? <Text style={styles.errorMsg}>{error}</Text> : null}
-    </View>
-  )
-}
-
 const styles = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: '#F8F9FA' },
+  root:    { flex: 1, backgroundColor: '#F8FAFC' },
+  centered:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16, paddingVertical: 12,
+    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: '#212121' },
+  headerTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  iconBtn:     { padding: 4 },
   saveBtn: {
-    backgroundColor: '#1A73E8',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    minWidth: 60,
-    alignItems: 'center',
+    backgroundColor: '#1A56D6', borderRadius: 8,
+    paddingHorizontal: 16, paddingVertical: 8,
+    minWidth: 70, alignItems: 'center',
   },
-  saveBtnDisabled: { opacity: 0.6 },
-  saveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
+  saveBtnDisabled: { backgroundColor: '#93C5FD' },
+  saveBtnText:     { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 
-  content: { padding: 16 },
-  fieldWrapper: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: '#424242', marginBottom: 7 },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderWidth: 1.5,
-    borderColor: '#E0E0E0',
+  scrollContent: { padding: 16, gap: 16 },
+
+  errorBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FEF2F2', borderRadius: 10,
+    borderWidth: 1, borderColor: '#FECACA',
+    paddingHorizontal: 12, paddingVertical: 10,
   },
-  inputError: { borderColor: '#E53935' },
-  input: { flex: 1, fontSize: 14, color: '#212121' },
-  errorMsg: { color: '#E53935', fontSize: 12, marginTop: 4 },
+  errorText: { flex: 1, fontSize: 13, color: '#EF4444', fontWeight: '500' },
 
-  textarea: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 14,
-    color: '#212121',
-    borderWidth: 1.5,
-    borderColor: '#E0E0E0',
-    height: 100,
-    marginBottom: 16,
+  fieldGroup: { gap: 6 },
+  label:      { fontSize: 13, fontWeight: '600', color: '#374151' },
+  required:   { color: '#EF4444' },
+  input: {
+    backgroundColor: '#FFFFFF', borderRadius: 10,
+    borderWidth: 1, borderColor: '#E2E8F0',
+    paddingHorizontal: 14, paddingVertical: 12,
+    fontSize: 14, color: '#0F172A',
   },
+  textarea: { minHeight: 100, paddingTop: 12 },
 
-  statusGrid: { gap: 8 },
+  statusSelector: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 10,
+    borderWidth: 1, borderColor: '#E2E8F0',
+    paddingHorizontal: 14, paddingVertical: 12,
+  },
+  statusDot:   { width: 8, height: 8, borderRadius: 4 },
+  statusLabel: { flex: 1, fontSize: 14, fontWeight: '600' },
+
+  statusDropdown: {
+    backgroundColor: '#FFFFFF', borderRadius: 10,
+    borderWidth: 1, borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8, elevation: 4,
+  },
   statusOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#E0E0E0',
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 12,
   },
-  statusDot: { width: 10, height: 10, borderRadius: 5 },
-  statusOptionText: { flex: 1, fontSize: 14, color: '#424242', fontWeight: '500' },
+  statusOptionText: { fontSize: 14, fontWeight: '600' },
 })

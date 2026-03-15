@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chatApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
@@ -36,6 +37,7 @@ export default function ChatPage() {
   const initialScrollDone = useRef(false);
   const inputRef = useRef<MentionInputHandle>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const clearUnreadChat = useChatStore((s) => s.clear);
 
@@ -267,7 +269,7 @@ export default function ChatPage() {
                       }`}
                     >
                       <p className={`text-sm whitespace-pre-wrap ${isOwn ? 'text-white/95' : 'text-surface-200'}`}>
-                        {renderWithMentions(msg.message, user?.name)}
+                        {renderWithMentions(msg.message, user?.name, (id) => navigate(`/?product=${id}`))}
                         <span className={`float-right ml-3 mt-1.5 text-[9px] translate-y-0.5 ${isOwn ? 'text-white/60' : 'text-surface-500'}`}>
                           {formatTime(msg.created_at)}
                         </span>

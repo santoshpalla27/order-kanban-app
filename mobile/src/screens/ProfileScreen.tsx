@@ -1,42 +1,69 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, FlatList, ActivityIndicator,
+  TextInput, ActivityIndicator, Alert, KeyboardAvoidingView,
+  Platform,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-
-import Avatar from '../components/Avatar'
 import { useAuthStore } from '../store/authStore'
-import { userApi, productApi } from '../api/services'
-import { formatDate, statusLabel } from '../utils/helpers'
-import type { User, ActivityLog } from '../types'
+import { userApi } from '../api/services'
 
-const ROLE_COLOR: Record<string, string> = {
-  admin:     '#E53935',
-  manager:   '#1A73E8',
-  organiser: '#FB8C00',
-  employee:  '#43A047',
-  view_only: '#757575',
+const AVATAR_COLORS = ['#6366F1','#8B5CF6','#EC4899','#F59E0B','#10B981','#3B82F6','#EF4444','#14B8A6']
+
+function avatarColor(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+
+function initials(name: string): string {
+  return name.split(' ').map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
 }
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets()
-  const { user, role, logout, loadUser } = useAuthStore()
-  const [users,    setUsers]    = useState<User[]>([])
-  const [activity, setActivity] = useState<ActivityLog[]>([])
-  const [loadingUsers, setLoadingUsers] = useState(false)
-  const [tab, setTab] = useState<'info' | 'activity' | 'users'>('info')
-  const isAdmin = role === 'admin'
+  const { user, loadUser, logout } = useAuthStore()
 
-  useEffect(() => {
-    loadUser()
-    productApi.getActivity(30).then(setActivity).catch(() => {})
-    if (isAdmin) {
-      setLoadingUsers(true)
-      userApi.all().then(setUsers).finally(() => setLoadingUsers(false))
+  const [editing,  setEditing]  = useState(false)
+  const [nameVal,  setNameVal]  = useState(user?.name ?? '')
+  const [saving,   setSaving]   = useState(false)
+  const [error,    setError]    = useState('')
+  const [success,  setSuccess]  = useState(false)
+
+  const color = avatarColor(user?.name ?? 'U')
+  const abbr  = initials(user?.name ?? '?')
+
+  const handleEdit = () => {
+    setNameVal(user?.name ?? '')
+    setError('')
+    setSuccess(false)
+    setEditing(true)
+  }
+
+  const handleCancel = () => {
+    setEditing(false)
+    setError('')
+  }
+
+  const handleSave = async () => {
+    const name = nameVal.trim()
+    if (!name) { setError('Name cannot be empty.'); return }
+    if (name === user?.name) { setEditing(false); return }
+    setSaving(true)
+    setError('')
+    try {
+      await userApi.updateMe({ name })
+      await loadUser()           // refresh user in store
+      setSuccess(true)
+      setEditing(false)
+      setTimeout(() => setSuccess(false), 2000)
+    } catch (e: any) {
+      setError(e?.response?.data?.error ?? 'Failed to save.')
+    } finally {
+      setSaving(false)
     }
-  }, [])
+  }
 
   const handleLogout = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -46,221 +73,245 @@ export default function ProfileScreen() {
   }
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-          <Ionicons name="log-out-outline" size={20} color="#E53935" />
-          <Text style={styles.logoutText}>Sign Out</Text>
-        </TouchableOpacity>
+        <Text style={styles.title}>Profile</Text>
+        {!editing ? (
+          <TouchableOpacity style={styles.editBtn} onPress={handleEdit}>
+            <Ionicons name="create-outline" size={18} color="#1A56D6" />
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.editBtn} onPress={handleCancel}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Profile card */}
-      {user && (
-        <View style={styles.profileCard}>
-          <Avatar name={user.name} size={64} />
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>{user.name}</Text>
-            <Text style={styles.profileEmail}>{user.email}</Text>
-            <View style={[styles.roleBadge, { backgroundColor: (ROLE_COLOR[role] ?? '#757575') + '20' }]}>
-              <Text style={[styles.roleText, { color: ROLE_COLOR[role] ?? '#757575' }]}>
-                {role.charAt(0).toUpperCase() + role.slice(1).replace('_', ' ')}
-              </Text>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Avatar */}
+        <View style={styles.avatarSection}>
+          <View style={[styles.avatarCircle, { backgroundColor: color }]}>
+            <Text style={styles.avatarText}>{abbr}</Text>
+          </View>
+          {success && (
+            <View style={styles.successBadge}>
+              <Ionicons name="checkmark-circle" size={14} color="#16A34A" />
+              <Text style={styles.successText}>Saved!</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Name card */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Account</Text>
+
+          <View style={styles.fieldRow}>
+            <View style={styles.fieldLabelRow}>
+              <Ionicons name="person-outline" size={15} color="#94A3B8" />
+              <Text style={styles.fieldLabel}>Name</Text>
+            </View>
+            {editing ? (
+              <TextInput
+                style={styles.nameInput}
+                value={nameVal}
+                onChangeText={setNameVal}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={handleSave}
+                maxLength={80}
+              />
+            ) : (
+              <Text style={styles.fieldValue}>{user?.name ?? '—'}</Text>
+            )}
+          </View>
+
+          {!!error && (
+            <View style={styles.errorRow}>
+              <Ionicons name="alert-circle-outline" size={13} color="#EF4444" />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
+          {editing && (
+            <TouchableOpacity
+              style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+              onPress={handleSave}
+              disabled={saving}
+            >
+              {saving
+                ? <ActivityIndicator size="small" color="#FFFFFF" />
+                : <Text style={styles.saveBtnText}>Save Name</Text>
+              }
+            </TouchableOpacity>
+          )}
+
+          <View style={styles.divider} />
+
+          <View style={styles.fieldRow}>
+            <View style={styles.fieldLabelRow}>
+              <Ionicons name="mail-outline" size={15} color="#94A3B8" />
+              <Text style={styles.fieldLabel}>Email</Text>
+            </View>
+            <Text style={styles.fieldValue}>{user?.email ?? '—'}</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.fieldRow}>
+            <View style={styles.fieldLabelRow}>
+              <Ionicons name="shield-outline" size={15} color="#94A3B8" />
+              <Text style={styles.fieldLabel}>Role</Text>
+            </View>
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleBadgeText}>{user?.role?.name ?? '—'}</Text>
             </View>
           </View>
         </View>
-      )}
 
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        {(['info', 'activity', isAdmin ? 'users' : null] as const)
-          .filter(Boolean).map(t => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.tab, tab === t && styles.tabActive]}
-              onPress={() => setTab(t!)}
-            >
-              <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t === 'info' ? 'Info' : t === 'activity' ? 'Activity' : 'Users'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-      </View>
+        {/* App info */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>App</Text>
 
-      {/* Content */}
-      <ScrollView contentContainerStyle={styles.content}>
-        {tab === 'info' && user && (
-          <View style={styles.card}>
-            <InfoRow icon="mail-outline"          label="Email"    value={user.email} />
-            <InfoRow icon="shield-checkmark-outline" label="Role"  value={role} />
-            <InfoRow icon="calendar-outline"      label="Joined"   value={formatDate(user.created_at ?? '')} />
+          <View style={styles.fieldRow}>
+            <View style={styles.fieldLabelRow}>
+              <Ionicons name="grid-outline" size={15} color="#94A3B8" />
+              <Text style={styles.fieldLabel}>Version</Text>
+            </View>
+            <Text style={styles.fieldValue}>1.0.0</Text>
           </View>
-        )}
 
-        {tab === 'activity' && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Recent Activity</Text>
-            {activity.length === 0
-              ? <Text style={styles.empty}>No recent activity</Text>
-              : activity.slice(0, 20).map(a => (
-                  <View key={a.id} style={styles.activityRow}>
-                    <View style={styles.activityDot} />
-                    <View style={styles.activityContent}>
-                      <Text style={styles.activityDetails}>{a.details}</Text>
-                      <Text style={styles.activityTime}>{formatDate(a.created_at)}</Text>
-                    </View>
-                  </View>
-                ))
-            }
+          <View style={styles.divider} />
+
+          <View style={styles.fieldRow}>
+            <View style={styles.fieldLabelRow}>
+              <Ionicons name="server-outline" size={15} color="#94A3B8" />
+              <Text style={styles.fieldLabel}>Backend</Text>
+            </View>
+            <Text style={[styles.fieldValue, styles.fieldValueSmall]}>
+              app.santoshdevops.cloud
+            </Text>
           </View>
-        )}
+        </View>
 
-        {tab === 'users' && isAdmin && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Team Members ({users.length})</Text>
-            {loadingUsers
-              ? <ActivityIndicator color="#1A73E8" />
-              : users.map(u => (
-                  <View key={u.id} style={styles.userRow}>
-                    <Avatar name={u.name} size={36} />
-                    <View style={styles.userInfo}>
-                      <Text style={styles.userName}>{u.name}</Text>
-                      <Text style={styles.userEmail}>{u.email}</Text>
-                    </View>
-                    <View style={[
-                      styles.userRoleBadge,
-                      { backgroundColor: (ROLE_COLOR[u.role.name] ?? '#757575') + '18' }
-                    ]}>
-                      <Text style={[
-                        styles.userRoleText,
-                        { color: ROLE_COLOR[u.role.name] ?? '#757575' }
-                      ]}>
-                        {u.role.name}
-                      </Text>
-                    </View>
-                  </View>
-                ))
-            }
-          </View>
-        )}
+        {/* Sign out */}
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+          <Ionicons name="log-out-outline" size={18} color="#EF4444" />
+          <Text style={styles.logoutText}>Sign Out</Text>
+        </TouchableOpacity>
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 32 }} />
       </ScrollView>
-    </View>
-  )
-}
-
-function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Ionicons name={icon as any} size={18} color="#9E9E9E" style={{ width: 26 }} />
-      <Text style={styles.infoLabel}>{label}</Text>
-      <Text style={styles.infoValue}>{value}</Text>
-    </View>
+    </KeyboardAvoidingView>
   )
 }
 
 const styles = StyleSheet.create({
-  root:  { flex: 1, backgroundColor: '#F8F9FA' },
+  root: { flex: 1, backgroundColor: '#F8FAFC' },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20, paddingVertical: 16,
+    borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#212121' },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  logoutText: { color: '#E53935', fontSize: 14, fontWeight: '600' },
+  title:      { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  editBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
+  editBtnText:{ fontSize: 14, fontWeight: '600', color: '#1A56D6' },
+  cancelText: { fontSize: 14, fontWeight: '600', color: '#94A3B8' },
 
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    gap: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  profileInfo: { flex: 1 },
-  profileName:  { fontSize: 18, fontWeight: '800', color: '#212121' },
-  profileEmail: { fontSize: 13, color: '#757575', marginTop: 2 },
-  roleBadge: { alignSelf: 'flex-start', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3, marginTop: 6 },
-  roleText: { fontSize: 12, fontWeight: '700' },
+  scroll: { paddingHorizontal: 16, paddingTop: 24, gap: 16 },
 
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+  avatarSection: { alignItems: 'center', marginBottom: 4 },
+  avatarCircle: {
+    width: 88, height: 88, borderRadius: 44,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10, elevation: 6,
   },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  tabActive: { borderBottomWidth: 2, borderBottomColor: '#1A73E8' },
-  tabText:      { fontSize: 13, color: '#9E9E9E', fontWeight: '600' },
-  tabTextActive:{ color: '#1A73E8' },
+  avatarText: { fontSize: 34, fontWeight: '800', color: '#FFFFFF' },
 
-  content: { padding: 12 },
+  successBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: '#F0FDF4', borderRadius: 20,
+    paddingHorizontal: 10, paddingVertical: 4,
+    marginTop: 10,
+    borderWidth: 1, borderColor: '#BBF7D0',
+  },
+  successText: { fontSize: 12, fontWeight: '600', color: '#16A34A' },
+
   card: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    elevation: 1,
-    shadowColor: '#000',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowRadius: 4, elevation: 1,
   },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#212121', marginBottom: 12 },
+  sectionTitle: {
+    fontSize: 11, fontWeight: '700', color: '#94A3B8',
+    textTransform: 'uppercase', letterSpacing: 0.6,
+    marginTop: 12, marginBottom: 4,
+  },
+  fieldRow: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 13,
+  },
+  fieldLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  fieldLabel:    { fontSize: 14, color: '#64748B', fontWeight: '500' },
+  fieldValue:    { fontSize: 14, color: '#0F172A', fontWeight: '600', maxWidth: '55%', textAlign: 'right' },
+  fieldValueSmall: { fontSize: 12, color: '#64748B', fontWeight: '400' },
+  divider: { height: 1, backgroundColor: '#F8FAFC' },
 
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-    gap: 6,
+  nameInput: {
+    flex: 1, marginLeft: 16,
+    fontSize: 14, fontWeight: '600', color: '#0F172A',
+    textAlign: 'right',
+    borderBottomWidth: 1, borderBottomColor: '#1A56D6',
+    paddingBottom: 2,
   },
-  infoLabel: { fontSize: 13, color: '#9E9E9E', width: 70 },
-  infoValue: { flex: 1, fontSize: 13, color: '#212121', fontWeight: '500' },
 
-  activityRow: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-    alignItems: 'flex-start',
+  errorRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingBottom: 8,
   },
-  activityDot: {
-    width: 8, height: 8, borderRadius: 4,
-    backgroundColor: '#1A73E8', marginTop: 4,
-  },
-  activityContent: { flex: 1 },
-  activityDetails: { fontSize: 13, color: '#424242' },
-  activityTime:    { fontSize: 11, color: '#9E9E9E', marginTop: 2 },
+  errorText: { fontSize: 12, color: '#EF4444' },
 
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
-    gap: 10,
+  saveBtn: {
+    backgroundColor: '#1A56D6', borderRadius: 10,
+    paddingVertical: 11, alignItems: 'center',
+    marginBottom: 10,
   },
-  userInfo:     { flex: 1 },
-  userName:     { fontSize: 14, fontWeight: '700', color: '#212121' },
-  userEmail:    { fontSize: 12, color: '#757575' },
-  userRoleBadge:{ borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  userRoleText: { fontSize: 11, fontWeight: '700' },
+  saveBtnDisabled: { backgroundColor: '#93C5FD' },
+  saveBtnText:     { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 
-  empty: { color: '#9E9E9E', textAlign: 'center', paddingVertical: 20, fontSize: 13 },
+  roleBadge: {
+    backgroundColor: '#EFF6FF', borderRadius: 8,
+    paddingHorizontal: 10, paddingVertical: 4,
+  },
+  roleBadgeText: {
+    fontSize: 12, fontWeight: '700', color: '#1A56D6',
+    textTransform: 'capitalize',
+  },
+
+  logoutBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 14,
+    backgroundColor: '#FEF2F2', borderRadius: 14,
+    borderWidth: 1, borderColor: '#FECACA',
+  },
+  logoutText: { fontSize: 15, fontWeight: '700', color: '#EF4444' },
 })

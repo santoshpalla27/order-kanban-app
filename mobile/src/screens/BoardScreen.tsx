@@ -1,233 +1,182 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback } from 'react'
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity,
-  ScrollView, RefreshControl, Platform, StatusBar,
+  View, Text, StyleSheet, ScrollView,
+  TextInput, TouchableOpacity, RefreshControl,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-
-import KanbanColumn from '../components/KanbanColumn'
-import { useBoardStore } from '../store/boardStore'
+import { useBoardStore, STATUSES } from '../store/boardStore'
 import { useNotifStore } from '../store/notificationStore'
-import { useAuthStore } from '../store/authStore'
-import { wsManager } from '../websocket/wsManager'
+import KanbanColumn from '../components/KanbanColumn'
 import type { RootStackParams } from '../types'
 
-type Nav = NativeStackNavigationProp<RootStackParams>
-
 export default function BoardScreen() {
-  const insets   = useSafeAreaInsets()
-  const nav      = useNavigation<Nav>()
-  const { columns, isRefreshing, error, fetchAll, loadMore, refresh, setSearch, search } = useBoardStore()
-  const { unreadCount, fetchUnread, incrementUnread } = useNotifStore()
-  const { role } = useAuthStore()
-  const [localSearch, setLocalSearch] = useState(search)
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>()
+  const insets = useSafeAreaInsets()
+  const nav    = useNavigation<NativeStackNavigationProp<RootStackParams>>()
 
-  const canCreate = ['admin', 'manager', 'organiser'].includes(role)
+  const { columns, isRefreshing, fetchAll, loadMore, refresh, setSearch } = useBoardStore()
+  const unreadNotif = useNotifStore(s => s.unreadCount)
 
-  useEffect(() => { fetchAll(); fetchUnread() }, [])
+  const [searchText, setSearchText] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  useFocusEffect(useCallback(() => {
-    fetchAll()
-    fetchUnread()
-  }, []))
-
-  // Live updates via WebSocket
   useEffect(() => {
-    const unsub = wsManager.subscribe(event => {
-      if (['product_created', 'product_update', 'product_deleted'].includes(event.type)) {
-        refresh()
-      }
-      if (event.type === 'notification') {
-        incrementUnread()
-      }
-    })
-    return unsub
+    fetchAll()
   }, [])
 
-  const handleSearch = (text: string) => {
-    setLocalSearch(text)
-    clearTimeout(searchTimer.current)
-    searchTimer.current = setTimeout(() => setSearch(text), 400)
+  const handleSearch = useCallback((text: string) => {
+    setSearchText(text)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setSearch(text), 350)
+  }, [setSearch])
+
+  const clearSearch = () => {
+    setSearchText('')
+    setSearch('')
   }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
-      {/* Top bar */}
-      <View style={styles.topBar}>
-        <Text style={styles.title}>Kanban Board</Text>
-        <View style={styles.topActions}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => nav.navigate('Notifications')}>
-            <Ionicons name="notifications-outline" size={22} color="#212121" />
-            {unreadCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          {canCreate && (
-            <TouchableOpacity
-              style={styles.addBtn}
-              onPress={() => nav.navigate('CreateEditProduct', {})}
-            >
-              <Ionicons name="add" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-          )}
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Ionicons name="grid" size={22} color="#1A56D6" />
+          <Text style={styles.title}>Board</Text>
         </View>
+        <TouchableOpacity
+          style={styles.notifBtn}
+          onPress={() => nav.navigate('Notifications')}
+        >
+          <Ionicons name="notifications-outline" size={22} color="#0F172A" />
+          {unreadNotif > 0 && (
+            <View style={styles.notifBadge}>
+              <Text style={styles.notifBadgeText}>
+                {unreadNotif > 99 ? '99+' : unreadNotif}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
-      {/* Search bar */}
+      {/* Search + Add */}
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
-          <Ionicons name="search-outline" size={18} color="#9E9E9E" />
+          <Ionicons name="search-outline" size={16} color="#94A3B8" style={{ marginRight: 6 }} />
           <TextInput
             style={styles.searchInput}
-            value={localSearch}
+            placeholder="Search orders…"
+            placeholderTextColor="#CBD5E1"
+            value={searchText}
             onChangeText={handleSearch}
-            placeholder="Search products..."
-            placeholderTextColor="#BDBDBD"
             returnKeyType="search"
+            autoCorrect={false}
           />
-          {localSearch.length > 0 && (
-            <TouchableOpacity onPress={() => handleSearch('')}>
-              <Ionicons name="close-circle" size={17} color="#BDBDBD" />
+          {searchText.length > 0 && (
+            <TouchableOpacity onPress={clearSearch}>
+              <Ionicons name="close-circle" size={16} color="#CBD5E1" />
             </TouchableOpacity>
           )}
         </View>
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => nav.navigate('CreateEditProduct', {})}
+        >
+          <Ionicons name="add" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
 
-      {/* Error banner */}
-      {error ? (
-        <View style={styles.errorBanner}>
-          <Ionicons name="alert-circle-outline" size={16} color="#E53935" />
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity onPress={() => fetchAll()}>
-            <Text style={styles.errorRetry}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      ) : null}
-
-      {/* Board — fills remaining space, pull-to-refresh on outer scroll */}
+      {/* Horizontal kanban columns */}
       <ScrollView
-        style={styles.board}
-        contentContainerStyle={styles.boardContent}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.columnsContainer}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={refresh}
-            colors={['#1A73E8']}
-            tintColor="#1A73E8"
+            tintColor="#1A56D6"
           />
         }
-        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.grid}>
-          {/* Left column: Yet to Start + Review */}
-          <View style={styles.col}>
-            <KanbanColumn
-              status="yet_to_start"
-              column={columns['yet_to_start']}
-              onCardPress={id => nav.navigate('ProductDetail', { id })}
-              onLoadMore={() => loadMore('yet_to_start')}
-            />
-            <KanbanColumn
-              status="review"
-              column={columns['review']}
-              onCardPress={id => nav.navigate('ProductDetail', { id })}
-              onLoadMore={() => loadMore('review')}
-            />
-          </View>
-
-          {/* Right column: Working + Done */}
-          <View style={styles.col}>
-            <KanbanColumn
-              status="working"
-              column={columns['working']}
-              onCardPress={id => nav.navigate('ProductDetail', { id })}
-              onLoadMore={() => loadMore('working')}
-            />
-            <KanbanColumn
-              status="done"
-              column={columns['done']}
-              onCardPress={id => nav.navigate('ProductDetail', { id })}
-              onLoadMore={() => loadMore('done')}
-            />
-          </View>
-        </View>
+        {STATUSES.map(status => (
+          <KanbanColumn
+            key={status}
+            status={status}
+            column={
+              columns[status] ?? {
+                data: [], total: 0, nextCursor: null,
+                hasMore: false, isLoading: true, isLoadingMore: false,
+              }
+            }
+            onLoadMore={() => loadMore(status)}
+          />
+        ))}
       </ScrollView>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  root:  { flex: 1, backgroundColor: '#F8F9FA' },
+  root: { flex: 1, backgroundColor: '#F8FAFC' },
 
-  topBar: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#F1F5F9',
   },
-  title: { fontSize: 20, fontWeight: '800', color: '#212121' },
-  topActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn: { position: 'relative', padding: 4 },
-  badge: {
+  headerLeft:     { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  title:          { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  notifBtn:       { padding: 4 },
+  notifBadge: {
     position: 'absolute', top: 0, right: 0,
-    backgroundColor: '#E53935', borderRadius: 8,
-    minWidth: 16, height: 16,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+    backgroundColor: '#EF4444', borderRadius: 8,
+    minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3,
   },
-  badgeText: { color: '#FFF', fontSize: 9, fontWeight: '700' },
-  addBtn: {
-    backgroundColor: '#1A73E8', borderRadius: 8, padding: 6, marginLeft: 4,
-  },
+  notifBadgeText: { fontSize: 9, color: '#FFFFFF', fontWeight: '700' },
 
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
-    paddingBottom: 10,
-    paddingTop: 8,
-    ...Platform.select({
-      android: { elevation: 2 },
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3 },
-    }),
+    paddingVertical: 10,
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   searchBox: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 22,
-    paddingHorizontal: 12,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
     paddingVertical: 8,
-    gap: 6,
   },
-  searchInput: { flex: 1, fontSize: 14, color: '#212121', padding: 0 },
+  searchInput: { flex: 1, fontSize: 14, color: '#0F172A', padding: 0 },
+  addBtn: {
+    backgroundColor: '#1A56D6',
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
-  board:        { flex: 1 },
-  boardContent: { flex: 1, padding: 10, paddingBottom: 24 },
-  grid: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
+  columnsContainer: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 24,
+    flexGrow: 1,
   },
-  col: { flex: 1, flexDirection: 'column', gap: 0 },
-
-  errorBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    backgroundColor: '#FFEBEE', paddingHorizontal: 16, paddingVertical: 10,
-  },
-  errorText:  { flex: 1, color: '#E53935', fontSize: 13 },
-  errorRetry: { color: '#E53935', fontWeight: '700', fontSize: 13 },
 })

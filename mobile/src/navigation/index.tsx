@@ -1,22 +1,23 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, View } from 'react-native'
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, useNavigationState } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 import { Ionicons } from '@expo/vector-icons'
 
-import LoginScreen         from '../screens/LoginScreen'
-import BoardScreen         from '../screens/BoardScreen'
-import ListScreen          from '../screens/ListScreen'
-import ChatScreen          from '../screens/ChatScreen'
-import ProfileScreen       from '../screens/ProfileScreen'
-import NotificationsScreen from '../screens/NotificationsScreen'
+import LoginScreen            from '../screens/LoginScreen'
+import BoardScreen            from '../screens/BoardScreen'
+import ListScreen             from '../screens/ListScreen'
+import ChatScreen             from '../screens/ChatScreen'
+import ProfileScreen          from '../screens/ProfileScreen'
+import NotificationsScreen    from '../screens/NotificationsScreen'
 import ProductDetailScreen    from '../screens/ProductDetailScreen'
 import CreateEditProductScreen from '../screens/CreateEditProductScreen'
 
 import { tokenManager }  from '../utils/tokenManager'
 import { useNotifStore } from '../store/notificationStore'
 import { useChatStore }  from '../store/chatStore'
+import { useWsEvents }   from '../hooks/useWsEvents'
 import type { RootStackParams, MainTabParams } from '../types'
 
 const Stack = createNativeStackNavigator<RootStackParams>()
@@ -25,6 +26,16 @@ const Tab   = createBottomTabNavigator<MainTabParams>()
 function MainTabs() {
   const unreadNotif = useNotifStore(s => s.unreadCount)
   const unreadChat  = useChatStore(s => s.unreadCount)
+
+  // Track whether the Chat tab is currently focused
+  const activeName = useNavigationState(state => state?.routes[state.index]?.name)
+  const activeNameRef = useRef(activeName)
+  activeNameRef.current = activeName
+
+  const isChatActive = useCallback(() => activeNameRef.current === 'Chat', [])
+
+  // Wire up WebSocket event dispatching
+  useWsEvents(isChatActive)
 
   return (
     <Tab.Navigator
@@ -46,22 +57,16 @@ function MainTabs() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarIcon: ({ color, size, focused }) => {
           const icons: Record<string, [string, string]> = {
-            Board:   ['grid',         'grid-outline'],
-            List:    ['list',         'list-outline'],
-            Chat:    ['chatbubbles',  'chatbubbles-outline'],
-            Profile: ['person',       'person-outline'],
+            Board:   ['grid',        'grid-outline'],
+            List:    ['list',        'list-outline'],
+            Chat:    ['chatbubbles', 'chatbubbles-outline'],
+            Profile: ['person',      'person-outline'],
           }
-          const [filled, outline] = icons[route.name] ?? ['ellipse','ellipse-outline']
-          return (
-            <Ionicons
-              name={(focused ? filled : outline) as any}
-              size={size}
-              color={color}
-            />
-          )
+          const [filled, outline] = icons[route.name] ?? ['ellipse', 'ellipse-outline']
+          return <Ionicons name={(focused ? filled : outline) as any} size={size} color={color} />
         },
         tabBarBadge: route.name === 'Chat' && unreadChat > 0
-          ? unreadChat > 99 ? '99+' : unreadChat
+          ? (unreadChat > 99 ? '99+' : unreadChat)
           : undefined,
       })}
     >
@@ -74,8 +79,8 @@ function MainTabs() {
 }
 
 export default function AppNavigation() {
-  const [ready,     setReady]     = useState(false)
-  const [loggedIn,  setLoggedIn]  = useState(false)
+  const [ready,    setReady]    = useState(false)
+  const [loggedIn, setLoggedIn] = useState(false)
 
   useEffect(() => {
     tokenManager.isLoggedIn().then(ok => {
