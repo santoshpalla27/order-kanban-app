@@ -126,10 +126,25 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   updateProductLocally: (p) =>
     set(s => ({
       columns: Object.fromEntries(
-        STATUSES.map(status => [
-          status,
-          { ...s.columns[status], data: s.columns[status].data.map(x => x.id === p.id ? p : x) },
-        ])
+        STATUSES.map(status => {
+          const col   = s.columns[status]
+          const hadIt = col.data.some(x => x.id === p.id)
+          if (p.status === status) {
+            // Correct column: update in-place or insert at top if moved here
+            return [status, {
+              ...col,
+              data:  hadIt ? col.data.map(x => x.id === p.id ? p : x) : [p, ...col.data],
+              total: hadIt ? col.total : col.total + 1,
+            }]
+          } else {
+            // Wrong column: remove if it was here (status changed away)
+            return [status, {
+              ...col,
+              data:  col.data.filter(x => x.id !== p.id),
+              total: hadIt ? Math.max(0, col.total - 1) : col.total,
+            }]
+          }
+        })
       ),
     })),
 

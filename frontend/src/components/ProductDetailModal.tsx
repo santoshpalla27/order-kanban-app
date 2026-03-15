@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, attachmentsApi, commentsApi } from '../api/client';
 import { useAuthStore } from '../store/authStore';
-import { Product, Attachment, Comment, STATUS_LABELS } from '../types';
+import { Product, Attachment, Comment, STATUS_LABELS, STATUS_ORDER } from '../types';
 import MentionInput, { renderWithMentions, MentionInputHandle } from './MentionInput';
 import {
   X, Paperclip, MessageSquare, Package, Upload, Download, Trash2,
@@ -283,6 +283,7 @@ function ImageLightbox({ src, alt, attId, onClose }: { src: string; alt: string;
 export default function ProductDetailModal({ productId, onClose }: Props) {
   const [activeTab, setActiveTab] = useState<'details' | 'attachments' | 'comments'>('details');
   const [commentingAttachment, setCommentingAttachment] = useState<Attachment | null>(null);
+  const queryClient = useQueryClient();
 
   const { data: productData } = useQuery({ queryKey: ['products', productId], queryFn: () => productsApi.getById(productId) });
   const product: Product | null = productData?.data || null;
@@ -292,6 +293,11 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   const { data: commentsData } = useQuery({ queryKey: ['comments', productId], queryFn: () => commentsApi.getByProduct(productId) });
   const comments: Comment[] = commentsData?.data || [];
+
+  const statusMutation = useMutation({
+    mutationFn: (newStatus: string) => productsApi.updateStatus(productId, newStatus),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+  });
 
   const tabs = [
     { id: 'details' as const, label: 'Details', icon: Package },
@@ -304,11 +310,22 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
         <div className="w-full max-w-2xl max-h-[85vh] glass rounded-2xl flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between p-5 border-b border-surface-700/50">
-            <div>
-              <h2 className="text-lg font-semibold">{product?.product_id || 'Loading...'}</h2>
-              {product && <span className={`inline-block mt-1 text-xs px-2.5 py-0.5 rounded-full status-${product.status}`}>{STATUS_LABELS[product.status]}</span>}
+            <h2 className="text-lg font-semibold">{product?.product_id || 'Loading...'}</h2>
+            <div className="flex items-center gap-4 mr-1">
+              {product && (
+                <select
+                  value={product.status}
+                  onChange={(e) => statusMutation.mutate(e.target.value)}
+                  disabled={statusMutation.isPending}
+                  className={`text-xs px-2.5 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer disabled:opacity-60`}
+                >
+                  {STATUS_ORDER.map((s) => (
+                    <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                  ))}
+                </select>
+              )}
+              <button onClick={onClose} className="btn-ghost p-2 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
-            <button onClick={onClose} className="btn-ghost p-2 rounded-lg"><X className="w-5 h-5" /></button>
           </div>
           <div className="flex border-b border-surface-700/50">
             {tabs.map((tab) => (

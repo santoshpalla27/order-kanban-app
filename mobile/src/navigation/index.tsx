@@ -15,16 +15,15 @@ import ProductDetailScreen    from '../screens/ProductDetailScreen'
 import CreateEditProductScreen from '../screens/CreateEditProductScreen'
 
 import { tokenManager }  from '../utils/tokenManager'
-import { useNotifStore } from '../store/notificationStore'
 import { useChatStore }  from '../store/chatStore'
 import { useWsEvents }   from '../hooks/useWsEvents'
+import { useNotifStore } from '../store/notificationStore'
 import type { RootStackParams, MainTabParams } from '../types'
 
 const Stack = createNativeStackNavigator<RootStackParams>()
 const Tab   = createBottomTabNavigator<MainTabParams>()
 
 function MainTabs() {
-  const unreadNotif = useNotifStore(s => s.unreadCount)
   const unreadChat  = useChatStore(s => s.unreadCount)
 
   // Track whether the Chat tab is currently focused
@@ -84,6 +83,7 @@ export default function AppNavigation() {
 
   useEffect(() => {
     tokenManager.isLoggedIn().then(ok => {
+      if (ok) useNotifStore.getState().fetchUnread()
       setLoggedIn(ok)
       setReady(true)
     })

@@ -11,6 +11,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { productApi } from '../api/services'
 import { useAuthStore } from '../store/authStore'
 import { useBoardStore } from '../store/boardStore'
+import { useProductDetailStore } from '../store/productDetailStore'
 import type { Product, Comment, Attachment, RootStackParams } from '../types'
 import Avatar from '../components/Avatar'
 import StatusChip from '../components/StatusChip'
@@ -80,6 +81,7 @@ export default function ProductDetailScreen() {
 
   const currentUser = useAuthStore(s => s.user)
   const { removeProductLocally } = useBoardStore()
+  const { setActiveId, commentSignal, attachSignal } = useProductDetailStore()
 
   const [product,     setProduct]     = useState<Product | null>(null)
   const [comments,    setComments]    = useState<Comment[]>([])
@@ -111,7 +113,25 @@ export default function ProductDetailScreen() {
     }
   }, [id])
 
+  // Register this product as active so useWsEvents can signal reloads
+  useEffect(() => {
+    setActiveId(id)
+    return () => setActiveId(null)
+  }, [id, setActiveId])
+
   useEffect(() => { load() }, [load])
+
+  // Re-fetch comments when a WS comment_added event fires for this product
+  useEffect(() => {
+    if (commentSignal === 0) return
+    productApi.getComments(id).then(setComments).catch(() => {})
+  }, [commentSignal])
+
+  // Re-fetch attachments when a WS attachment_uploaded event fires for this product
+  useEffect(() => {
+    if (attachSignal === 0) return
+    productApi.getAttachments(id).then(setAttachments).catch(() => {})
+  }, [attachSignal])
 
   const onRefresh = () => {
     setRefreshing(true)

@@ -5,7 +5,7 @@ import {
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
+import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { productApi } from '../api/services'
 import { useBoardStore } from '../store/boardStore'
@@ -88,7 +88,12 @@ export default function ListScreen() {
     }
   }, [])
 
-  // Reload when filter changes
+  // Reload when tab gains focus (picks up any WS-driven board changes)
+  useFocusEffect(useCallback(() => {
+    fetch(searchText, statusFilter)
+  }, [statusFilter]))
+
+  // Reload when status filter changes
   useEffect(() => {
     fetch(searchText, statusFilter)
   }, [statusFilter])
