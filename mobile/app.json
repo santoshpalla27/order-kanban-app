@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Kanban",
+    "slug": "kanban-mobile",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.kanbanmobile"
+    },
+    "ios": {
+      "bundleIdentifier": "com.kanbanmobile",
+      "supportsTablet": true
+    },
+    "newArchEnabled": true
+  }
+}
