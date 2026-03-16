@@ -89,25 +89,63 @@ test.describe('Kanban Board', () => {
     await page.waitForTimeout(300);
   });
 
-  test('filter control is present on the board', async ({ page }) => {
+  test('filter button is present and opens filter panel', async ({ page }) => {
     await page.goto(`${BASE_URL}/kanban`);
     await page.waitForLoadState('networkidle');
 
-    const filterControl = page
-      .getByRole('combobox', { name: /filter/i })
-      .or(page.getByRole('button',  { name: /filter/i }))
-      .or(page.getByLabel(/filter/i))
-      .or(page.getByText(/filter/i).locator('..').getByRole('button'))
-      .or(page.locator('select[name*="filter" i], [class*="filter" i]'));
+    const filterBtn = page.getByRole('button', { name: /filters?/i });
+    await expect(filterBtn.first()).toBeVisible({ timeout: 10_000 });
 
-    const count = await filterControl.count();
-    // Filter may or may not be visible depending on whether there are products
-    // We just assert the page loaded successfully (no crash)
-    expect(page.url()).toContain('/kanban');
-    // If a filter is found, it should be visible
-    if (count > 0) {
-      await expect(filterControl.first()).toBeVisible();
-    }
+    // Open the filter panel
+    await filterBtn.first().click();
+
+    // Status and Created By filters are always present
+    await expect(page.getByText(/status/i).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(/created by/i).first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('filter panel includes Assignee filter', async ({ page }) => {
+    await page.goto(`${BASE_URL}/kanban`);
+    await page.waitForLoadState('networkidle');
+
+    const filterBtn = page.getByRole('button', { name: /filters?/i });
+    await filterBtn.first().click();
+
+    await expect(page.getByText(/assignee/i).first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('filter panel includes Delivery Due filter with presets', async ({ page }) => {
+    await page.goto(`${BASE_URL}/kanban`);
+    await page.waitForLoadState('networkidle');
+
+    const filterBtn = page.getByRole('button', { name: /filters?/i });
+    await filterBtn.first().click();
+
+    await expect(page.getByText(/delivery due/i).first()).toBeVisible({ timeout: 5_000 });
+
+    // Preset buttons should be visible
+    await expect(page.getByRole('button', { name: /overdue/i }).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('button', { name: /today/i }).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('button', { name: /tomorrow/i }).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('button', { name: /3 days/i }).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('button', { name: /6 days/i }).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole('button', { name: /custom/i }).first()).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('delivery due preset "Today" shows a date picker when Custom is selected', async ({ page }) => {
+    await page.goto(`${BASE_URL}/kanban`);
+    await page.waitForLoadState('networkidle');
+
+    const filterBtn = page.getByRole('button', { name: /filters?/i });
+    await filterBtn.first().click();
+
+    // Click "Custom"
+    const customBtn = page.getByRole('button', { name: /custom/i }).first();
+    await customBtn.click();
+
+    // A date input should appear
+    const dateInput = page.locator('input[type="date"]');
+    await expect(dateInput.first()).toBeVisible({ timeout: 5_000 });
   });
 
   test('clicking a card opens a detail modal or side panel', async ({ page }) => {
