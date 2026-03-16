@@ -5,7 +5,7 @@ import { usersApi } from '../api/client';
 import { ProductStatus, STATUS_LABELS, STATUS_ORDER } from '../types';
 import { User } from '../types';
 
-interface Filters {
+export interface BaseFilters {
   search: string;
   status: string;
   created_by: string;
@@ -13,12 +13,12 @@ interface Filters {
   date_to: string;
 }
 
-interface Props {
-  filters: Filters;
-  onChange: (filters: Filters) => void;
+interface Props<T extends BaseFilters> {
+  filters: T;
+  onChange: (filters: T) => void;
 }
 
-export default function SearchFilters({ filters, onChange }: Props) {
+export default function SearchFilters<T extends BaseFilters>({ filters, onChange }: Props<T>) {
   const [showFilters, setShowFilters] = useState(false);
 
   const { data: usersData } = useQuery({
@@ -27,10 +27,15 @@ export default function SearchFilters({ filters, onChange }: Props) {
   });
   const users: User[] = usersData?.data || [];
 
-  const hasActiveFilters = filters.status || filters.created_by || filters.date_from || filters.date_to;
+  const hasActiveFilters = [
+    filters.status,
+    filters.created_by,
+    filters.date_from,
+    filters.date_to
+  ].some(v => v !== '' && v !== 'all');
 
   const clearFilters = () => {
-    onChange({ search: '', status: '', created_by: '', date_from: '', date_to: '' });
+    onChange({ ...filters, search: '', status: '', created_by: '', date_from: '', date_to: '' } as T);
     setShowFilters(false);
   };
 
@@ -41,7 +46,7 @@ export default function SearchFilters({ filters, onChange }: Props) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
           <input
             type="text"
-            placeholder="Search products..."
+            placeholder="Search by ID, customer, phone or description…"
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
             className="w-full !pl-10"

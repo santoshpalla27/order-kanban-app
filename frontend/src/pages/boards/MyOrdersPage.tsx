@@ -5,23 +5,24 @@ import { productsApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
 import { Product, STATUS_LABELS, STATUS_ORDER, ProductStatus } from '../../types';
 import ProductDetailModal from '../../components/ProductDetailModal';
-import { Eye, Loader2, Search, X } from 'lucide-react';
+import SearchFilters from '../../components/SearchFilters';
+import { Eye, Loader2, ChevronDown } from 'lucide-react';
 import { formatDate } from '../../utils/date';
 
 const PAGE_SIZE = 50;
 
-type TabKey = ProductStatus | 'all';
+type TabKey = string; // ProductStatus | 'all'
 
 const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: 'all',          label: 'All'          },
+  { key: '',             label: 'All'          },
   { key: 'yet_to_start', label: 'Yet to Start' },
   { key: 'working',      label: 'In Progress'  },
   { key: 'review',       label: 'In Review'    },
   { key: 'done',         label: 'Done'         },
 ];
 
-const TAB_ACTIVE: Record<TabKey, string> = {
-  all:          'bg-brand-500/15 text-brand-400 border-brand-500/40',
+const TAB_ACTIVE: Record<string, string> = {
+  '':           'bg-brand-500/15 text-brand-400 border-brand-500/40',
   yet_to_start: 'bg-surface-500/15 text-surface-300 border-surface-500/40',
   working:      'bg-blue-500/15 text-blue-400 border-blue-500/40',
   review:       'bg-amber-500/15 text-amber-400 border-amber-500/40',
@@ -37,31 +38,43 @@ function useTabCounts(baseFilters: Record<string, string>) {
   const review       = useQuery({ queryKey: ['my-orders', 'cnt', 'review',       baseFilters], queryFn: () => productsApi.getPaged({ ...baseFilters, status: 'review'       }, 1), staleTime: 30000 });
   const done         = useQuery({ queryKey: ['my-orders', 'cnt', 'done',         baseFilters], queryFn: () => productsApi.getPaged({ ...baseFilters, status: 'done'         }, 1), staleTime: 30000 });
   return {
-    all:          all.data?.data.total          ?? null,
+    '':           all.data?.data.total          ?? null,
     yet_to_start: yet_to_start.data?.data.total ?? null,
     working:      working.data?.data.total      ?? null,
     review:       review.data?.data.total       ?? null,
     done:         done.data?.data.total         ?? null,
-  };
+  } as Record<string, number | null>;
 }
 
 export default function MyOrdersPage() {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab]             = useState<TabKey>('all');
-  const [search, setSearch]                   = useState('');
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    created_by: '',
+    date_from: '',
+    date_to: '',
+    assigned_to: String(user?.id ?? 0),
+  });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
   const queryClient = useQueryClient();
   const parentRef   = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const baseFilters: Record<string, string> = {
-    assigned_to: String(user?.id ?? 0),
-    ...(search.trim() ? { search: search.trim() } : {}),
-  };
+  // Base filters for counts exclude status
+  const baseFilters = Object.fromEntries(
+    Object.entries(filters).filter(([k, v]) => v !== '' && k !== 'status')
+  ) as Record<string, string>;
 
   const counts   = useTabCounts(baseFilters);
-  const queryParams = activeTab === 'all' ? baseFilters : { ...baseFilters, status: activeTab };
-  const queryKey    = ['my-orders', 'list', activeTab, baseFilters];
+  const tabLabel = TABS.find(t => t.key === filters.status)?.label ?? '';
+
+  // API parameters and Cache Key
+  const apiParams = Object.fromEntries(
+    Object.entries(filters).filter(([_, v]) => v !== '')
+  ) as Record<string, string>;
+
+  const queryKey = ['my-orders', 'list', filters];
 
   const {
     data,
@@ -71,7 +84,7 @@ export default function MyOrdersPage() {
     fetchNextPage,
   } = useInfiniteQuery({
     queryKey,
-    queryFn: ({ pageParam }) => productsApi.getPaged(queryParams, PAGE_SIZE, pageParam as number | undefined),
+    queryFn: ({ pageParam }) => productsApi.getPaged(apiParams, PAGE_SIZE, pageParam as number | undefined),
     getNextPageParam: (lastPage) => lastPage.data.next_cursor ?? undefined,
     initialPageParam: undefined as number | undefined,
   });
@@ -109,8 +122,10 @@ export default function MyOrdersPage() {
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => productsApi.updateStatus(id, status),
-    onMutate: ({ id }) => {
-      if (activeTab !== 'all') {
+    onMutate: async ({ id }) => {
+      if (filters.status !== '') {
+        await queryClient.cancelQueries({ queryKey });
+        const previous = queryClient.getQueryData(queryKey);
         queryClient.setQueryData(queryKey, (old: any) => {
           if (!old) return old;
           return {
@@ -121,9 +136,18 @@ export default function MyOrdersPage() {
             })),
           };
         });
+        return { previous };
       }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: ['my-orders'] }),
+    onError: (_err, _vars, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
+    },
   });
 
   const virtualItems = virtualizer.getVirtualItems();
@@ -136,31 +160,17 @@ export default function MyOrdersPage() {
         <h1 className="text-2xl font-bold">My Orders</h1>
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-2 glass rounded-xl px-3 py-2 border border-surface-700/40 flex-shrink-0">
-        <Search className="w-4 h-4 text-surface-500 flex-shrink-0" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by product ID, customer or description…"
-          className="flex-1 bg-transparent border-0 outline-none text-sm placeholder:text-surface-500"
-        />
-        {search && (
-          <button onClick={() => setSearch('')} className="text-surface-500 hover:text-surface-300 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
+      <SearchFilters filters={filters} onChange={setFilters} />
 
       {/* Status chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-0.5 flex-shrink-0">
         {TABS.map(({ key, label }) => {
           const count    = counts[key];
-          const isActive = activeTab === key;
+          const isActive = filters.status === key;
           return (
             <button
               key={key}
-              onClick={() => setActiveTab(key)}
+              onClick={() => setFilters({ ...filters, status: key })}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all duration-150 whitespace-nowrap flex-shrink-0 ${
                 isActive ? TAB_ACTIVE[key] : TAB_IDLE
               }`}
@@ -181,13 +191,13 @@ export default function MyOrdersPage() {
       {/* Table */}
       <div className="flex-1 min-h-0 glass rounded-2xl border border-surface-700/30 flex flex-col overflow-hidden">
 
-        <div className="flex-shrink-0 bg-surface-900/90 backdrop-blur-sm border-b border-surface-700/50 grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_140px_80px]">
+        <div className="flex-shrink-0 bg-surface-900/90 backdrop-blur-sm border-b border-surface-700/50 grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_140px]">
           <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Product ID</div>
           <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Customer</div>
           <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden md:block">Delivery</div>
           <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:block">Description</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</div>
-          <div className="text-right text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">View</div>
+          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">View</div>
+          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</div>
         </div>
 
         {isLoading ? (
@@ -209,7 +219,7 @@ export default function MyOrdersPage() {
                     data-index={vi.index}
                     ref={virtualizer.measureElement}
                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)` }}
-                    className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_140px_80px] border-b border-surface-700/30 hover:bg-surface-800/40 transition-colors group"
+                    className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_140px] border-b border-surface-700/30 hover:bg-surface-800/40 transition-colors group"
                   >
                     <div className="px-4 py-3 text-sm font-medium text-brand-400 truncate">{product.product_id}</div>
                     <div className="px-4 py-3 text-sm text-surface-200 truncate">{product.customer_name}</div>
@@ -217,7 +227,16 @@ export default function MyOrdersPage() {
                       {product.delivery_at ? formatDate(product.delivery_at) : '—'}
                     </div>
                     <div className="px-4 py-3 text-sm text-surface-400 truncate hidden lg:block">{product.description || '—'}</div>
-                    <div className="px-4 py-3">
+                    <div className="px-4 py-3 flex items-center justify-center">
+                      <button
+                        onClick={() => setSelectedProduct(product.id)}
+                        className="p-1.5 rounded-lg text-surface-400 hover:text-brand-400 hover:bg-brand-500/10 transition-colors"
+                        title="View details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="px-4 py-3 flex items-center justify-center">
                       <select
                         value={product.status}
                         onChange={(e) => statusMutation.mutate({ id: product.id, status: e.target.value })}
@@ -229,15 +248,6 @@ export default function MyOrdersPage() {
                           <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                         ))}
                       </select>
-                    </div>
-                    <div className="px-4 py-3 flex items-center justify-end gap-1">
-                      <button
-                        onClick={() => setSelectedProduct(product.id)}
-                        className="p-1.5 rounded-lg text-surface-400 hover:text-brand-400 hover:bg-brand-500/10 transition-colors"
-                        title="View details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
                     </div>
                   </div>
                 );

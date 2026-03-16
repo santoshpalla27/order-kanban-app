@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { productsApi } from '../../api/client';
@@ -6,22 +6,23 @@ import { useAuthStore } from '../../store/authStore';
 import { Product, STATUS_LABELS, STATUS_ORDER, ProductStatus } from '../../types';
 import ProductDetailModal from '../../components/ProductDetailModal';
 import CreateProductModal from '../../components/CreateProductModal';
-import { Plus, Eye, Trash2, Loader2, Search, X, ChevronDown } from 'lucide-react';
+import SearchFilters from '../../components/SearchFilters';
+import { Plus, Eye, Trash2, Loader2, ChevronDown } from 'lucide-react';
 
 const PAGE_SIZE = 50;
 
-type TabKey = ProductStatus | 'all';
+type TabKey = string; // ProductStatus | 'all'
 
 const TABS: Array<{ key: TabKey; label: string }> = [
-  { key: 'all',          label: 'All'          },
+  { key: '',             label: 'All'          },
   { key: 'yet_to_start', label: 'Yet to Start' },
   { key: 'working',      label: 'In Progress'  },
   { key: 'review',       label: 'In Review'    },
   { key: 'done',         label: 'Done'         },
 ];
 
-const TAB_ACTIVE: Record<TabKey, string> = {
-  all:          'bg-brand-500/15 text-brand-400 border-brand-500/40',
+const TAB_ACTIVE: Record<string, string> = {
+  '':           'bg-brand-500/15 text-brand-400 border-brand-500/40',
   yet_to_start: 'bg-surface-500/15 text-surface-300 border-surface-500/40',
   working:      'bg-blue-500/15 text-blue-400 border-blue-500/40',
   review:       'bg-amber-500/15 text-amber-400 border-amber-500/40',
@@ -39,19 +40,24 @@ function useTabCounts(baseFilters: Record<string, string>) {
   const review       = useQuery({ queryKey: ['products', 'cnt', 'review',       baseFilters], queryFn: () => productsApi.getPaged({ ...baseFilters, status: 'review'       }, 1), staleTime: 30000 });
   const done         = useQuery({ queryKey: ['products', 'cnt', 'done',         baseFilters], queryFn: () => productsApi.getPaged({ ...baseFilters, status: 'done'         }, 1), staleTime: 30000 });
   return {
-    all:          all.data?.data.total          ?? null,
+    '':           all.data?.data.total          ?? null,
     yet_to_start: yet_to_start.data?.data.total ?? null,
     working:      working.data?.data.total      ?? null,
     review:       review.data?.data.total       ?? null,
     done:         done.data?.data.total         ?? null,
-  };
+  } as Record<string, number | null>;
 }
 
 // ─── Main ListView ───────────────────────────────────────────────────────────
 
 export default function ListView() {
-  const [activeTab, setActiveTab]             = useState<TabKey>('all');
-  const [search, setSearch]                   = useState('');
+  const [filters, setFilters] = useState({
+    search: '',
+    status: '',
+    created_by: '',
+    date_from: '',
+    date_to: '',
+  });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
   const [showCreate, setShowCreate]           = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
@@ -60,13 +66,20 @@ export default function ListView() {
   const parentRef   = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const baseFilters: Record<string, string> = search.trim() ? { search: search.trim() } : {};
-  const counts   = useTabCounts(baseFilters);
-  const tabLabel = TABS.find(t => t.key === activeTab)?.label ?? '';
+  // Base filters for counts exclude status but include everything else
+  const baseFilters = Object.fromEntries(
+    Object.entries(filters).filter(([k, v]) => v !== '' && k !== 'status')
+  ) as Record<string, string>;
 
-  // Reset to first page when tab/search changes
-  const queryParams = activeTab === 'all' ? baseFilters : { ...baseFilters, status: activeTab };
-  const queryKey    = ['products', 'list', activeTab, baseFilters];
+  const counts   = useTabCounts(baseFilters);
+  const tabLabel = TABS.find(t => t.key === filters.status)?.label ?? '';
+
+  // API parameters and Cache Key
+  const apiParams = Object.fromEntries(
+    Object.entries(filters).filter(([_, v]) => v !== '')
+  ) as Record<string, string>;
+
+  const queryKey = ['products', 'list', filters];
 
   const {
     data,
@@ -76,7 +89,7 @@ export default function ListView() {
     fetchNextPage,
   } = useInfiniteQuery({
     queryKey,
-    queryFn: ({ pageParam }) => productsApi.getPaged(queryParams, PAGE_SIZE, pageParam as number | undefined),
+    queryFn: ({ pageParam }) => productsApi.getPaged(apiParams, PAGE_SIZE, pageParam as number | undefined),
     getNextPageParam: (lastPage) => lastPage.data.next_cursor ?? undefined,
     initialPageParam: undefined as number | undefined,
   });
@@ -117,8 +130,10 @@ export default function ListView() {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) => productsApi.updateStatus(id, status),
-    onMutate: ({ id }) => {
-      if (activeTab !== 'all') {
+    onMutate: async ({ id }) => {
+      if (filters.status !== '') {
+        await queryClient.cancelQueries({ queryKey });
+        const previous = queryClient.getQueryData(queryKey);
         queryClient.setQueryData(queryKey, (old: any) => {
           if (!old) return old;
           return {
@@ -129,6 +144,12 @@ export default function ListView() {
             })),
           };
         });
+        return { previous };
+      }
+    },
+    onError: (_err, _vars, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
       }
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
@@ -158,31 +179,17 @@ export default function ListView() {
         )}
       </div>
 
-      {/* Search */}
-      <div className="flex items-center gap-2 glass rounded-xl px-3 py-2 border border-surface-700/40 flex-shrink-0">
-        <Search className="w-4 h-4 text-surface-500 flex-shrink-0" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by product ID, customer, phone or description…"
-          className="flex-1 bg-transparent border-0 outline-none text-sm placeholder:text-surface-500"
-        />
-        {search && (
-          <button onClick={() => setSearch('')} className="text-surface-500 hover:text-surface-300 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
+      <SearchFilters filters={filters} onChange={setFilters} />
 
       {/* Status chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-0.5 flex-shrink-0">
         {TABS.map(({ key, label }) => {
           const count    = counts[key];
-          const isActive = activeTab === key;
+          const isActive = filters.status === key;
           return (
             <button
               key={key}
-              onClick={() => setActiveTab(key)}
+              onClick={() => setFilters({ ...filters, status: key })}
               className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all duration-150 whitespace-nowrap flex-shrink-0 ${
                 isActive ? TAB_ACTIVE[key] : TAB_IDLE
               }`}
@@ -204,13 +211,14 @@ export default function ListView() {
       <div className="flex-1 min-h-0 glass rounded-2xl border border-surface-700/30 flex flex-col overflow-hidden">
 
         {/* Sticky column header */}
-        <div className="flex-shrink-0 bg-surface-900/90 backdrop-blur-sm border-b border-surface-700/50 grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_140px_100px]">
+        <div className="flex-shrink-0 bg-surface-900/90 backdrop-blur-sm border-b border-surface-700/50 grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_160px_60px]">
           <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Product ID</div>
           <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Customer</div>
           <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden md:block">Phone</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:block">Description</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</div>
-          <div className="text-right text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Actions</div>
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:block">Assignee</div>
+          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">View</div>
+          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</div>
+          <div />
         </div>
 
         {/* Body */}
@@ -221,7 +229,7 @@ export default function ListView() {
         ) : items.length === 0 ? (
           <div className="flex-1 flex items-center justify-center">
             <p className="text-surface-500 text-sm">
-              {search ? 'No products match your search' : `No products in "${tabLabel}"`}
+              {filters.search ? 'No products match your search' : `No products in "${tabLabel}"`}
             </p>
           </div>
         ) : (
@@ -243,7 +251,7 @@ export default function ListView() {
                       width: '100%',
                       transform: `translateY(${vr.start}px)`,
                     }}
-                    className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_140px_100px] border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors"
+                    className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_160px_60px] border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors"
                   >
                     <div className="px-4 py-3 flex items-center min-w-0">
                       <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
@@ -253,9 +261,16 @@ export default function ListView() {
                       {product.customer_phone || '—'}
                     </div>
                     <div className="px-4 py-3 items-center text-sm text-surface-400 hidden lg:flex truncate min-w-0">
-                      {product.description || '—'}
+                      {product.assignees && product.assignees.length > 0
+                        ? product.assignees.map(a => a.name).join(', ')
+                        : '—'}
                     </div>
-                    <div className="px-4 py-3 flex items-center">
+                    <div className="px-4 py-3 flex items-center justify-center">
+                      <button onClick={() => setSelectedProduct(product.id)} className="btn-ghost p-1.5 rounded-lg" title="View details">
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="px-4 py-3 flex items-center justify-center">
                       <select
                         value={product.status}
                         onChange={(e) => statusMutation.mutate({ id: product.id, status: e.target.value })}
@@ -266,10 +281,7 @@ export default function ListView() {
                         ))}
                       </select>
                     </div>
-                    <div className="px-4 py-3 flex items-center justify-end gap-1">
-                      <button onClick={() => setSelectedProduct(product.id)} className="btn-ghost p-1.5 rounded-lg" title="View details">
-                        <Eye className="w-4 h-4" />
-                      </button>
+                    <div className="px-2 py-3 flex items-center justify-center">
                       {canDeleteProduct() && (
                         <button onClick={() => setDeleteConfirmId(product.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete">
                           <Trash2 className="w-4 h-4" />

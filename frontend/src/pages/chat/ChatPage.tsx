@@ -137,9 +137,6 @@ export default function ChatPage() {
     inputRef.current?.focus();
   };
 
-  const formatTime = (dateStr: string) =>
-    formatTime(dateStr);
-
   const formatDateSep = (dateStr: string) => {
     const d = new Date(dateStr);
     const today = new Date();
