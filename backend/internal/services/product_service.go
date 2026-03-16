@@ -14,12 +14,13 @@ import (
 const gracePeriodDays = 10
 
 type ProductFilter struct {
-	Status     string
-	CreatedBy  uint
-	AssignedTo uint
-	Search     string
-	DateFrom   string
-	DateTo     string
+	Status         string
+	CreatedBy      uint
+	AssignedTo     uint
+	Search         string
+	DateFrom       string
+	DateTo         string
+	DeliveryBefore string
 }
 
 // ProductCursorPage is returned by GetProductsCursor for paginated list views.
@@ -50,6 +51,9 @@ func applyProductFilters(query *gorm.DB, filter ProductFilter) *gorm.DB {
 	}
 	if filter.DateTo != "" {
 		query = query.Where("created_at <= ?", filter.DateTo)
+	}
+	if filter.DeliveryBefore != "" {
+		query = query.Where("DATE(delivery_at) <= ?", filter.DeliveryBefore)
 	}
 	return query
 }
