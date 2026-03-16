@@ -12,6 +12,14 @@ import {
   ExternalLink,
 } from 'lucide-react';
 
+function todayAtMidnight() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T00:00`;
+}
+
 interface Props {
   productId: number;
   onClose: () => void;
@@ -358,6 +366,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ product_id: '', customer_name: '', customer_phone: '', description: '', delivery_at: '', assigned_to: '' });
 
+
   const { data: usersData } = useQuery({
     queryKey: ['users-list'],
     queryFn: () => usersApi.getList(),
@@ -374,6 +383,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
       delivery_at: product.delivery_at ? new Date(product.delivery_at).toISOString().slice(0, 16) : '',
       assigned_to: product.assigned_to != null ? String(product.assigned_to) : '',
     });
+
     setEditError(null);
     setEditing(true);
   };
@@ -456,9 +466,21 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
               <input
                 type="datetime-local"
                 value={editForm.delivery_at}
+                onFocus={() => { if (!editForm.delivery_at) setEditForm(f => ({ ...f, delivery_at: todayAtMidnight() })); }}
                 onChange={(e) => setEditForm(f => ({ ...f, delivery_at: e.target.value }))}
                 className="text-sm"
               />
+              {editForm.delivery_at && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setEditForm(f => ({ ...f, delivery_at: '' }))}
+                    className="text-xs text-surface-500 hover:text-surface-300 px-2 py-0.5 rounded transition-colors"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-surface-500 uppercase tracking-wider">Assign To</label>

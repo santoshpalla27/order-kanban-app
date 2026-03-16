@@ -4,6 +4,14 @@ import { productsApi, usersApi } from '../api/client';
 import { User } from '../types';
 import { X, Package } from 'lucide-react';
 
+function todayAtMidnight() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}T00:00`;
+}
+
 interface Props {
   onClose: () => void;
 }
@@ -118,9 +126,21 @@ export default function CreateProductModal({ onClose }: Props) {
             <input
               type="datetime-local"
               value={deliveryAt}
+              onFocus={() => { if (!deliveryAt) setDeliveryAt(todayAtMidnight()); }}
               onChange={(e) => setDeliveryAt(e.target.value)}
               className="w-full"
             />
+            {deliveryAt && (
+              <div className="flex justify-end mt-1">
+                <button
+                  type="button"
+                  onClick={() => setDeliveryAt('')}
+                  className="text-xs text-surface-500 hover:text-surface-300 px-2 py-0.5 rounded transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
           </div>
 
           <div>
