@@ -378,3 +378,98 @@ body {
 [data-theme="light"] .bg-surface-800\/50.px-2 {
   background-color: rgba(226, 232, 240, 0.5) !important;
 }
+
+/* ── ListView light-mode fixes ── */
+
+/* Search bar & table card border */
+[data-theme="light"] .border-surface-700\/40 {
+  border-color: rgba(148, 163, 184, 0.5) !important;
+}
+
+/* Row divider lines */
+[data-theme="light"] .border-surface-700\/20 {
+  border-color: rgba(203, 213, 225, 0.6) !important;
+}
+
+/* Row hover background */
+[data-theme="light"] .hover\:bg-surface-700\/20:hover {
+  background-color: rgba(226, 232, 240, 0.5) !important;
+}
+
+/* Load-more button hover */
+[data-theme="light"] .hover\:bg-surface-700\/30:hover {
+  background-color: rgba(226, 232, 240, 0.6) !important;
+}
+
+/* Active tab chip count badge — bg-white/10 is invisible in light mode */
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Idle tab chip count badge */
+[data-theme="light"] .bg-surface-700\/60 {
+  background-color: rgba(203, 213, 225, 0.7) !important;
+}
+
+/* Table sticky header */
+[data-theme="light"] .bg-surface-900\/90 {
+  background-color: rgba(241, 245, 249, 0.95) !important;
+}
+
+/* Breadcrumb / info text */
+[data-theme="light"] .text-surface-600 {
+  color: #475569 !important;
+}
+
+/* Tab chip idle hover — bg-surface-800/60 is too faint in light */
+[data-theme="light"] .hover\:bg-surface-800\/60:hover {
+  background-color: rgba(226, 232, 240, 0.7) !important;
+}
+
+/* Tab chip active text — -400 variants are too faint on light backgrounds */
+[data-theme="light"] .text-brand-400 {
+  color: #2563eb !important;
+}
+[data-theme="light"] .text-blue-400 {
+  color: #1d4ed8 !important;
+}
+[data-theme="light"] .text-amber-400 {
+  color: #b45309 !important;
+}
+[data-theme="light"] .text-emerald-400 {
+  color: #047857 !important;
+}
+
+/* Tab chip active background — slightly stronger tint in light */
+[data-theme="light"] .bg-brand-500\/15 {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+}
+[data-theme="light"] .bg-blue-500\/15 {
+  background-color: rgba(29, 78, 216, 0.1) !important;
+}
+[data-theme="light"] .bg-amber-500\/15 {
+  background-color: rgba(180, 83, 9, 0.08) !important;
+}
+[data-theme="light"] .bg-emerald-500\/15 {
+  background-color: rgba(4, 120, 87, 0.08) !important;
+}
+[data-theme="light"] .bg-surface-500\/15 {
+  background-color: rgba(100, 116, 139, 0.1) !important;
+}
+
+/* Tab chip active border */
+[data-theme="light"] .border-brand-500\/40 {
+  border-color: rgba(37, 99, 235, 0.35) !important;
+}
+[data-theme="light"] .border-blue-500\/40 {
+  border-color: rgba(29, 78, 216, 0.35) !important;
+}
+[data-theme="light"] .border-amber-500\/40 {
+  border-color: rgba(180, 83, 9, 0.3) !important;
+}
+[data-theme="light"] .border-emerald-500\/40 {
+  border-color: rgba(4, 120, 87, 0.3) !important;
+}
+[data-theme="light"] .border-surface-500\/40 {
+  border-color: rgba(100, 116, 139, 0.35) !important;
+}
