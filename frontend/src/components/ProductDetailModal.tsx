@@ -364,7 +364,8 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
   const queryClient = useQueryClient();
   const { canCreateProduct } = useAuthStore();
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ product_id: '', customer_name: '', customer_phone: '', description: '', delivery_at: '', assigned_to: '' });
+  const [editForm, setEditForm] = useState({ product_id: '', customer_name: '', customer_phone: '', description: '', delivery_at: '' });
+  const [editAssigneeIds, setEditAssigneeIds] = useState<number[]>([]);
 
 
   const { data: usersData } = useQuery({
@@ -381,9 +382,8 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
       customer_phone: product.customer_phone || '',
       description: product.description || '',
       delivery_at: product.delivery_at ? new Date(product.delivery_at).toISOString().slice(0, 16) : '',
-      assigned_to: product.assigned_to != null ? String(product.assigned_to) : '',
     });
-
+    setEditAssigneeIds((product.assignees || []).map(u => u.id));
     setEditError(null);
     setEditing(true);
   };
@@ -406,7 +406,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
     editMutation.mutate({
       ...editForm,
       delivery_at: editForm.delivery_at ? new Date(editForm.delivery_at).toISOString() : null,
-      assigned_to: editForm.assigned_to ? Number(editForm.assigned_to) : null,
+      assignee_ids: editAssigneeIds,
     } as any);
   };
 
@@ -484,13 +484,31 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-surface-500 uppercase tracking-wider">Assign To</label>
+              {editAssigneeIds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-1">
+                  {editAssigneeIds.map(id => {
+                    const u = usersList.find((u: any) => u.id === id);
+                    return u ? (
+                      <span key={id} className="inline-flex items-center gap-1 bg-brand-500/15 text-brand-300 text-xs px-2.5 py-1 rounded-full border border-brand-500/30">
+                        {(u as any).name}
+                        <button type="button" onClick={() => setEditAssigneeIds(prev => prev.filter(x => x !== id))} className="hover:text-red-400 transition-colors ml-0.5">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
               <select
-                value={editForm.assigned_to}
-                onChange={(e) => setEditForm(f => ({ ...f, assigned_to: e.target.value }))}
+                value=""
+                onChange={(e) => {
+                  const id = Number(e.target.value);
+                  if (id && !editAssigneeIds.includes(id)) setEditAssigneeIds(prev => [...prev, id]);
+                }}
                 className="text-sm"
               >
-                <option value="">Unassigned</option>
-                {usersList.map((u: any) => (
+                <option value="">+ Add assignee…</option>
+                {usersList.filter((u: any) => !editAssigneeIds.includes(u.id)).map((u: any) => (
                   <option key={u.id} value={u.id}>{u.name}</option>
                 ))}
               </select>
@@ -512,7 +530,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
             <DetailRow label="Customer Phone" value={product.customer_phone || '—'} />
             <DetailRow label="Description" value={product.description || '—'} />
             <DetailRow label="Delivery Date & Time" value={product.delivery_at ? formatDateTime(product.delivery_at) : '—'} />
-            <DetailRow label="Assigned To" value={product.assignee?.name || '—'} />
+            <DetailRow label="Assigned To" value={(product.assignees && product.assignees.length > 0) ? product.assignees.map(u => u.name).join(', ') : '—'} />
           </>
         )}
         <DetailRow label="Created By" value={product.creator?.name || '—'} />

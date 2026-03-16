@@ -22,7 +22,7 @@ export default function CreateProductModal({ onClose }: Props) {
   const [customerPhone, setCustomerPhone] = useState('');
   const [description, setDescription] = useState('');
   const [deliveryAt, setDeliveryAt] = useState('');
-  const [assignedTo, setAssignedTo] = useState('');
+  const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
 
@@ -51,9 +51,14 @@ export default function CreateProductModal({ onClose }: Props) {
       customer_phone: customerPhone,
       description,
       delivery_at: deliveryAt ? new Date(deliveryAt).toISOString() : null,
-      assigned_to: assignedTo ? Number(assignedTo) : null,
+      assignee_ids: assigneeIds,
     });
   };
+
+  const addAssignee = (id: number) => {
+    if (id && !assigneeIds.includes(id)) setAssigneeIds(prev => [...prev, id]);
+  };
+  const removeAssignee = (id: number) => setAssigneeIds(prev => prev.filter(x => x !== id));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
@@ -145,13 +150,28 @@ export default function CreateProductModal({ onClose }: Props) {
 
           <div>
             <label className="block text-sm font-medium text-surface-300 mb-1.5">Assign To</label>
+            {assigneeIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {assigneeIds.map(id => {
+                  const u = users.find(u => u.id === id);
+                  return u ? (
+                    <span key={id} className="inline-flex items-center gap-1 bg-brand-500/15 text-brand-300 text-xs px-2.5 py-1 rounded-full border border-brand-500/30">
+                      {u.name}
+                      <button type="button" onClick={() => removeAssignee(id)} className="hover:text-red-400 transition-colors ml-0.5">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ) : null;
+                })}
+              </div>
+            )}
             <select
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
+              value=""
+              onChange={(e) => addAssignee(Number(e.target.value))}
               className="w-full"
             >
-              <option value="">Unassigned</option>
-              {users.map(u => (
+              <option value="">+ Add assignee…</option>
+              {users.filter(u => !assigneeIds.includes(u.id)).map(u => (
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </select>

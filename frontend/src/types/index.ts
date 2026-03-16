@@ -25,8 +25,7 @@ export interface Product {
   attachments?: Attachment[];
   comments?: Comment[];
   delivery_at?: string | null;
-  assigned_to?: number | null;
-  assignee?: User | null;
+  assignees?: User[];
   deleted_at?: string | null;
   deleted_by?: number;
   created_at: string;

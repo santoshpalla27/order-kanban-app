@@ -17,8 +17,7 @@ type Product struct {
 	Status        string         `json:"status" gorm:"default:yet_to_start;not null"`
 	CreatedBy     uint           `json:"created_by" gorm:"not null"`
 	Creator       User           `json:"creator" gorm:"foreignKey:CreatedBy"`
-	AssignedTo    *uint          `json:"assigned_to"`
-	Assignee      *User          `json:"assignee" gorm:"foreignKey:AssignedTo"`
+	Assignees     []User         `json:"assignees" gorm:"many2many:product_assignees;"`
 	Attachments   []Attachment   `json:"attachments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
 	Comments      []Comment      `json:"comments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
 	DeliveryAt    *time.Time     `json:"delivery_at"`
@@ -34,7 +33,7 @@ type CreateProductRequest struct {
 	CustomerPhone string     `json:"customer_phone"`
 	Description   string     `json:"description"`
 	DeliveryAt    *time.Time `json:"delivery_at"`
-	AssignedTo    *uint      `json:"assigned_to"`
+	AssigneeIDs   []uint     `json:"assignee_ids"`
 }
 
 type UpdateProductRequest struct {
@@ -43,7 +42,7 @@ type UpdateProductRequest struct {
 	CustomerPhone string     `json:"customer_phone"`
 	Description   string     `json:"description"`
 	DeliveryAt    *time.Time `json:"delivery_at"`
-	AssignedTo    *uint      `json:"assigned_to"`
+	AssigneeIDs   []uint     `json:"assignee_ids"`
 }
 
 type UpdateStatusRequest struct {

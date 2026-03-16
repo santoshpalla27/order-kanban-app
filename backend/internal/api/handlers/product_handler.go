@@ -129,12 +129,11 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		CustomerPhone: req.CustomerPhone,
 		Description:   req.Description,
 		DeliveryAt:    req.DeliveryAt,
-		AssignedTo:    req.AssignedTo,
 		Status:        "yet_to_start",
 		CreatedBy:     userID,
 	}
 
-	if err := services.CreateProduct(product); err != nil {
+	if err := services.CreateProduct(product, req.AssigneeIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product"})
 		return
 	}
@@ -190,9 +189,8 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	updates["customer_phone"] = req.CustomerPhone
 	updates["description"] = req.Description
 	updates["delivery_at"] = req.DeliveryAt
-	updates["assigned_to"] = req.AssignedTo
 
-	if err := services.UpdateProduct(uint(id), updates); err != nil {
+	if err := services.UpdateProduct(uint(id), updates, req.AssigneeIDs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})
 		return
 	}

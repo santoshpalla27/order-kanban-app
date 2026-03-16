@@ -39,7 +39,7 @@ func applyProductFilters(query *gorm.DB, filter ProductFilter) *gorm.DB {
 		query = query.Where("created_by = ?", filter.CreatedBy)
 	}
 	if filter.AssignedTo > 0 {
-		query = query.Where("assigned_to = ?", filter.AssignedTo)
+		query = query.Where("EXISTS (SELECT 1 FROM product_assignees WHERE product_id = products.id AND user_id = ?)", filter.AssignedTo)
 	}
 	if filter.Search != "" {
 		search := "%" + filter.Search + "%"
@@ -58,7 +58,7 @@ func applyProductFilters(query *gorm.DB, filter ProductFilter) *gorm.DB {
 // Used by the Kanban board which loads the full list once.
 func GetProducts(filter ProductFilter) ([]models.Product, error) {
 	query := applyProductFilters(
-		database.DB.Preload("Creator").Preload("Creator.Role").Preload("Assignee").Preload("Assignee.Role"),
+		database.DB.Preload("Creator").Preload("Creator.Role").Preload("Assignees").Preload("Assignees.Role"),
 		filter,
 	)
 	var products []models.Product
@@ -67,19 +67,15 @@ func GetProducts(filter ProductFilter) ([]models.Product, error) {
 }
 
 // GetProductsCursor returns one page of products using keyset (cursor) pagination.
-// cursor is the ID of the last product seen; pass 0 for the first page.
-// Products are ordered by id DESC so that the cursor is stable even if created_at values
-// are identical (e.g. bulk imports).
 func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCursorPage, error) {
 	query := applyProductFilters(
-		database.DB.Preload("Creator").Preload("Creator.Role").Preload("Assignee").Preload("Assignee.Role"),
+		database.DB.Preload("Creator").Preload("Creator.Role").Preload("Assignees").Preload("Assignees.Role"),
 		filter,
 	)
 	if cursor > 0 {
 		query = query.Where("id < ?", cursor)
 	}
 
-	// Fetch one extra row to detect whether a next page exists
 	var products []models.Product
 	if err := query.Order("updated_at DESC, id DESC").Limit(limit + 1).Find(&products).Error; err != nil {
 		return ProductCursorPage{}, err
@@ -96,7 +92,6 @@ func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCur
 		nextCursor = &last
 	}
 
-	// Total count for this filter set (no cursor applied — shows real column size)
 	var total int64
 	applyProductFilters(database.DB.Model(&models.Product{}), filter).Count(&total)
 
@@ -106,7 +101,7 @@ func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCur
 func GetProductByID(id uint) (*models.Product, error) {
 	var product models.Product
 	err := database.DB.Preload("Creator").Preload("Creator.Role").
-		Preload("Assignee").Preload("Assignee.Role").
+		Preload("Assignees").Preload("Assignees.Role").
 		Preload("Attachments").Preload("Attachments.Uploader").
 		Preload("Comments").Preload("Comments.User").
 		First(&product, id).Error
@@ -116,21 +111,26 @@ func GetProductByID(id uint) (*models.Product, error) {
 func GetProductByIDSimple(id uint) (*models.Product, error) {
 	var product models.Product
 	err := database.DB.Preload("Creator").Preload("Creator.Role").
-		Preload("Assignee").Preload("Assignee.Role").First(&product, id).Error
+		Preload("Assignees").Preload("Assignees.Role").First(&product, id).Error
 	return &product, err
 }
 
-func CreateProduct(product *models.Product) error {
-	return database.DB.Create(product).Error
+func CreateProduct(product *models.Product, assigneeIDs []uint) error {
+	if err := database.DB.Create(product).Error; err != nil {
+		return err
+	}
+	if len(assigneeIDs) > 0 {
+		var users []models.User
+		database.DB.Where("id IN ?", assigneeIDs).Find(&users)
+		database.DB.Model(product).Association("Assignees").Replace(users)
+	}
+	return nil
 }
 
 // IsProductIDTaken checks both active products and grace-period soft-deleted products.
-// The Postgres partial unique index (WHERE deleted_at IS NULL) handles active-product
-// uniqueness at the DB level; this check adds a grace-period guard with a friendly message.
 func IsProductIDTaken(productID string) (bool, string, error) {
 	var count int64
 
-	// Active products (GORM auto-applies deleted_at IS NULL scope)
 	if err := database.DB.Model(&models.Product{}).
 		Where("product_id = ?", productID).Count(&count).Error; err != nil {
 		return false, "", err
@@ -139,7 +139,6 @@ func IsProductIDTaken(productID string) (bool, string, error) {
 		return true, "product ID already exists", nil
 	}
 
-	// Soft-deleted products still within the grace period
 	graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
 	if err := database.DB.Unscoped().Model(&models.Product{}).
 		Where("product_id = ? AND deleted_at IS NOT NULL AND deleted_at > ?", productID, graceCutoff).
@@ -156,8 +155,17 @@ func IsProductIDTaken(productID string) (bool, string, error) {
 	return false, "", nil
 }
 
-func UpdateProduct(id uint, updates map[string]interface{}) error {
-	return database.DB.Model(&models.Product{}).Where("id = ?", id).Updates(updates).Error
+func UpdateProduct(id uint, updates map[string]interface{}, assigneeIDs []uint) error {
+	if err := database.DB.Model(&models.Product{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+		return err
+	}
+	// Always replace assignees (empty slice clears all)
+	var users []models.User
+	if len(assigneeIDs) > 0 {
+		database.DB.Where("id IN ?", assigneeIDs).Find(&users)
+	}
+	product := &models.Product{ID: id}
+	return database.DB.Model(product).Association("Assignees").Replace(users)
 }
 
 func UpdateProductStatus(id uint, status string) error {
@@ -165,8 +173,7 @@ func UpdateProductStatus(id uint, status string) error {
 		Updates(map[string]interface{}{"status": status, "updated_at": time.Now()}).Error
 }
 
-// DeleteProduct soft-deletes a product. No ID mangling needed — the Postgres partial unique
-// index (WHERE deleted_at IS NULL) releases the uniqueness slot automatically on soft delete.
+// DeleteProduct soft-deletes a product.
 func DeleteProduct(id uint, deletedByID uint) error {
 	if err := database.DB.Model(&models.Product{}).Where("id = ?", id).
 		Update("deleted_by", deletedByID).Error; err != nil {
@@ -181,15 +188,14 @@ func GetDeletedProducts() ([]models.Product, error) {
 	graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
 	err := database.DB.Unscoped().
 		Preload("Creator").Preload("Creator.Role").
-		Preload("Assignee").Preload("Assignee.Role").
+		Preload("Assignees").Preload("Assignees.Role").
 		Where("deleted_at IS NOT NULL AND deleted_at > ?", graceCutoff).
 		Order("deleted_at DESC").
 		Find(&products).Error
 	return products, err
 }
 
-// RestoreProduct un-deletes a product. The partial unique index re-enforces uniqueness
-// automatically once deleted_at is cleared back to NULL.
+// RestoreProduct un-deletes a product.
 func RestoreProduct(id uint) error {
 	return database.DB.Unscoped().Model(&models.Product{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"deleted_at": nil,
@@ -197,12 +203,10 @@ func RestoreProduct(id uint) error {
 	}).Error
 }
 
-// PurgeExpiredDeletedProducts hard-deletes products whose grace period has elapsed,
-// cleaning up their R2 attachments first to prevent orphaned files.
+// PurgeExpiredDeletedProducts hard-deletes products whose grace period has elapsed.
 func PurgeExpiredDeletedProducts() error {
 	graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
 
-	// Collect IDs of products about to be purged
 	var productIDs []uint
 	if err := database.DB.Unscoped().Model(&models.Product{}).
 		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
@@ -213,7 +217,6 @@ func PurgeExpiredDeletedProducts() error {
 		return nil
 	}
 
-	// Delete R2 files for all attachments belonging to these products
 	if R2 != nil {
 		var attachments []models.Attachment
 		if err := database.DB.Where("product_id IN ?", productIDs).Find(&attachments).Error; err == nil {
@@ -227,7 +230,6 @@ func PurgeExpiredDeletedProducts() error {
 		}
 	}
 
-	// Hard-delete products (DB cascades to attachments, comments via FK ON DELETE CASCADE)
 	return database.DB.Unscoped().
 		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
 		Delete(&models.Product{}).Error
