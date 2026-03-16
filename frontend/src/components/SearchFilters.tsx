@@ -11,14 +11,16 @@ export interface BaseFilters {
   created_by: string;
   date_from: string;
   date_to: string;
+  assigned_to?: string;
 }
 
 interface Props<T extends BaseFilters> {
   filters: T;
   onChange: (filters: T) => void;
+  showAssigneeFilter?: boolean;
 }
 
-export default function SearchFilters<T extends BaseFilters>({ filters, onChange }: Props<T>) {
+export default function SearchFilters<T extends BaseFilters>({ filters, onChange, showAssigneeFilter }: Props<T>) {
   const [showFilters, setShowFilters] = useState(false);
 
   const { data: usersData } = useQuery({
@@ -31,11 +33,12 @@ export default function SearchFilters<T extends BaseFilters>({ filters, onChange
     filters.status,
     filters.created_by,
     filters.date_from,
-    filters.date_to
+    filters.date_to,
+    showAssigneeFilter ? filters.assigned_to : '',
   ].some(v => v !== '' && v !== 'all');
 
   const clearFilters = () => {
-    onChange({ ...filters, search: '', status: '', created_by: '', date_from: '', date_to: '' } as T);
+    onChange({ ...filters, search: '', status: '', created_by: '', date_from: '', date_to: '', ...(showAssigneeFilter ? { assigned_to: '' } : {}) } as T);
     setShowFilters(false);
   };
 
@@ -97,6 +100,21 @@ export default function SearchFilters<T extends BaseFilters>({ filters, onChange
               ))}
             </select>
           </div>
+          {showAssigneeFilter && (
+            <div className="flex-1 min-w-[150px]">
+              <label className="block text-xs font-medium text-surface-400 mb-1">Assignee</label>
+              <select
+                value={filters.assigned_to ?? ''}
+                onChange={(e) => onChange({ ...filters, assigned_to: e.target.value })}
+                className="w-full"
+              >
+                <option value="">All Assignees</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex-1 min-w-[150px]">
             <label className="block text-xs font-medium text-surface-400 mb-1">From Date</label>
             <input

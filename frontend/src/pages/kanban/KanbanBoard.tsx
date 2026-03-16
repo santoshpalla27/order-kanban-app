@@ -28,7 +28,7 @@ const colKey = (status: string, base: Record<string, string>) =>
 export default function KanbanBoard() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({
-    search: '', status: '', created_by: '', date_from: '', date_to: '',
+    search: '', status: '', created_by: '', date_from: '', date_to: '', assigned_to: '',
   });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -162,7 +162,7 @@ export default function KanbanBoard() {
         )}
       </div>
 
-      <SearchFilters filters={filters} onChange={setFilters} />
+      <SearchFilters filters={filters} onChange={setFilters} showAssigneeFilter />
 
       <DndContext
         sensors={sensors}

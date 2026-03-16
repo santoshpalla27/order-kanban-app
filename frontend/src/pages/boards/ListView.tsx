@@ -57,6 +57,7 @@ export default function ListView() {
     created_by: '',
     date_from: '',
     date_to: '',
+    assigned_to: '',
   });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
   const [showCreate, setShowCreate]           = useState(false);
@@ -179,7 +180,7 @@ export default function ListView() {
         )}
       </div>
 
-      <SearchFilters filters={filters} onChange={setFilters} />
+      <SearchFilters filters={filters} onChange={setFilters} showAssigneeFilter />
 
       {/* Status chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-0.5 flex-shrink-0">
