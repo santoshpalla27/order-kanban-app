@@ -36,10 +36,10 @@ function dayStartUTC(daysOffset: number): string {
 // Returns exclusive-upper-bound UTC ISO ranges for each preset
 function presetToRange(preset: DeliveryPreset): { from: string; to: string } {
   if (preset === 'due')      return { from: '',             to: dayStartUTC(0) };  // before local today
-  if (preset === 'today')    return { from: dayStartUTC(0), to: dayStartUTC(1) };  // local today only
-  if (preset === 'tomorrow') return { from: dayStartUTC(0), to: dayStartUTC(2) };  // today + tomorrow
-  if (preset === '3days')    return { from: dayStartUTC(0), to: dayStartUTC(4) };
-  if (preset === '6days')    return { from: dayStartUTC(0), to: dayStartUTC(7) };
+  if (preset === 'today')    return { from: '',             to: dayStartUTC(1) };  // overdue + today
+  if (preset === 'tomorrow') return { from: '',             to: dayStartUTC(2) };  // overdue + today + tomorrow
+  if (preset === '3days')    return { from: '',             to: dayStartUTC(4) };  // overdue + next 3 days
+  if (preset === '6days')    return { from: '',             to: dayStartUTC(7) };  // overdue + next 6 days
   return { from: '', to: '' };
 }
 
@@ -186,30 +186,17 @@ export default function SearchFilters<T extends BaseFilters>({ filters, onChange
                 ))}
               </div>
               {deliveryPreset === 'custom' && (
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    onChange={(e) => {
-                      if (!e.target.value) { onChange({ ...filters, delivery_from: '' } as T); return; }
-                      const [y, m, d] = e.target.value.split('-').map(Number);
-                      const dt = new Date(y, m - 1, d, 0, 0, 0, 0);
-                      onChange({ ...filters, delivery_from: dt.toISOString() } as T);
-                    }}
-                    className="w-full"
-                    placeholder="From"
-                  />
-                  <input
-                    type="date"
-                    onChange={(e) => {
-                      if (!e.target.value) { onChange({ ...filters, delivery_to: '' } as T); return; }
-                      const [y, m, d] = e.target.value.split('-').map(Number);
-                      const dt = new Date(y, m - 1, d + 1, 0, 0, 0, 0); // exclusive: start of next day
-                      onChange({ ...filters, delivery_to: dt.toISOString() } as T);
-                    }}
-                    className="w-full"
-                    placeholder="To"
-                  />
-                </div>
+                <input
+                  type="date"
+                  onChange={(e) => {
+                    if (!e.target.value) { onChange({ ...filters, delivery_from: '', delivery_to: '' } as T); return; }
+                    const [y, m, d] = e.target.value.split('-').map(Number);
+                    const to = new Date(y, m - 1, d + 1, 0, 0, 0, 0);
+                    onChange({ ...filters, delivery_from: '', delivery_to: to.toISOString() } as T);
+                  }}
+                  className="w-full"
+                  placeholder="Pick a date"
+                />
               )}
             </div>
           )}
