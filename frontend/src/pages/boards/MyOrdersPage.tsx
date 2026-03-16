@@ -55,6 +55,8 @@ export default function MyOrdersPage() {
     date_from: '',
     date_to: '',
     assigned_to: String(user?.id ?? 0),
+    delivery_from: '',
+    delivery_to: '',
   });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
   const queryClient = useQueryClient();
@@ -160,7 +162,7 @@ export default function MyOrdersPage() {
         <h1 className="text-2xl font-bold">My Orders</h1>
       </div>
 
-      <SearchFilters filters={filters} onChange={setFilters} />
+      <SearchFilters filters={filters} onChange={setFilters} showDeliveryFilter />
 
       {/* Status chips */}
       <div className="flex items-center gap-2 overflow-x-auto pb-0.5 flex-shrink-0">
