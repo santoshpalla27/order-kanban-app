@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation, useFocusEffect } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { productApi } from '../api/services'
-import { useBoardStore } from '../store/boardStore'
+import { useAuthStore } from '../store/authStore'
 import type { Product, RootStackParams } from '../types'
 import StatusChip from '../components/StatusChip'
 import FilterPanel, { type FilterState } from '../components/FilterPanel'
@@ -18,15 +18,15 @@ type NavProp = NativeStackNavigationProp<RootStackParams>
 
 const PAGE_SIZE = 20
 
-const STATUS_FILTERS = [
-  { value: '',            label: 'All' },
+const STATUS_TABS = [
+  { value: '',            label: 'All'         },
   { value: 'yet_to_start', label: 'Yet to Start' },
-  { value: 'working',      label: 'In Progress' },
-  { value: 'review',       label: 'In Review' },
-  { value: 'done',         label: 'Done' },
+  { value: 'working',     label: 'In Progress'  },
+  { value: 'review',      label: 'In Review'    },
+  { value: 'done',        label: 'Done'         },
 ]
 
-const ACCENT: Record<string, string> = {
+const TAB_COLOR: Record<string, string> = {
   '':            '#1A56D6',
   yet_to_start:  '#94A3B8',
   working:       '#1A56D6',
@@ -34,16 +34,17 @@ const ACCENT: Record<string, string> = {
   done:          '#16A34A',
 }
 
-function formatDate(iso: string) {
+function formatDate(iso?: string | null) {
+  if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 interface ListState {
-  data:       Product[]
-  total:      number
-  nextCursor: number | null
-  hasMore:    boolean
-  loading:    boolean
+  data:        Product[]
+  total:       number
+  nextCursor:  number | null
+  hasMore:     boolean
+  loading:     boolean
   loadingMore: boolean
 }
 
@@ -61,12 +62,12 @@ function parseRes(res: any): { data: Product[]; total: number; hasMore: boolean;
   }
 }
 
-export default function ListScreen() {
+export default function MyOrdersScreen() {
   const insets = useSafeAreaInsets()
   const nav    = useNavigation<NavProp>()
-  const { removeProductLocally } = useBoardStore()
+  const user   = useAuthStore(s => s.user)
 
-  const [statusFilter,  setStatusFilter]  = useState('')
+  const [statusTab,     setStatusTab]     = useState('')
   const [searchText,    setSearchText]    = useState('')
   const [filterVisible, setFilterVisible] = useState(false)
   const [extraFilters,  setExtraFilters]  = useState<FilterState>({
@@ -77,56 +78,57 @@ export default function ListScreen() {
   const [refreshing, setRefreshing] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const searchRef   = useRef(searchText)
-  searchRef.current = searchText
 
-  const buildParams = (search: string, status: string, f: FilterState, cursor?: number) => {
-    const p: Record<string, any> = { limit: PAGE_SIZE }
+  const buildParams = useCallback((search: string, status: string, f: FilterState, cursor?: number) => {
+    const p: Record<string, any> = {
+      limit: PAGE_SIZE,
+      assigned_to: String(user?.id ?? 0),
+    }
     if (search)          p.search        = search
     if (status)          p.status        = status
     if (f.created_by)    p.created_by    = f.created_by
-    if (f.assigned_to)   p.assigned_to   = f.assigned_to
     if (f.date_from)     p.date_from     = f.date_from
     if (f.date_to)       p.date_to       = f.date_to
     if (f.delivery_from) p.delivery_from = f.delivery_from
     if (f.delivery_to)   p.delivery_to   = f.delivery_to
     if (cursor)          p.cursor        = cursor
     return p
-  }
+  }, [user?.id])
 
-  const fetch = useCallback(async (search: string, status: string, f: FilterState, silent = false) => {
+  const fetch = useCallback(async (
+    search: string, status: string, f: FilterState, silent = false
+  ) => {
     if (!silent) setState(s => ({ ...s, loading: true }))
     try {
       const res: any = await productApi.list(buildParams(search, status, f))
-      const parsed = parseRes(res)
-      setState({ ...parsed, loading: false, loadingMore: false })
+      setState({ ...parseRes(res), loading: false, loadingMore: false })
     } catch {
       setState(s => ({ ...s, loading: false }))
     }
-  }, [])
+  }, [buildParams])
 
   useFocusEffect(useCallback(() => {
-    fetch(searchText, statusFilter, extraFilters)
-  }, [statusFilter, extraFilters]))
+    fetch(searchText, statusTab, extraFilters)
+  }, [statusTab, extraFilters]))
 
   useEffect(() => {
-    fetch(searchText, statusFilter, extraFilters)
-  }, [statusFilter, extraFilters])
+    fetch(searchText, statusTab, extraFilters)
+  }, [statusTab, extraFilters])
 
   const handleSearch = (text: string) => {
     setSearchText(text)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => fetch(text, statusFilter, extraFilters), 350)
+    debounceRef.current = setTimeout(() => fetch(text, statusTab, extraFilters), 350)
   }
 
   const clearSearch = () => {
     setSearchText('')
-    fetch('', statusFilter, extraFilters)
+    fetch('', statusTab, extraFilters)
   }
 
   const onRefresh = async () => {
     setRefreshing(true)
-    await fetch(searchText, statusFilter, extraFilters, true)
+    await fetch(searchText, statusTab, extraFilters, true)
     setRefreshing(false)
   }
 
@@ -134,7 +136,7 @@ export default function ListScreen() {
     if (!state.hasMore || !state.nextCursor || state.loadingMore) return
     setState(s => ({ ...s, loadingMore: true }))
     try {
-      const res: any = await productApi.list(buildParams(searchText, statusFilter, extraFilters, state.nextCursor))
+      const res: any = await productApi.list(buildParams(searchText, statusTab, extraFilters, state.nextCursor))
       const { data: newData, hasMore, nextCursor } = parseRes(res)
       setState(s => ({ ...s, data: [...s.data, ...newData], hasMore, nextCursor, loadingMore: false }))
     } catch {
@@ -144,37 +146,14 @@ export default function ListScreen() {
 
   const handleFilterChange = (f: FilterState) => {
     setExtraFilters(f)
+    setSearchText(f.search || searchText)
   }
 
   const activeFilterCount = [
-    extraFilters.created_by, extraFilters.assigned_to,
+    extraFilters.created_by,
     extraFilters.date_from || extraFilters.date_to,
     extraFilters.delivery_from || extraFilters.delivery_to,
   ].filter(Boolean).length
-
-  const deleteProduct = (product: Product) => {
-    Alert.alert('Delete Order', `Delete ${product.product_id}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          try {
-            await productApi.delete(product.id)
-            removeProductLocally(product.id)
-            setState(s => ({
-              ...s,
-              data:  s.data.filter(p => p.id !== product.id),
-              total: Math.max(0, s.total - 1),
-            }))
-          } catch {
-            Alert.alert('Error', 'Failed to delete order.')
-          }
-        },
-      },
-    ])
-  }
-
-  const accent = ACCENT[statusFilter] ?? '#1A56D6'
 
   const renderItem = ({ item }: { item: Product }) => (
     <TouchableOpacity
@@ -188,53 +167,37 @@ export default function ListScreen() {
           <StatusChip status={item.status} small />
         </View>
         <Text style={styles.customerName} numberOfLines={1}>{item.customer_name}</Text>
-        {!!item.customer_phone && (
-          <Text style={styles.phone}>{item.customer_phone}</Text>
-        )}
-        {!!item.description && (
-          <Text style={styles.desc} numberOfLines={1}>{item.description}</Text>
-        )}
-        <Text style={styles.date}>{formatDate(item.created_at)}</Text>
+        {!!item.customer_phone && <Text style={styles.phone}>{item.customer_phone}</Text>}
+        {!!item.description && <Text style={styles.desc} numberOfLines={1}>{item.description}</Text>}
+        <View style={styles.metaRow}>
+          {item.delivery_at && (
+            <View style={styles.metaTag}>
+              <Ionicons name="calendar-outline" size={10} color="#D97706" />
+              <Text style={styles.metaDelivery}>{formatDate(item.delivery_at)}</Text>
+            </View>
+          )}
+          <Text style={styles.date}>{formatDate(item.created_at)}</Text>
+        </View>
       </View>
-      <View style={styles.rowActions}>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => nav.navigate('ProductDetail', { id: item.id })}
-        >
-          <Ionicons name="eye-outline" size={18} color="#94A3B8" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => deleteProduct(item)}
-        >
-          <Ionicons name="trash-outline" size={16} color="#FDA4A4" />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={styles.viewBtn}
+        onPress={() => nav.navigate('ProductDetail', { id: item.id })}
+      >
+        <Ionicons name="eye-outline" size={18} color="#94A3B8" />
+      </TouchableOpacity>
     </TouchableOpacity>
   )
 
   const ListFooter = () => {
-    if (state.loadingMore) {
-      return (
-        <View style={styles.footerSpinner}>
-          <ActivityIndicator size="small" color="#1A56D6" />
-        </View>
-      )
-    }
-    if (state.hasMore) {
-      return (
-        <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore}>
-          <Text style={styles.loadMoreText}>Load more</Text>
-        </TouchableOpacity>
-      )
-    }
-    if (state.data.length > 0) {
-      return (
-        <View style={styles.endRow}>
-          <Text style={styles.endText}>All {state.total} orders loaded</Text>
-        </View>
-      )
-    }
+    if (state.loadingMore) return <View style={styles.footerSpinner}><ActivityIndicator size="small" color="#1A56D6" /></View>
+    if (state.hasMore) return (
+      <TouchableOpacity style={styles.loadMoreBtn} onPress={loadMore}>
+        <Text style={styles.loadMoreText}>Load more</Text>
+      </TouchableOpacity>
+    )
+    if (state.data.length > 0) return (
+      <View style={styles.endRow}><Text style={styles.endText}>All {state.total} orders loaded</Text></View>
+    )
     return null
   }
 
@@ -243,23 +206,15 @@ export default function ListScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Ionicons name="list" size={22} color="#1A56D6" />
-          <Text style={styles.title}>Orders</Text>
-        </View>
-        <View style={styles.headerRight}>
+          <Ionicons name="person" size={20} color="#1A56D6" />
+          <Text style={styles.title}>My Orders</Text>
           {state.total > 0 && (
             <View style={styles.totalBadge}>
               <Text style={styles.totalText}>{state.total}</Text>
             </View>
           )}
-          <NotifBell />
-          <TouchableOpacity
-            style={styles.addBtn}
-            onPress={() => nav.navigate('CreateEditProduct', {})}
-          >
-            <Ionicons name="add" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
         </View>
+        <NotifBell />
       </View>
 
       {/* Search + Filter */}
@@ -294,23 +249,23 @@ export default function ListScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Status filter chips */}
-      <View style={styles.filterRow}>
+      {/* Status Tabs */}
+      <View style={styles.tabsRow}>
         <FlatList
           horizontal
-          data={STATUS_FILTERS}
-          keyExtractor={f => f.value}
+          data={STATUS_TABS}
+          keyExtractor={t => t.value}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterList}
-          renderItem={({ item: f }) => {
-            const active = statusFilter === f.value
-            const color  = active ? ACCENT[f.value] : '#94A3B8'
+          contentContainerStyle={styles.tabsList}
+          renderItem={({ item: t }) => {
+            const active = statusTab === t.value
+            const color  = active ? TAB_COLOR[t.value] : '#94A3B8'
             return (
               <TouchableOpacity
-                style={[styles.filterChip, active && { borderColor: color, backgroundColor: `${color}12` }]}
-                onPress={() => setStatusFilter(f.value)}
+                style={[styles.tab, active && { borderBottomColor: color, borderBottomWidth: 2 }]}
+                onPress={() => setStatusTab(t.value)}
               >
-                <Text style={[styles.filterChipText, { color }]}>{f.label}</Text>
+                <Text style={[styles.tabText, { color }]}>{t.label}</Text>
               </TouchableOpacity>
             )
           }}
@@ -319,11 +274,8 @@ export default function ListScreen() {
 
       {/* List */}
       {state.loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#1A56D6" />
-        </View>
+        <View style={styles.centered}><ActivityIndicator size="large" color="#1A56D6" /></View>
       ) : (
-        <>
         <FlatList
           data={state.data}
           keyExtractor={p => String(p.id)}
@@ -331,20 +283,15 @@ export default function ListScreen() {
           ListFooterComponent={ListFooter}
           ListEmptyComponent={
             <View style={styles.centered}>
-              <Ionicons name="cube-outline" size={44} color="#E2E8F0" />
-              <Text style={styles.emptyText}>
-                {searchText ? 'No results found' : 'No orders yet'}
-              </Text>
+              <Ionicons name="person-outline" size={44} color="#E2E8F0" />
+              <Text style={styles.emptyText}>No orders assigned to you</Text>
             </View>
           }
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1A56D6" />
-          }
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#1A56D6" />}
           contentContainerStyle={[styles.listContent, state.data.length === 0 && { flex: 1 }]}
           showsVerticalScrollIndicator={false}
           ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
-        </>
       )}
 
       <FilterPanel
@@ -352,6 +299,7 @@ export default function ListScreen() {
         onClose={() => setFilterVisible(false)}
         filters={extraFilters}
         onChange={handleFilterChange}
+        hideAssignedTo
       />
     </View>
   )
@@ -368,17 +316,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
   headerLeft:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   title:       { fontSize: 20, fontWeight: '800', color: '#0F172A' },
   totalBadge: {
     backgroundColor: '#EFF6FF', borderRadius: 12,
     paddingHorizontal: 8, paddingVertical: 3,
   },
   totalText: { fontSize: 12, fontWeight: '700', color: '#1A56D6' },
-  addBtn: {
-    backgroundColor: '#1A56D6', width: 34, height: 34,
-    borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-  },
 
   searchRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -407,45 +350,42 @@ const styles = StyleSheet.create({
   },
   filterBadgeText: { fontSize: 9, color: '#FFFFFF', fontWeight: '700' },
 
-  filterRow: {
+  tabsRow: {
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
-  filterList: { paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
-  filterChip: {
-    borderWidth: 1, borderColor: '#E2E8F0',
-    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 5,
-    backgroundColor: '#FFFFFF',
+  tabsList: { paddingHorizontal: 12 },
+  tab: {
+    paddingHorizontal: 12, paddingVertical: 12,
+    borderBottomWidth: 2, borderBottomColor: 'transparent',
   },
-  filterChipText: { fontSize: 12, fontWeight: '600' },
+  tabText: { fontSize: 13, fontWeight: '600' },
 
   listContent: { paddingHorizontal: 12, paddingTop: 10, paddingBottom: 24 },
   separator:   { height: 6 },
 
   row: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12, padding: 12,
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12,
     flexDirection: 'row', alignItems: 'flex-start',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3, elevation: 1,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 3, elevation: 1,
   },
-  rowMain:    { flex: 1, gap: 3 },
-  rowTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-  productId:  { fontSize: 12, fontWeight: '700', color: '#1A56D6' },
+  rowMain:      { flex: 1, gap: 3 },
+  rowTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  productId:    { fontSize: 12, fontWeight: '700', color: '#1A56D6' },
   customerName: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-  phone:      { fontSize: 12, color: '#64748B' },
-  desc:       { fontSize: 12, color: '#94A3B8' },
-  date:       { fontSize: 11, color: '#CBD5E1', marginTop: 2 },
-  rowActions: { flexDirection: 'row', gap: 4, marginLeft: 8, paddingTop: 2 },
-  actionBtn:  { padding: 5 },
+  phone:        { fontSize: 12, color: '#64748B' },
+  desc:         { fontSize: 12, color: '#94A3B8' },
+  metaRow:      { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
+  metaTag:      { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  metaDelivery: { fontSize: 11, color: '#D97706', fontWeight: '500' },
+  date:         { fontSize: 11, color: '#CBD5E1' },
+  viewBtn:      { padding: 5, marginLeft: 8, paddingTop: 2 },
 
   footerSpinner: { paddingVertical: 16, alignItems: 'center' },
   loadMoreBtn: {
     margin: 12, borderWidth: 1, borderColor: '#E2E8F0',
-    borderRadius: 10, paddingVertical: 12, alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    borderRadius: 10, paddingVertical: 12, alignItems: 'center', backgroundColor: '#FFFFFF',
   },
   loadMoreText: { fontSize: 13, fontWeight: '600', color: '#1A56D6' },
   endRow:       { paddingVertical: 16, alignItems: 'center' },

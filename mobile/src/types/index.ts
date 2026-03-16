@@ -30,9 +30,12 @@ export interface Product {
   customer_phone: string
   description: string
   status: ProductStatus
+  created_by?: number
   creator?: User
+  assignees?: User[]
   attachments?: Attachment[]
   comments?: Comment[]
+  delivery_at?: string | null
   created_at: string
   updated_at?: string
 }
@@ -76,6 +79,7 @@ export interface Attachment {
   file_size: number
   uploader?: User
   uploaded_at: string
+  view_url?: string
 }
 export interface PresignResponse { upload_url: string; s3_key: string }
 
@@ -133,14 +137,14 @@ export interface WsEvent {
 // ─── Navigation ───────────────────────────────────────────────────────────────
 export type RootStackParams = {
   Login: undefined
-  Main: undefined
+  Main: { screen: keyof MainTabParams } | undefined
   ProductDetail: { id: number }
   CreateEditProduct: { id?: number }
   Notifications: undefined
 }
 export type MainTabParams = {
-  Board: undefined
   List: undefined
+  MyOrders: undefined
   Chat: undefined
   Profile: undefined
 }

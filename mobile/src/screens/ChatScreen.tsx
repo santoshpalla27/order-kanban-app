@@ -11,6 +11,7 @@ import { useAuthStore } from '../store/authStore'
 import { userApi, productApi } from '../api/services'
 import type { User, Product, ChatMessage } from '../types'
 import Avatar from '../components/Avatar'
+import NotifBell from '../components/NotifBell'
 
 
 // ─── Token rendering ──────────────────────────────────────────────────────────
@@ -93,7 +94,11 @@ export default function ChatScreen() {
       setTimeout(() => flatRef.current?.scrollToEnd({ animated: false }), 150)
     })
     userApi.list().then(setAllUsers).catch(() => {})
-    // No polling — new messages arrive via WebSocket (useWsEvents in AppNavigator)
+
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => flatRef.current?.scrollToEnd({ animated: true }), 100)
+    })
+    return () => show.remove()
   }, [])
 
   const msgCount = messages.length
@@ -220,15 +225,18 @@ export default function ChatScreen() {
   return (
     <KeyboardAvoidingView
       style={[styles.root, { paddingTop: insets.top }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerIcon}>
-          <Ionicons name="chatbubbles" size={16} color="#FFFFFF" />
+        <View style={styles.headerLeft}>
+          <View style={styles.headerIcon}>
+            <Ionicons name="chatbubbles" size={16} color="#FFFFFF" />
+          </View>
+          <Text style={styles.headerTitle}>Team Chat</Text>
         </View>
-        <Text style={styles.headerTitle}>Team Chat</Text>
+        <NotifBell />
       </View>
 
       {/* Messages */}
@@ -364,12 +372,12 @@ const styles = StyleSheet.create({
   centered:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: {
-    flexDirection: 'row', alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 16, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
-    gap: 10,
   },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerIcon: {
     width: 30, height: 30, borderRadius: 8,
     backgroundColor: '#1A56D6',

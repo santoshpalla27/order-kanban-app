@@ -7,6 +7,21 @@ const PAGE_SIZE = 10
 export const STATUSES = ['yet_to_start', 'working', 'review', 'done'] as const
 export type BoardStatus = typeof STATUSES[number]
 
+export interface BoardFilters {
+  search:        string
+  created_by:    string
+  assigned_to:   string
+  date_from:     string
+  date_to:       string
+  delivery_from: string
+  delivery_to:   string
+}
+
+export const emptyFilters = (): BoardFilters => ({
+  search: '', created_by: '', assigned_to: '',
+  date_from: '', date_to: '', delivery_from: '', delivery_to: '',
+})
+
 export interface ColumnState {
   data:          Product[]
   total:         number
@@ -21,14 +36,16 @@ const emptyColumn = (): ColumnState => ({
 })
 
 interface BoardState {
-  columns:     Record<string, ColumnState>
-  search:      string
+  columns:      Record<string, ColumnState>
+  filters:      BoardFilters
   isRefreshing: boolean
-  error:       string | null
-  fetchAll:    (search?: string) => Promise<void>
-  loadMore:    (status: string) => Promise<void>
-  refresh:     () => Promise<void>
-  setSearch:   (q: string) => void
+  error:        string | null
+  fetchAll:     (filters?: Partial<BoardFilters>) => Promise<void>
+  loadMore:     (status: string) => Promise<void>
+  refresh:      () => Promise<void>
+  setSearch:    (q: string) => void
+  setFilters:   (f: Partial<BoardFilters>) => void
+  resetFilters: () => void
   updateProductLocally: (p: Product) => void
   removeProductLocally: (id: number) => void
   addProductLocally:    (p: Product) => void
@@ -41,15 +58,26 @@ const parseRes = (res: any) => ({
   nextCursor: Array.isArray(res) ? null : (res.next_cursor ?? null),
 })
 
+function toApiParams(f: BoardFilters, status: string) {
+  const p: Record<string, string | number> = { limit: PAGE_SIZE, status }
+  if (f.search)        p.search        = f.search
+  if (f.created_by)    p.created_by    = f.created_by
+  if (f.assigned_to)   p.assigned_to   = f.assigned_to
+  if (f.date_from)     p.date_from     = f.date_from
+  if (f.date_to)       p.date_to       = f.date_to
+  if (f.delivery_from) p.delivery_from = f.delivery_from
+  if (f.delivery_to)   p.delivery_to   = f.delivery_to
+  return p
+}
+
 export const useBoardStore = create<BoardState>((set, get) => ({
   columns:      Object.fromEntries(STATUSES.map(s => [s, emptyColumn()])),
-  search:       '',
+  filters:      emptyFilters(),
   isRefreshing: false,
   error:        null,
 
-  fetchAll: async (search) => {
-    const q = search ?? get().search
-    // Mark all columns as loading
+  fetchAll: async (overrideFilters) => {
+    const f = overrideFilters ? { ...get().filters, ...overrideFilters } : get().filters
     set(s => ({
       error: null,
       columns: Object.fromEntries(
@@ -59,11 +87,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
     await Promise.all(STATUSES.map(async (status) => {
       try {
-        const res: any = await productApi.list({
-          status,
-          search: q || undefined,
-          limit: PAGE_SIZE,
-        })
+        const res: any = await productApi.list(toApiParams(f, status) as any)
         const { data, total, hasMore, nextCursor } = parseRes(res)
         set(s => ({
           columns: {
@@ -86,12 +110,8 @@ export const useBoardStore = create<BoardState>((set, get) => ({
       columns: { ...s.columns, [status]: { ...s.columns[status], isLoadingMore: true } },
     }))
     try {
-      const res: any = await productApi.list({
-        status,
-        search: get().search || undefined,
-        limit: PAGE_SIZE,
-        cursor: col.nextCursor,
-      })
+      const params = { ...toApiParams(get().filters, status), cursor: col.nextCursor } as any
+      const res: any = await productApi.list(params)
       const { data: newData, hasMore, nextCursor } = parseRes(res)
       set(s => ({
         columns: {
@@ -119,8 +139,21 @@ export const useBoardStore = create<BoardState>((set, get) => ({
   },
 
   setSearch: (q) => {
-    set({ search: q })
-    get().fetchAll(q || undefined)
+    const f = { ...get().filters, search: q }
+    set({ filters: f })
+    get().fetchAll(f)
+  },
+
+  setFilters: (partial) => {
+    const f = { ...get().filters, ...partial }
+    set({ filters: f })
+    get().fetchAll(f)
+  },
+
+  resetFilters: () => {
+    const f = emptyFilters()
+    set({ filters: f })
+    get().fetchAll(f)
   },
 
   updateProductLocally: (p) =>
@@ -130,14 +163,12 @@ export const useBoardStore = create<BoardState>((set, get) => ({
           const col   = s.columns[status]
           const hadIt = col.data.some(x => x.id === p.id)
           if (p.status === status) {
-            // Correct column: update in-place or insert at top if moved here
             return [status, {
               ...col,
               data:  hadIt ? col.data.map(x => x.id === p.id ? p : x) : [p, ...col.data],
               total: hadIt ? col.total : col.total + 1,
             }]
           } else {
-            // Wrong column: remove if it was here (status changed away)
             return [status, {
               ...col,
               data:  col.data.filter(x => x.id !== p.id),
@@ -152,7 +183,7 @@ export const useBoardStore = create<BoardState>((set, get) => ({
     set(s => ({
       columns: Object.fromEntries(
         STATUSES.map(status => {
-          const col = s.columns[status]
+          const col   = s.columns[status]
           const hadIt = col.data.some(x => x.id === id)
           return [
             status,

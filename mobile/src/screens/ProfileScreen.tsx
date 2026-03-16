@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuthStore } from '../store/authStore'
 import { userApi } from '../api/services'
+import NotifBell from '../components/NotifBell'
 
 const AVATAR_COLORS = ['#6366F1','#8B5CF6','#EC4899','#F59E0B','#10B981','#3B82F6','#EF4444','#14B8A6']
 
@@ -80,16 +81,19 @@ export default function ProfileScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Profile</Text>
-        {!editing ? (
-          <TouchableOpacity style={styles.editBtn} onPress={handleEdit}>
-            <Ionicons name="create-outline" size={18} color="#1A56D6" />
-            <Text style={styles.editBtnText}>Edit</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.editBtn} onPress={handleCancel}>
-            <Text style={styles.cancelText}>Cancel</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerRight}>
+          <NotifBell />
+          {!editing ? (
+            <TouchableOpacity style={styles.editBtn} onPress={handleEdit}>
+              <Ionicons name="create-outline" size={18} color="#1A56D6" />
+              <Text style={styles.editBtnText}>Edit</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.editBtn} onPress={handleCancel}>
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <ScrollView
@@ -224,6 +228,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#F1F5F9',
   },
   title:      { fontSize: 20, fontWeight: '800', color: '#0F172A' },
+  headerRight:{ flexDirection: 'row', alignItems: 'center', gap: 8 },
   editBtn:    { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 4 },
   editBtnText:{ fontSize: 14, fontWeight: '600', color: '#1A56D6' },
   cancelText: { fontSize: 14, fontWeight: '600', color: '#94A3B8' },

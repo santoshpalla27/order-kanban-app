@@ -6,8 +6,11 @@ import {
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useNotifStore } from '../store/notificationStore'
-import type { Notification } from '../types'
+import type { Notification, RootStackParams } from '../types'
+
+type NavProp = NativeStackNavigationProp<RootStackParams>
 
 function formatRelative(iso: string) {
   const diff = Date.now() - new Date(iso).getTime()
@@ -37,7 +40,7 @@ const STATUS_FILTERS = [
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets()
-  const nav    = useNavigation()
+  const nav    = useNavigation<NavProp>()
 
   const {
     notifications, isLoading, hasMore,
@@ -72,6 +75,15 @@ export default function NotificationsScreen() {
     setMarkingAll(false)
   }
 
+  const handleTap = useCallback(async (n: Notification) => {
+    if (!n.is_read) await markRead(n.id)
+    if (n.entity_type === 'product' && n.entity_id) {
+      nav.navigate('ProductDetail', { id: n.entity_id })
+    } else if (n.entity_type === 'chat') {
+      nav.navigate('Main', { screen: 'Chat' })
+    }
+  }, [markRead, nav])
+
   const filtered = notifications.filter(n => {
     if (statusFilter === 'unread' && n.is_read)  return false
     if (statusFilter === 'read'   && !n.is_read) return false
@@ -82,12 +94,17 @@ export default function NotificationsScreen() {
   const unreadCount = notifications.filter(n => !n.is_read).length
 
   const renderItem = useCallback(({ item: n }: { item: Notification }) => {
-    const icon = TYPE_ICON[n.type] ?? 'notifications-outline'
+    const icon       = TYPE_ICON[n.type] ?? 'notifications-outline'
+    const isProduct  = n.entity_type === 'product' && !!n.entity_id
+    const isChat     = n.entity_type === 'chat'
+    const hasLink    = isProduct || isChat
+    const linkLabel  = isChat ? 'Go to Team Chat →' : 'Go to product →'
+
     return (
       <TouchableOpacity
-        style={[styles.item, !n.is_read && styles.itemUnread]}
-        onPress={() => !n.is_read && markRead(n.id)}
-        activeOpacity={0.75}
+        style={[styles.item, !n.is_read && styles.itemUnread, hasLink && styles.itemTappable]}
+        onPress={() => handleTap(n)}
+        activeOpacity={hasLink ? 0.7 : 1}
       >
         {/* Icon */}
         <View style={[styles.iconBox, !n.is_read && styles.iconBoxUnread]}>
@@ -99,6 +116,9 @@ export default function NotificationsScreen() {
           <Text style={[styles.itemMessage, !n.is_read && styles.itemMessageUnread]} numberOfLines={3}>
             {n.message}
           </Text>
+          {hasLink && (
+            <Text style={styles.linkHint}>{linkLabel}</Text>
+          )}
           <View style={styles.itemMeta}>
             {!!n.type && (
               <View style={styles.typeBadge}>
@@ -113,7 +133,7 @@ export default function NotificationsScreen() {
         {!n.is_read && <View style={styles.unreadDot} />}
       </TouchableOpacity>
     )
-  }, [markRead])
+  }, [handleTap])
 
   const ListFooter = () => {
     if (loadingMore) return (
@@ -287,7 +307,9 @@ const styles = StyleSheet.create({
     gap: 12,
     borderBottomWidth: 1, borderBottomColor: '#F8FAFC',
   },
-  itemUnread: { backgroundColor: '#F8FBFF' },
+  itemUnread:   { backgroundColor: '#F8FBFF' },
+  itemTappable: { borderLeftWidth: 3, borderLeftColor: 'transparent' },
+  linkHint:     { fontSize: 11, color: '#1A56D6', fontWeight: '600', marginTop: 3 },
 
   iconBox: {
     width: 36, height: 36, borderRadius: 10,

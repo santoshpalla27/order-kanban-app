@@ -10,17 +10,25 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useBoardStore, STATUSES } from '../store/boardStore'
 import { useNotifStore } from '../store/notificationStore'
 import KanbanColumn from '../components/KanbanColumn'
+import FilterPanel from '../components/FilterPanel'
 import type { RootStackParams } from '../types'
 
 export default function BoardScreen() {
   const insets = useSafeAreaInsets()
   const nav    = useNavigation<NativeStackNavigationProp<RootStackParams>>()
 
-  const { columns, isRefreshing, fetchAll, loadMore, refresh, setSearch } = useBoardStore()
+  const { columns, filters, isRefreshing, fetchAll, loadMore, refresh, setSearch, setFilters, resetFilters } = useBoardStore()
   const unreadNotif = useNotifStore(s => s.unreadCount)
 
-  const [searchText, setSearchText] = useState('')
+  const [searchText,    setSearchText]    = useState('')
+  const [filterVisible, setFilterVisible] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  const activeFilterCount = [
+    filters.created_by, filters.assigned_to,
+    filters.date_from || filters.date_to,
+    filters.delivery_from || filters.delivery_to,
+  ].filter(Boolean).length
 
   useEffect(() => {
     fetchAll()
@@ -60,7 +68,7 @@ export default function BoardScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Search + Add */}
+      {/* Search + Filter + Add */}
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
           <Ionicons name="search-outline" size={16} color="#94A3B8" style={{ marginRight: 6 }} />
@@ -79,6 +87,17 @@ export default function BoardScreen() {
             </TouchableOpacity>
           )}
         </View>
+        <TouchableOpacity
+          style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
+          onPress={() => setFilterVisible(true)}
+        >
+          <Ionicons name="options-outline" size={18} color={activeFilterCount > 0 ? '#1A56D6' : '#64748B'} />
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.addBtn}
           onPress={() => nav.navigate('CreateEditProduct', {})}
@@ -114,6 +133,15 @@ export default function BoardScreen() {
           />
         ))}
       </ScrollView>
+
+      <FilterPanel
+        visible={filterVisible}
+        onClose={() => setFilterVisible(false)}
+        filters={{ ...filters, search: searchText }}
+        onChange={(f) => {
+          setFilters({ ...f, search: searchText })
+        }}
+      />
     </View>
   )
 }
@@ -152,6 +180,19 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
+  filterBtn: {
+    width: 38, height: 38, borderRadius: 10,
+    borderWidth: 1, borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  filterBtnActive: { borderColor: '#BFDBFE', backgroundColor: '#EFF6FF' },
+  filterBadge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: '#1A56D6', borderRadius: 8,
+    minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3,
+  },
+  filterBadgeText: { fontSize: 9, color: '#FFFFFF', fontWeight: '700' },
   searchBox: {
     flex: 1,
     flexDirection: 'row',

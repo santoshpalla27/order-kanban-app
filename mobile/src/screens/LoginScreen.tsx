@@ -53,8 +53,16 @@ export default function LoginScreen() {
         {/* White card */}
         <View style={[styles.card, { paddingBottom: insets.bottom + 32 }]}>
 
-          {/* Error banner */}
-          {error ? (
+          {/* Pending approval banner */}
+          {error === 'Account pending approval' ? (
+            <View style={styles.pendingBanner}>
+              <Ionicons name="time-outline" size={20} color="#92400E" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pendingTitle}>Awaiting Approval</Text>
+                <Text style={styles.pendingText}>Your account is registered. An admin needs to approve it before you can sign in.</Text>
+              </View>
+            </View>
+          ) : error ? (
             <View style={styles.errorBanner}>
               <Ionicons name="alert-circle-outline" size={16} color="#DC2626" />
               <Text style={styles.errorText}>{error}</Text>
@@ -156,6 +164,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     flex: 1,
   },
+
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 20,
+  },
+  pendingTitle: { fontSize: 13, fontWeight: '700', color: '#92400E', marginBottom: 2 },
+  pendingText:  { fontSize: 12, color: '#92400E', lineHeight: 17 },
 
   errorBanner: {
     flexDirection: 'row',
