@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { notificationsApi } from '../../api/client';
+import { formatDate, formatDateTime } from '../../utils/date';
 import { Notification } from '../../types';
 import { useThemeStore } from '../../store/themeStore';
 import {
@@ -16,14 +17,11 @@ function formatRelative(dateStr: string) {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d ago`;
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatDate(dateStr);
 }
 
 function formatFull(dateStr: string) {
-  return new Date(dateStr).toLocaleString(undefined, {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  });
+  return formatDateTime(dateStr);
 }
 
 const PAGE_SIZE = 50;

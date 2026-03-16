@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { activityApi } from '../api/client';
+import { formatDate } from '../utils/date';
 import {
   Plus, Trash2, RefreshCw, Edit3, ShieldCheck, X, Activity, ArrowRight,
 } from 'lucide-react';
@@ -39,7 +40,7 @@ function formatRelative(dateStr: string) {
   if (h < 24) return `${h}h ago`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d ago`;
-  return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return formatDate(dateStr);
 }
 
 function getAvatarColor(name: string) {

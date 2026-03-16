@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chatApi } from '../../api/client';
+import { formatDate, formatTime } from '../../utils/date';
 import { useAuthStore } from '../../store/authStore';
 import { useChatStore } from '../../store/chatStore';
 import { ChatMessage } from '../../types';
@@ -137,7 +138,7 @@ export default function ChatPage() {
   };
 
   const formatTime = (dateStr: string) =>
-    new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    formatTime(dateStr);
 
   const formatDateSep = (dateStr: string) => {
     const d = new Date(dateStr);
@@ -146,7 +147,7 @@ export default function ChatPage() {
     const yesterday = new Date(today);
     yesterday.setDate(today.getDate() - 1);
     if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
-    return d.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+    return formatDate(d);
   };
 
   // Pre-process messages: compute grouping info

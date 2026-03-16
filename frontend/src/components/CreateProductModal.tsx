@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { productsApi } from '../api/client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { productsApi, usersApi } from '../api/client';
+import { User } from '../types';
 import { X, Package } from 'lucide-react';
 
 interface Props {
@@ -12,8 +13,16 @@ export default function CreateProductModal({ onClose }: Props) {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [description, setDescription] = useState('');
+  const [deliveryAt, setDeliveryAt] = useState('');
+  const [assignedTo, setAssignedTo] = useState('');
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
+
+  const { data: usersData } = useQuery({
+    queryKey: ['users-list'],
+    queryFn: () => usersApi.getList(),
+  });
+  const users: User[] = usersData?.data || [];
 
   const mutation = useMutation({
     mutationFn: (data: any) => productsApi.create(data),
@@ -33,6 +42,8 @@ export default function CreateProductModal({ onClose }: Props) {
       customer_name: customerName,
       customer_phone: customerPhone,
       description,
+      delivery_at: deliveryAt ? new Date(deliveryAt).toISOString() : null,
+      assigned_to: assignedTo ? Number(assignedTo) : null,
     });
   };
 
@@ -100,6 +111,30 @@ export default function CreateProductModal({ onClose }: Props) {
               rows={3}
               className="w-full resize-none"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-surface-300 mb-1.5">Delivery Date & Time</label>
+            <input
+              type="datetime-local"
+              value={deliveryAt}
+              onChange={(e) => setDeliveryAt(e.target.value)}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-surface-300 mb-1.5">Assign To</label>
+            <select
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="w-full"
+            >
+              <option value="">Unassigned</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
+            </select>
           </div>
 
           <div className="flex gap-3 pt-2">

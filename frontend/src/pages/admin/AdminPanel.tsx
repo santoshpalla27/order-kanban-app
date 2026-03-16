@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '../../api/client';
+import { formatDate } from '../../utils/date';
 import { User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { Users, UserPlus, Trash2, Shield, X, AlertTriangle } from 'lucide-react';
@@ -139,7 +140,7 @@ export default function AdminPanel() {
                       </select>
                     </td>
                     <td className="px-6 py-4 text-sm text-surface-500">
-                      {new Date(u.created_at).toLocaleDateString()}
+                      {formatDate(u.created_at)}
                     </td>
                     <td className="px-6 py-4 text-right">
                       {u.id !== currentUser?.id ? (

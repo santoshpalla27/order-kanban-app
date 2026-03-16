@@ -11,6 +11,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy-load non-critical routes — each becomes a separate JS chunk
 const ListView = lazy(() => import('./pages/boards/ListView'));
+const MyOrdersPage = lazy(() => import('./pages/boards/MyOrdersPage'));
 const ChatPage = lazy(() => import('./pages/chat/ChatPage'));
 const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 const TrashPage = lazy(() => import('./pages/boards/TrashPage'));
@@ -88,6 +89,7 @@ export default function App() {
               {/* KanbanBoard is the landing page — keep it eager */}
               <Route path="/" element={<KanbanBoard />} />
               <Route path="/list" element={<LazyRoute><ListView /></LazyRoute>} />
+              <Route path="/my-orders" element={<LazyRoute><MyOrdersPage /></LazyRoute>} />
               <Route path="/chat" element={<LazyRoute><ChatPage /></LazyRoute>} />
               <Route path="/activity" element={<LazyRoute><ActivityPage /></LazyRoute>} />
               <Route path="/notifications" element={<LazyRoute><NotificationsPage /></LazyRoute>} />

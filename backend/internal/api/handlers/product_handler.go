@@ -48,6 +48,11 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 			filter.CreatedBy = uint(id)
 		}
 	}
+	if assignedToStr := c.Query("assigned_to"); assignedToStr != "" {
+		if id, err := strconv.ParseUint(assignedToStr, 10, 32); err == nil {
+			filter.AssignedTo = uint(id)
+		}
+	}
 
 	// When limit is absent the Kanban board gets the full list (existing behaviour).
 	// When limit is present the list view gets a cursor-paginated page.
@@ -123,6 +128,8 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 		CustomerName:  req.CustomerName,
 		CustomerPhone: req.CustomerPhone,
 		Description:   req.Description,
+		DeliveryAt:    req.DeliveryAt,
+		AssignedTo:    req.AssignedTo,
 		Status:        "yet_to_start",
 		CreatedBy:     userID,
 	}
@@ -182,6 +189,8 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	// Allow clearing optional fields by always setting them when present in the request
 	updates["customer_phone"] = req.CustomerPhone
 	updates["description"] = req.Description
+	updates["delivery_at"] = req.DeliveryAt
+	updates["assigned_to"] = req.AssignedTo
 
 	if err := services.UpdateProduct(uint(id), updates); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update product"})

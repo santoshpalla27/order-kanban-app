@@ -13,6 +13,7 @@ import ProfileModal from './ProfileModal';
 import {
   LayoutDashboard,
   List,
+  ClipboardList,
   MessageSquare,
   Users,
   Bell,
@@ -109,6 +110,7 @@ export default function Layout() {
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Kanban Board' },
     { to: '/list', icon: List, label: 'List View' },
+    { to: '/my-orders', icon: ClipboardList, label: 'My Orders' },
     { to: '/chat', icon: MessageSquare, label: 'Team Chat' },
     ...(isAdmin() ? [{ to: '/admin', icon: Users, label: 'Admin Panel' }] : []),
     ...(canAccessTrash() ? [{ to: '/trash', icon: Trash2, label: 'Trash' }] : []),

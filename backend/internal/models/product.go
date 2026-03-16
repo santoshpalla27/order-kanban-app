@@ -17,8 +17,11 @@ type Product struct {
 	Status        string         `json:"status" gorm:"default:yet_to_start;not null"`
 	CreatedBy     uint           `json:"created_by" gorm:"not null"`
 	Creator       User           `json:"creator" gorm:"foreignKey:CreatedBy"`
+	AssignedTo    *uint          `json:"assigned_to"`
+	Assignee      *User          `json:"assignee" gorm:"foreignKey:AssignedTo"`
 	Attachments   []Attachment   `json:"attachments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
 	Comments      []Comment      `json:"comments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
+	DeliveryAt    *time.Time     `json:"delivery_at"`
 	DeletedBy     uint           `json:"deleted_by" gorm:"default:0"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
@@ -26,17 +29,21 @@ type Product struct {
 }
 
 type CreateProductRequest struct {
-	ProductID     string `json:"product_id" binding:"required"`
-	CustomerName  string `json:"customer_name" binding:"required"`
-	CustomerPhone string `json:"customer_phone"`
-	Description   string `json:"description"`
+	ProductID     string     `json:"product_id" binding:"required"`
+	CustomerName  string     `json:"customer_name" binding:"required"`
+	CustomerPhone string     `json:"customer_phone"`
+	Description   string     `json:"description"`
+	DeliveryAt    *time.Time `json:"delivery_at"`
+	AssignedTo    *uint      `json:"assigned_to"`
 }
 
 type UpdateProductRequest struct {
-	ProductID     string `json:"product_id"`
-	CustomerName  string `json:"customer_name"`
-	CustomerPhone string `json:"customer_phone"`
-	Description   string `json:"description"`
+	ProductID     string     `json:"product_id"`
+	CustomerName  string     `json:"customer_name"`
+	CustomerPhone string     `json:"customer_phone"`
+	Description   string     `json:"description"`
+	DeliveryAt    *time.Time `json:"delivery_at"`
+	AssignedTo    *uint      `json:"assigned_to"`
 }
 
 type UpdateStatusRequest struct {

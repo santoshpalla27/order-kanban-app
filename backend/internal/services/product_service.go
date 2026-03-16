@@ -14,11 +14,12 @@ import (
 const gracePeriodDays = 10
 
 type ProductFilter struct {
-	Status    string
-	CreatedBy uint
-	Search    string
-	DateFrom  string
-	DateTo    string
+	Status     string
+	CreatedBy  uint
+	AssignedTo uint
+	Search     string
+	DateFrom   string
+	DateTo     string
 }
 
 // ProductCursorPage is returned by GetProductsCursor for paginated list views.
@@ -37,6 +38,9 @@ func applyProductFilters(query *gorm.DB, filter ProductFilter) *gorm.DB {
 	if filter.CreatedBy > 0 {
 		query = query.Where("created_by = ?", filter.CreatedBy)
 	}
+	if filter.AssignedTo > 0 {
+		query = query.Where("assigned_to = ?", filter.AssignedTo)
+	}
 	if filter.Search != "" {
 		search := "%" + filter.Search + "%"
 		query = query.Where("product_id ILIKE ? OR customer_name ILIKE ? OR description ILIKE ?", search, search, search)
@@ -54,7 +58,7 @@ func applyProductFilters(query *gorm.DB, filter ProductFilter) *gorm.DB {
 // Used by the Kanban board which loads the full list once.
 func GetProducts(filter ProductFilter) ([]models.Product, error) {
 	query := applyProductFilters(
-		database.DB.Preload("Creator").Preload("Creator.Role"),
+		database.DB.Preload("Creator").Preload("Creator.Role").Preload("Assignee").Preload("Assignee.Role"),
 		filter,
 	)
 	var products []models.Product
@@ -68,7 +72,7 @@ func GetProducts(filter ProductFilter) ([]models.Product, error) {
 // are identical (e.g. bulk imports).
 func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCursorPage, error) {
 	query := applyProductFilters(
-		database.DB.Preload("Creator").Preload("Creator.Role"),
+		database.DB.Preload("Creator").Preload("Creator.Role").Preload("Assignee").Preload("Assignee.Role"),
 		filter,
 	)
 	if cursor > 0 {
@@ -102,6 +106,7 @@ func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCur
 func GetProductByID(id uint) (*models.Product, error) {
 	var product models.Product
 	err := database.DB.Preload("Creator").Preload("Creator.Role").
+		Preload("Assignee").Preload("Assignee.Role").
 		Preload("Attachments").Preload("Attachments.Uploader").
 		Preload("Comments").Preload("Comments.User").
 		First(&product, id).Error
@@ -110,7 +115,8 @@ func GetProductByID(id uint) (*models.Product, error) {
 
 func GetProductByIDSimple(id uint) (*models.Product, error) {
 	var product models.Product
-	err := database.DB.Preload("Creator").Preload("Creator.Role").First(&product, id).Error
+	err := database.DB.Preload("Creator").Preload("Creator.Role").
+		Preload("Assignee").Preload("Assignee.Role").First(&product, id).Error
 	return &product, err
 }
 
@@ -175,6 +181,7 @@ func GetDeletedProducts() ([]models.Product, error) {
 	graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
 	err := database.DB.Unscoped().
 		Preload("Creator").Preload("Creator.Role").
+		Preload("Assignee").Preload("Assignee.Role").
 		Where("deleted_at IS NOT NULL AND deleted_at > ?", graceCutoff).
 		Order("deleted_at DESC").
 		Find(&products).Error

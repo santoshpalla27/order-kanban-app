@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productsApi, attachmentsApi, commentsApi } from '../api/client';
+import { productsApi, attachmentsApi, commentsApi, usersApi } from '../api/client';
+import { formatDate, formatDateTime, formatTime } from '../utils/date';
 import { useAuthStore } from '../store/authStore';
 import { Product, Attachment, Comment, STATUS_LABELS, STATUS_ORDER } from '../types';
 import MentionInput, { renderWithMentions, MentionInputHandle } from './MentionInput';
@@ -355,7 +356,13 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
   const queryClient = useQueryClient();
   const { canCreateProduct } = useAuthStore();
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ product_id: '', customer_name: '', customer_phone: '', description: '' });
+  const [editForm, setEditForm] = useState({ product_id: '', customer_name: '', customer_phone: '', description: '', delivery_at: '', assigned_to: '' });
+
+  const { data: usersData } = useQuery({
+    queryKey: ['users-list'],
+    queryFn: () => usersApi.getList(),
+  });
+  const usersList = usersData?.data || [];
   const [editError, setEditError] = useState<string | null>(null);
 
   const startEdit = () => {
@@ -364,6 +371,8 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
       customer_name: product.customer_name,
       customer_phone: product.customer_phone || '',
       description: product.description || '',
+      delivery_at: product.delivery_at ? new Date(product.delivery_at).toISOString().slice(0, 16) : '',
+      assigned_to: product.assigned_to != null ? String(product.assigned_to) : '',
     });
     setEditError(null);
     setEditing(true);
@@ -384,7 +393,11 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editForm.product_id.trim() || !editForm.customer_name.trim()) return;
-    editMutation.mutate(editForm);
+    editMutation.mutate({
+      ...editForm,
+      delivery_at: editForm.delivery_at ? new Date(editForm.delivery_at).toISOString() : null,
+      assigned_to: editForm.assigned_to ? Number(editForm.assigned_to) : null,
+    } as any);
   };
 
   return (
@@ -438,6 +451,28 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
                 className="text-sm resize-none"
               />
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-surface-500 uppercase tracking-wider">Delivery Date & Time</label>
+              <input
+                type="datetime-local"
+                value={editForm.delivery_at}
+                onChange={(e) => setEditForm(f => ({ ...f, delivery_at: e.target.value }))}
+                className="text-sm"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-surface-500 uppercase tracking-wider">Assign To</label>
+              <select
+                value={editForm.assigned_to}
+                onChange={(e) => setEditForm(f => ({ ...f, assigned_to: e.target.value }))}
+                className="text-sm"
+              >
+                <option value="">Unassigned</option>
+                {usersList.map((u: any) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </div>
             {editError && <p className="text-xs text-red-400">{editError}</p>}
             <div className="flex gap-2">
               <button type="button" onClick={() => setEditing(false)} className="btn-ghost px-4 py-2 text-sm flex-1" disabled={editMutation.isPending}>
@@ -454,10 +489,12 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
             <DetailRow label="Customer Name" value={product.customer_name} />
             <DetailRow label="Customer Phone" value={product.customer_phone || '—'} />
             <DetailRow label="Description" value={product.description || '—'} />
+            <DetailRow label="Delivery Date & Time" value={product.delivery_at ? formatDateTime(product.delivery_at) : '—'} />
+            <DetailRow label="Assigned To" value={product.assignee?.name || '—'} />
           </>
         )}
         <DetailRow label="Created By" value={product.creator?.name || '—'} />
-        <DetailRow label="Created At" value={new Date(product.created_at).toLocaleString()} />
+        <DetailRow label="Created At" value={formatDateTime(product.created_at)} />
       </div>
       <div className="border-t border-surface-700/50 pt-4">
         <div className="flex items-center justify-between mb-3">
@@ -614,7 +651,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
                 return (
                   <div key={att.id} className="group flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors">
                     <div className="w-10 h-10 rounded-lg bg-surface-700 flex items-center justify-center flex-shrink-0"><Icon className="w-5 h-5 text-surface-400" /></div>
-                    <div className="flex-1 min-w-0"><p className="text-sm truncate">{att.file_name}</p><p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name} · {new Date(att.uploaded_at).toLocaleDateString()}</p></div>
+                    <div className="flex-1 min-w-0"><p className="text-sm truncate">{att.file_name}</p><p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name} · {formatDate(att.uploaded_at)}</p></div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button onClick={() => onCommentAttachment(att)} className="btn-ghost p-1.5 rounded-lg" title="Comment"><MessageSquare className="w-3.5 h-3.5" /></button>
                       <button onClick={() => downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true)} className="btn-ghost p-1.5 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
@@ -877,7 +914,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
                   <div className={`flex items-baseline gap-2 mb-1 px-1 ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
                     {!isOwn && <span className="text-[11px] font-medium text-surface-400">{c.user?.name}</span>}
                     <span className="text-[10px] text-surface-500">
-                      {new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatTime(c.created_at)}
                     </span>
                   </div>
 
