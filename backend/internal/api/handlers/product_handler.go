@@ -53,7 +53,8 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 			filter.AssignedTo = uint(id)
 		}
 	}
-	filter.DeliveryBefore = c.Query("delivery_before")
+	filter.DeliveryFrom = c.Query("delivery_from")
+	filter.DeliveryTo = c.Query("delivery_to")
 
 	// When limit is absent the Kanban board gets the full list (existing behaviour).
 	// When limit is present the list view gets a cursor-paginated page.

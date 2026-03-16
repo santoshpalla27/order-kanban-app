@@ -58,7 +58,8 @@ export default function ListView() {
     date_from: '',
     date_to: '',
     assigned_to: '',
-    delivery_before: '',
+    delivery_from: '',
+    delivery_to: '',
   });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
   const [showCreate, setShowCreate]           = useState(false);

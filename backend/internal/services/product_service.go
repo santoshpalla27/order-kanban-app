@@ -20,7 +20,8 @@ type ProductFilter struct {
 	Search         string
 	DateFrom       string
 	DateTo         string
-	DeliveryBefore string
+	DeliveryFrom string
+	DeliveryTo   string
 }
 
 // ProductCursorPage is returned by GetProductsCursor for paginated list views.
@@ -52,8 +53,11 @@ func applyProductFilters(query *gorm.DB, filter ProductFilter) *gorm.DB {
 	if filter.DateTo != "" {
 		query = query.Where("created_at <= ?", filter.DateTo)
 	}
-	if filter.DeliveryBefore != "" {
-		query = query.Where("DATE(delivery_at) <= ?", filter.DeliveryBefore)
+	if filter.DeliveryFrom != "" {
+		query = query.Where("delivery_at >= ?", filter.DeliveryFrom)
+	}
+	if filter.DeliveryTo != "" {
+		query = query.Where("delivery_at < ?", filter.DeliveryTo)
 	}
 	return query
 }
