@@ -8,6 +8,7 @@ import ProductDetailModal from '../../components/ProductDetailModal';
 import CreateProductModal from '../../components/CreateProductModal';
 import SearchFilters from '../../components/SearchFilters';
 import { Plus, Eye, Trash2, Loader2, ChevronDown } from 'lucide-react';
+import { useOrdersCommentStore } from '../../store/ordersCommentStore';
 
 const PAGE_SIZE = 50;
 
@@ -62,6 +63,8 @@ export default function ListView() {
     delivery_to: '',
   });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
+  const unreadProductIds = useOrdersCommentStore((s) => s.unreadProductIds);
+  const clearProduct = useOrdersCommentStore((s) => s.clearProduct);
   const [showCreate, setShowCreate]           = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const { canCreateProduct, canDeleteProduct } = useAuthStore();
@@ -256,8 +259,11 @@ export default function ListView() {
                     }}
                     className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_160px_60px] border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors"
                   >
-                    <div className="px-4 py-3 flex items-center min-w-0">
+                    <div className="px-4 py-3 flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
+                      {unreadProductIds[product.id] && (
+                        <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New comment" />
+                      )}
                     </div>
                     <div className="px-4 py-3 flex items-center text-sm truncate min-w-0">{product.customer_name}</div>
                     <div className="px-4 py-3 items-center text-sm text-surface-400 hidden md:flex truncate min-w-0">
@@ -269,7 +275,7 @@ export default function ListView() {
                         : '—'}
                     </div>
                     <div className="px-4 py-3 flex items-center justify-center">
-                      <button onClick={() => setSelectedProduct(product.id)} className="btn-ghost p-1.5 rounded-lg" title="View details">
+                      <button onClick={() => { setSelectedProduct(product.id); clearProduct(product.id); }} className="btn-ghost p-1.5 rounded-lg" title="View details">
                         <Eye className="w-4 h-4" />
                       </button>
                     </div>

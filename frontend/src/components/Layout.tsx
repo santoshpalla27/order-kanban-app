@@ -92,7 +92,7 @@ export default function Layout() {
   });
   const unreadCount = unreadData?.data?.count || 0;
   const unreadChatCount = useChatStore((s) => s.unreadCount);
-  const unreadOrderCommentCount = useOrdersCommentStore((s) => s.unreadCount);
+  const unreadOrderCommentCount = useOrdersCommentStore((s) => Object.keys(s.unreadProductIds).length);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {

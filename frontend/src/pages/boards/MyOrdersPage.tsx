@@ -49,9 +49,8 @@ function useTabCounts(baseFilters: Record<string, string>) {
 
 export default function MyOrdersPage() {
   const { user } = useAuthStore();
-  const clearOrderComments = useOrdersCommentStore((s) => s.clear);
-
-  useEffect(() => { clearOrderComments(); }, [clearOrderComments]);
+  const unreadProductIds = useOrdersCommentStore((s) => s.unreadProductIds);
+  const clearProduct = useOrdersCommentStore((s) => s.clearProduct);
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -227,7 +226,12 @@ export default function MyOrdersPage() {
                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)` }}
                     className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_140px] border-b border-surface-700/30 hover:bg-surface-800/40 transition-colors group"
                   >
-                    <div className="px-4 py-3 text-sm font-medium text-brand-400 truncate">{product.product_id}</div>
+                    <div className="px-4 py-3 flex items-center gap-2 min-w-0">
+                      <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
+                      {unreadProductIds[product.id] && (
+                        <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New comment" />
+                      )}
+                    </div>
                     <div className="px-4 py-3 text-sm text-surface-200 truncate">{product.customer_name}</div>
                     <div className="px-4 py-3 text-sm text-surface-400 truncate hidden md:block">
                       {product.delivery_at ? formatDate(product.delivery_at) : '—'}
@@ -235,7 +239,7 @@ export default function MyOrdersPage() {
                     <div className="px-4 py-3 text-sm text-surface-400 truncate hidden lg:block">{product.description || '—'}</div>
                     <div className="px-4 py-3 flex items-center justify-center">
                       <button
-                        onClick={() => setSelectedProduct(product.id)}
+                        onClick={() => { setSelectedProduct(product.id); clearProduct(product.id); }}
                         className="p-1.5 rounded-lg text-surface-400 hover:text-brand-400 hover:bg-brand-500/10 transition-colors"
                         title="View details"
                       >

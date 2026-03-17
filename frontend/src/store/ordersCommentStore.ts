@@ -1,13 +1,21 @@
 import { create } from 'zustand';
 
 interface OrdersCommentStore {
-  unreadCount: number;
-  increment: () => void;
+  unreadProductIds: Record<number, true>;
+  add: (productId: number) => void;
+  clearProduct: (productId: number) => void;
   clear: () => void;
 }
 
 export const useOrdersCommentStore = create<OrdersCommentStore>((set) => ({
-  unreadCount: 0,
-  increment: () => set((s) => ({ unreadCount: s.unreadCount + 1 })),
-  clear: () => set({ unreadCount: 0 }),
+  unreadProductIds: {},
+  add: (productId) =>
+    set((s) => ({ unreadProductIds: { ...s.unreadProductIds, [productId]: true } })),
+  clearProduct: (productId) =>
+    set((s) => {
+      const next = { ...s.unreadProductIds };
+      delete next[productId];
+      return { unreadProductIds: next };
+    }),
+  clear: () => set({ unreadProductIds: {} }),
 }));

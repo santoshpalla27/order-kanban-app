@@ -52,11 +52,8 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['comments'] });
             queryClient.invalidateQueries({ queryKey: ['products'] });
             queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-            if (
-              data.payload?.comment?.user_id !== currentUserId &&
-              !window.location.pathname.includes('/my-orders')
-            ) {
-              useOrdersCommentStore.getState().increment();
+            if (data.payload?.comment?.user_id !== currentUserId) {
+              useOrdersCommentStore.getState().add(data.payload.product_id);
             }
             break;
           case 'attachment_uploaded':
