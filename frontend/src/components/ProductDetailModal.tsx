@@ -224,7 +224,7 @@ function ImageCommentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="w-full max-w-lg glass rounded-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-surface-700/50">
           <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -269,7 +269,7 @@ function ImageLightbox({ src, alt, attId, onClose }: { src: string; alt: string;
     }
   };
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <img src={src} alt={alt} className="max-w-full max-h-[85vh] object-contain rounded-xl" />
         <div className="absolute top-3 right-3 flex gap-2">
@@ -316,7 +316,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="w-full max-w-2xl max-h-[85vh] glass rounded-2xl flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between p-5 border-b border-surface-700/50">
             <h2 className="text-lg font-semibold">{product?.product_id || 'Loading...'}</h2>
@@ -707,7 +707,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setDeleteConfirmId(null)}>
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) setDeleteConfirmId(null); }}>
           <div className="w-full max-w-sm glass rounded-2xl p-6 text-center animate-scale-in" onClick={(e) => e.stopPropagation()}>
             <div className="w-12 h-12 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center mx-auto mb-4">
               <Trash2 className="w-6 h-6" />
