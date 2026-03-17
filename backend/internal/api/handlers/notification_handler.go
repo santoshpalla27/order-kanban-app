@@ -76,7 +76,13 @@ func (h *NotificationHandler) MarkAllAsRead(c *gin.Context) {
 
 func (h *NotificationHandler) GetUnreadSummary(c *gin.Context) {
 	userID := c.GetUint("user_id")
-	summary, err := services.GetUnreadSummary(userID)
+	var assignedTo uint
+	if v := c.Query("assigned_to"); v != "" {
+		if parsed, err := strconv.ParseUint(v, 10, 32); err == nil {
+			assignedTo = uint(parsed)
+		}
+	}
+	summary, err := services.GetUnreadSummary(userID, assignedTo)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get summary"})
 		return

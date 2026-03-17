@@ -196,17 +196,20 @@ func MarkAllAsRead(userID uint) error {
 // GetUnreadSummary returns, for each product with unread notifications,
 // the distinct notification types that are unread.
 // Result is map[entityID][]type — only entity_type = "product" is included.
-func GetUnreadSummary(userID uint) (map[uint][]string, error) {
+// If assignedTo > 0, only products where that user is an assignee are included.
+func GetUnreadSummary(userID uint, assignedTo uint) (map[uint][]string, error) {
 	type row struct {
 		EntityID uint
 		Type     string
 	}
 	var rows []row
-	err := database.DB.Model(&models.Notification{}).
-		Select("entity_id, type").
-		Where("user_id = ? AND entity_type = 'product' AND is_read = ?", userID, false).
-		Distinct("entity_id", "type").
-		Scan(&rows).Error
+	q := database.DB.Model(&models.Notification{}).
+		Select("notifications.entity_id, notifications.type").
+		Where("notifications.user_id = ? AND notifications.entity_type = 'product' AND notifications.is_read = ?", userID, false)
+	if assignedTo > 0 {
+		q = q.Joins("JOIN product_assignees ON product_assignees.product_id = notifications.entity_id AND product_assignees.user_id = ?", assignedTo)
+	}
+	err := q.Distinct("notifications.entity_id", "notifications.type").Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
