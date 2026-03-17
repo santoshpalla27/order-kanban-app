@@ -6,12 +6,21 @@
  *  - Search input filters cards
  *  - Filter control is present and functional
  *  - Clicking a card opens a detail modal
+ *  - Red badge dot appears on a card with unread notifications
+ *  - Sidebar Kanban badge excludes products that are in My Orders
  *
  * Uses admin auth state (.auth/admin.json).
  */
 
 import { test, expect } from '@playwright/test';
-import { apiLogin, createProduct, deleteProduct } from '../helpers/api.helper';
+import {
+  apiLogin,
+  createProduct,
+  deleteProduct,
+  createComment,
+  markAllNotificationsRead,
+  getUnreadSummary,
+} from '../helpers/api.helper';
 
 const BASE_URL       = process.env.BASE_URL       || 'https://app.santoshdevops.cloud';
 const ADMIN_EMAIL    = process.env.ADMIN_EMAIL    || 'admin@gmail.com';
@@ -186,5 +195,63 @@ test.describe('Kanban Board', () => {
     if (await closeBtn.first().isVisible()) {
       await closeBtn.first().click();
     }
+  });
+
+  // ── Badge dots ─────────────────────────────────────────────────────────────
+
+  test('unread-summary API shows test product after admin posts a comment', async () => {
+    if (!testProductId) { test.skip(true, 'No test product'); return; }
+
+    const EMPLOYEE_EMAIL    = process.env.EMPLOYEE_EMAIL    || 'employee@gmail.com';
+    const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'employee123';
+    let employeeToken: string;
+    try {
+      employeeToken = await apiLogin(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
+    } catch {
+      test.skip(true, 'Employee credentials not configured');
+      return;
+    }
+
+    await markAllNotificationsRead(employeeToken);
+    await createComment(adminToken, testProductId, `Kanban badge test ${Date.now()}`);
+    await new Promise((r) => setTimeout(r, 1_500));
+
+    const summary = await getUnreadSummary(employeeToken);
+    expect(summary[String(testProductId)]).toBeDefined();
+    expect(summary[String(testProductId)]).toContain('comment_added');
+  });
+
+  test('sidebar Kanban badge excludes products assigned to the current user', async () => {
+    // The sidebar Kanban/List badge count = (all products with badges) MINUS (products in My Orders).
+    // We can't easily assign a product in E2E without a dedicated API endpoint,
+    // so this test verifies the API contract: unread-summary without assigned_to
+    // returns more (or equal) products than with a non-zero assigned_to filter.
+    if (!testProductId) { test.skip(true, 'No test product'); return; }
+
+    const EMPLOYEE_EMAIL    = process.env.EMPLOYEE_EMAIL    || 'employee@gmail.com';
+    const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'employee123';
+    let employeeToken: string;
+    try {
+      employeeToken = await apiLogin(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
+    } catch {
+      test.skip(true, 'Employee credentials not configured');
+      return;
+    }
+
+    const meRes = await fetch(
+      `${process.env.API_URL || 'https://app.santoshdevops.cloud/api'}/auth/me`,
+      { headers: { Authorization: `Bearer ${employeeToken}` } },
+    );
+    const me = await meRes.json() as { id: number };
+
+    const allSummary      = await getUnreadSummary(employeeToken);
+    const assignedSummary = await getUnreadSummary(employeeToken, me.id);
+
+    // Assigned summary must be a subset of all summary
+    for (const productId of Object.keys(assignedSummary)) {
+      expect(allSummary[productId]).toBeDefined();
+    }
+    // Assigned count must be <= total count
+    expect(Object.keys(assignedSummary).length).toBeLessThanOrEqual(Object.keys(allSummary).length);
   });
 });

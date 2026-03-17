@@ -200,7 +200,28 @@ export async function getUnreadNotificationCount(token: string): Promise<number>
 }
 
 export async function markAllNotificationsRead(token: string): Promise<void> {
-  await request<unknown>('PATCH', '/notifications/mark-all-read', token);
+  await request<unknown>('POST', '/notifications/read-all', token);
+}
+
+export async function getUnreadSummary(
+  token: string,
+  assignedTo?: number,
+): Promise<Record<string, string[]>> {
+  const qs = assignedTo ? `?assigned_to=${assignedTo}` : '';
+  return request<Record<string, string[]>>('GET', `/notifications/unread-summary${qs}`, token);
+}
+
+export async function markReadByEntityAndTypes(
+  token:      string,
+  entityType: string,
+  entityId:   number,
+  types:      string[],
+): Promise<void> {
+  await request<unknown>('POST', '/notifications/read-by-entity-type', token, {
+    entity_type: entityType,
+    entity_id:   entityId,
+    types,
+  });
 }
 
 export async function getNotifications(token: string): Promise<unknown[]> {

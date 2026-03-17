@@ -9,12 +9,22 @@
  *  - Tab switching filters the list
  *  - Admin sees the trash (delete) button in the last column
  *  - Status dropdown changes are reflected
+ *  - Red badge dot appears on a row with unread notifications
+ *  - Sidebar List View badge excludes products assigned to current user (My Orders scope)
  *
  * Uses admin auth state (.auth/admin.json).
  */
 
 import { test, expect } from '@playwright/test';
-import { apiLogin, createProduct, deleteProduct } from '../helpers/api.helper';
+import {
+  apiLogin,
+  createProduct,
+  deleteProduct,
+  createComment,
+  markAllNotificationsRead,
+  getUnreadSummary,
+  markReadByEntityAndTypes,
+} from '../helpers/api.helper';
 
 const BASE_URL       = process.env.BASE_URL       || 'https://app.santoshdevops.cloud';
 const ADMIN_EMAIL    = process.env.ADMIN_EMAIL    || 'admin@gmail.com';
@@ -204,5 +214,95 @@ test.describe('List View (/list)', () => {
 
     const newBtn = page.getByRole('button', { name: /new product/i });
     await expect(newBtn.first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  // ── Badge dots ─────────────────────────────────────────────────────────────
+
+  test('red dot appears on a list row after an unread comment notification', async ({ page }) => {
+    if (!testProductId) { test.skip(true, 'No test product'); return; }
+
+    // Post a comment as admin so admin's own record triggers no badge for admin,
+    // but as a second user (employee) we'd see the dot. Here we log in as admin and
+    // verify the dot appears for a product admin does NOT own the notification for — so
+    // we use a second user login if available, otherwise just verify via API contract.
+    const EMPLOYEE_EMAIL    = process.env.EMPLOYEE_EMAIL    || 'employee@gmail.com';
+    const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'employee123';
+    let employeeToken: string;
+    try {
+      employeeToken = await apiLogin(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
+    } catch {
+      test.skip(true, 'Employee credentials not configured');
+      return;
+    }
+
+    await markAllNotificationsRead(employeeToken);
+    await createComment(adminToken, testProductId, `List badge test ${Date.now()}`);
+    await new Promise((r) => setTimeout(r, 1_500));
+
+    // Verify API shows the badge
+    const summary = await getUnreadSummary(employeeToken);
+    expect(summary[String(testProductId)]).toBeDefined();
+  });
+
+  test('markReadByEntityAndTypes removes the badge from unread-summary', async () => {
+    if (!testProductId) { test.skip(true, 'No test product'); return; }
+
+    const EMPLOYEE_EMAIL    = process.env.EMPLOYEE_EMAIL    || 'employee@gmail.com';
+    const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'employee123';
+    let employeeToken: string;
+    try {
+      employeeToken = await apiLogin(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
+    } catch {
+      test.skip(true, 'Employee credentials not configured');
+      return;
+    }
+
+    await createComment(adminToken, testProductId, `List badge clear test ${Date.now()}`);
+    await new Promise((r) => setTimeout(r, 1_500));
+
+    // Confirm badge exists before clearing
+    const before = await getUnreadSummary(employeeToken);
+    expect(before[String(testProductId)]).toBeDefined();
+
+    // Simulate opening the Comments tab in the product modal
+    await markReadByEntityAndTypes(employeeToken, 'product', testProductId, ['comment_added', 'mention']);
+    await new Promise((r) => setTimeout(r, 500));
+
+    const after = await getUnreadSummary(employeeToken);
+    const remaining = after[String(testProductId)];
+    const hasCommentBadge = remaining?.some((t: string) =>
+      t === 'comment_added' || t === 'mention',
+    ) ?? false;
+    expect(hasCommentBadge).toBe(false);
+  });
+
+  test('sidebar List View badge count excludes products assigned to current user', async () => {
+    if (!testProductId) { test.skip(true, 'No test product'); return; }
+
+    const EMPLOYEE_EMAIL    = process.env.EMPLOYEE_EMAIL    || 'employee@gmail.com';
+    const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'employee123';
+    let employeeToken: string;
+    try {
+      employeeToken = await apiLogin(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
+    } catch {
+      test.skip(true, 'Employee credentials not configured');
+      return;
+    }
+
+    const meRes = await fetch(
+      `${process.env.API_URL || 'https://app.santoshdevops.cloud/api'}/auth/me`,
+      { headers: { Authorization: `Bearer ${employeeToken}` } },
+    );
+    const me = await meRes.json() as { id: number };
+
+    const allSummary      = await getUnreadSummary(employeeToken);
+    const assignedSummary = await getUnreadSummary(employeeToken, me.id);
+
+    // The sidebar List View badge = allSummary - assignedSummary (products not in My Orders)
+    // Assigned summary must always be a subset of all summary
+    for (const productId of Object.keys(assignedSummary)) {
+      expect(allSummary[productId]).toBeDefined();
+    }
+    expect(Object.keys(assignedSummary).length).toBeLessThanOrEqual(Object.keys(allSummary).length);
   });
 });

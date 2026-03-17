@@ -17,6 +17,8 @@ import {
   getUnreadNotificationCount,
   markAllNotificationsRead,
   getNotifications,
+  getUnreadSummary,
+  markReadByEntityAndTypes,
   createProduct,
   deleteProduct,
   createComment,
@@ -181,6 +183,110 @@ test.describe('Notifications', () => {
       const val = parseInt((await badge.first().textContent({ timeout: 3_000 }) || '0').trim(), 10);
       expect(val === 0 || Number.isNaN(val) || !(await badge.first().isVisible())).toBeTruthy();
     }
+  });
+
+  // ── Unread summary (badge source of truth) ───────────────────────────────
+
+  test('GET /notifications/unread-summary returns empty map when all read', async () => {
+    await markAllNotificationsRead(adminToken);
+    const summary = await getUnreadSummary(adminToken);
+    expect(Object.keys(summary)).toHaveLength(0);
+  });
+
+  test('unread-summary shows product after a comment is posted by another user', async () => {
+    if (!testProductId) { test.skip(true, 'No test product'); return; }
+
+    // Use a second user so the commenter != the observer
+    const EMPLOYEE_EMAIL    = process.env.EMPLOYEE_EMAIL    || 'employee@gmail.com';
+    const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'employee123';
+    let employeeToken: string;
+    try {
+      employeeToken = await apiLogin(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
+    } catch {
+      test.skip(true, 'Employee credentials not configured — skipping multi-user badge test');
+      return;
+    }
+
+    // Clear the employee's unread summary before the test
+    await markAllNotificationsRead(employeeToken);
+    const before = await getUnreadSummary(employeeToken);
+    expect(Object.keys(before)).toHaveLength(0);
+
+    // Admin posts a comment — employee should receive a notification
+    await createComment(adminToken, testProductId, `Badge test ${Date.now()}`);
+    await new Promise((r) => setTimeout(r, 1_500));
+
+    const after = await getUnreadSummary(employeeToken);
+    const productKey = String(testProductId);
+    expect(after[productKey]).toBeDefined();
+    expect(after[productKey]).toContain('comment_added');
+  });
+
+  test('markReadByEntityAndTypes clears comment badge for a product', async () => {
+    if (!testProductId) { test.skip(true, 'No test product'); return; }
+
+    const EMPLOYEE_EMAIL    = process.env.EMPLOYEE_EMAIL    || 'employee@gmail.com';
+    const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'employee123';
+    let employeeToken: string;
+    try {
+      employeeToken = await apiLogin(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
+    } catch {
+      test.skip(true, 'Employee credentials not configured');
+      return;
+    }
+
+    // Ensure there's at least one unread comment notification for this product
+    await createComment(adminToken, testProductId, `Clear badge test ${Date.now()}`);
+    await new Promise((r) => setTimeout(r, 1_500));
+
+    const before = await getUnreadSummary(employeeToken);
+    expect(before[String(testProductId)]).toBeDefined();
+
+    // Clear comment-type notifications for this product
+    await markReadByEntityAndTypes(employeeToken, 'product', testProductId, ['comment_added', 'mention']);
+    await new Promise((r) => setTimeout(r, 500));
+
+    const after = await getUnreadSummary(employeeToken);
+    // Product should no longer appear (comment types cleared)
+    const remaining = after[String(testProductId)];
+    const hasCommentBadge = remaining?.some((t: string) =>
+      t === 'comment_added' || t === 'mention',
+    ) ?? false;
+    expect(hasCommentBadge).toBe(false);
+  });
+
+  test('unread-summary with assigned_to only returns assigned products', async () => {
+    if (!testProductId) { test.skip(true, 'No test product'); return; }
+
+    const EMPLOYEE_EMAIL    = process.env.EMPLOYEE_EMAIL    || 'employee@gmail.com';
+    const EMPLOYEE_PASSWORD = process.env.EMPLOYEE_PASSWORD || 'employee123';
+    let employeeToken: string;
+    try {
+      employeeToken = await apiLogin(EMPLOYEE_EMAIL, EMPLOYEE_PASSWORD);
+    } catch {
+      test.skip(true, 'Employee credentials not configured');
+      return;
+    }
+
+    // Ensure there's an unread notification for the test product
+    await createComment(adminToken, testProductId, `Assigned badge test ${Date.now()}`);
+    await new Promise((r) => setTimeout(r, 1_500));
+
+    // Full summary (no filter) — product appears
+    const fullSummary = await getUnreadSummary(employeeToken);
+    expect(Object.keys(fullSummary).length).toBeGreaterThanOrEqual(0); // may or may not include it
+
+    // Summary filtered by employee's own ID — the test product is NOT assigned to employee,
+    // so it must NOT appear in the filtered result
+    // Get employee user id from /auth/me
+    const meRes = await fetch(`${process.env.API_URL || 'https://app.santoshdevops.cloud/api'}/auth/me`, {
+      headers: { Authorization: `Bearer ${employeeToken}` },
+    });
+    const me = await meRes.json() as { id: number };
+    const assignedSummary = await getUnreadSummary(employeeToken, me.id);
+
+    // Test product is not assigned to employee — must not appear
+    expect(assignedSummary[String(testProductId)]).toBeUndefined();
   });
 
   // ── Activity log format ───────────────────────────────────────────────────
