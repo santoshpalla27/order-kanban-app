@@ -13,6 +13,7 @@ import {
   PointerSensor, useSensor, useSensors, useDroppable, useDraggable,
 } from '@dnd-kit/core';
 import { Plus, GripVertical, Package, Loader2 } from 'lucide-react';
+import { useProductBadges } from '../../hooks/useProductBadges';
 
 const PAGE_SIZE = 20;          // cards per page per column
 const CARD_ESTIMATE_PX = 100;  // estimated card height for virtualizer
@@ -213,6 +214,7 @@ function KanbanColumn({
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: status });
+  const { hasAny } = useProductBadges();
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: colKey(status, baseFilters),
@@ -284,6 +286,7 @@ function KanbanColumn({
                 <KanbanCard
                   product={items[vItem.index]}
                   status={status}
+                  hasBadge={hasAny(items[vItem.index].id)}
                   onClick={() => onCardClick(items[vItem.index].id)}
                 />
               </div>
@@ -297,6 +300,7 @@ function KanbanColumn({
                 key={product.id}
                 product={product}
                 status={status}
+                hasBadge={hasAny(product.id)}
                 onClick={() => onCardClick(product.id)}
               />
             ))}
@@ -325,10 +329,11 @@ function KanbanColumn({
 // ─── Card ─────────────────────────────────────────────────────────────────────
 
 function KanbanCard({
-  product, status, onClick,
+  product, status, hasBadge, onClick,
 }: {
   product: Product;
   status: string;
+  hasBadge: boolean;
   onClick: () => void;
 }) {
   // useDraggable (not useSortable) — no within-column sort, no transform conflict with virtualizer
@@ -357,6 +362,7 @@ function KanbanCard({
           <div className="flex items-center gap-2 mb-1">
             <Package className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />
             <span className="text-xs font-mono text-brand-400">{product.product_id}</span>
+            {hasBadge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
           </div>
           <h4 className="text-sm font-medium truncate">{product.customer_name}</h4>
           {product.customer_phone && (

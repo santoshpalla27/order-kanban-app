@@ -117,6 +117,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 				notifications.GET("/unread-count", notificationHandler.GetUnreadCount)
 				notifications.PATCH("/:id/read", notificationHandler.MarkAsRead)
 				notifications.POST("/read-all", notificationHandler.MarkAllAsRead)
+				notifications.GET("/unread-summary", notificationHandler.GetUnreadSummary)
+				notifications.POST("/read-by-entity-type", notificationHandler.MarkReadByEntityAndTypes)
 			}
 
 			// Profile management (all authenticated users)

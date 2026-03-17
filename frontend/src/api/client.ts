@@ -174,6 +174,9 @@ export const notificationsApi = {
   getUnreadCount: () => api.get('/notifications/unread-count'),
   markAsRead: (id: number) => api.patch(`/notifications/${id}/read`),
   markAllAsRead: () => api.post('/notifications/read-all'),
+  getUnreadSummary: () => api.get<Record<string, string[]>>('/notifications/unread-summary'),
+  markReadByEntityAndTypes: (entityType: string, entityId: number, types: string[]) =>
+    api.post('/notifications/read-by-entity-type', { entity_type: entityType, entity_id: entityId, types }),
 };
 
 // Users

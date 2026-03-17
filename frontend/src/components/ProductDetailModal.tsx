@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productsApi, attachmentsApi, commentsApi, usersApi } from '../api/client';
+import { productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi } from '../api/client';
+import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES } from '../hooks/useProductBadges';
 import { formatDate, formatDateTime, formatTime } from '../utils/date';
 import { useAuthStore } from '../store/authStore';
 import { Product, Attachment, Comment, STATUS_LABELS, STATUS_ORDER } from '../types';
@@ -303,15 +304,33 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
   const { data: commentsData } = useQuery({ queryKey: ['comments', productId], queryFn: () => commentsApi.getByProduct(productId) });
   const comments: Comment[] = commentsData?.data || [];
 
+  const { has } = useProductBadges();
+
+  useEffect(() => {
+    if (activeTab === 'comments' && has(productId, 'comments')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+        queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+      });
+    } else if (activeTab === 'attachments' && has(productId, 'attachments')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+        queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+      });
+    }
+  }, [activeTab, productId]);
+
   const statusMutation = useMutation({
     mutationFn: (newStatus: string) => productsApi.updateStatus(productId, newStatus),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 
   const tabs = [
-    { id: 'details' as const, label: 'Details', icon: Package },
-    { id: 'attachments' as const, label: `Attachments (${attachments.length})`, icon: Paperclip },
-    { id: 'comments' as const, label: `Comments (${comments.length})`, icon: MessageSquare },
+    { id: 'details' as const, label: 'Details', icon: Package, badge: false },
+    { id: 'attachments' as const, label: `Attachments (${attachments.length})`, icon: Paperclip, badge: has(productId, 'attachments') },
+    { id: 'comments' as const, label: `Comments (${comments.length})`, icon: MessageSquare, badge: has(productId, 'comments') },
   ];
 
   return (
@@ -340,6 +359,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
             {tabs.map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-all duration-200 border-b-2 ${activeTab === tab.id ? 'border-brand-500 text-brand-400' : 'border-transparent text-surface-400 hover:text-surface-200'}`}>
                 <tab.icon className="w-4 h-4" /> {tab.label}
+                {tab.badge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
               </button>
             ))}
           </div>

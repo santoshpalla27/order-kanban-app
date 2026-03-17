@@ -8,7 +8,7 @@ import ProductDetailModal from '../../components/ProductDetailModal';
 import CreateProductModal from '../../components/CreateProductModal';
 import SearchFilters from '../../components/SearchFilters';
 import { Plus, Eye, Trash2, Loader2, ChevronDown } from 'lucide-react';
-import { useOrdersCommentStore } from '../../store/ordersCommentStore';
+import { useProductBadges } from '../../hooks/useProductBadges';
 
 const PAGE_SIZE = 50;
 
@@ -63,8 +63,7 @@ export default function ListView() {
     delivery_to: '',
   });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
-  const unreadProductIds = useOrdersCommentStore((s) => s.unreadProductIds);
-  const clearProduct = useOrdersCommentStore((s) => s.clearProduct);
+  const { hasAny } = useProductBadges();
   const [showCreate, setShowCreate]           = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const { canCreateProduct, canDeleteProduct } = useAuthStore();
@@ -261,7 +260,7 @@ export default function ListView() {
                   >
                     <div className="px-4 py-3 flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
-                      {unreadProductIds[product.id] && (
+                      {hasAny(product.id) && (
                         <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New comment" />
                       )}
                     </div>
@@ -275,7 +274,7 @@ export default function ListView() {
                         : '—'}
                     </div>
                     <div className="px-4 py-3 flex items-center justify-center">
-                      <button onClick={() => { setSelectedProduct(product.id); clearProduct(product.id); }} className="btn-ghost p-1.5 rounded-lg" title="View details">
+                      <button onClick={() => { setSelectedProduct(product.id); }} className="btn-ghost p-1.5 rounded-lg" title="View details">
                         <Eye className="w-4 h-4" />
                       </button>
                     </div>

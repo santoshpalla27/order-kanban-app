@@ -6,7 +6,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 import { useQuery } from '@tanstack/react-query';
 import { notificationsApi } from '../api/client';
 import { useChatStore } from '../store/chatStore';
-import { useOrdersCommentStore } from '../store/ordersCommentStore';
+import { useProductBadges } from '../hooks/useProductBadges';
 import NotificationPanel from './NotificationPanel';
 import ActivityPanel from './ActivityPanel';
 import NotificationToast from './NotificationToast';
@@ -92,7 +92,7 @@ export default function Layout() {
   });
   const unreadCount = unreadData?.data?.count || 0;
   const unreadChatCount = useChatStore((s) => s.unreadCount);
-  const unreadOrderCommentCount = useOrdersCommentStore((s) => Object.keys(s.unreadProductIds).length);
+  const { totalProducts: unreadProductCount } = useProductBadges();
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -140,9 +140,9 @@ export default function Layout() {
         <nav className="flex-1 p-3 space-y-1">
           {navItems.map((item) => {
             const isChat = item.to === '/chat';
-            const isMyOrders = item.to === '/my-orders';
+            const isProductView = ['/', '/list', '/my-orders'].includes(item.to);
             const showChatBadge = isChat && unreadChatCount > 0;
-            const showOrdersBadge = isMyOrders && unreadOrderCommentCount > 0;
+            const showProductBadge = isProductView && unreadProductCount > 0;
             return (
               <NavLink
                 key={item.to}
@@ -162,7 +162,7 @@ export default function Layout() {
               >
                 <div className="relative flex-shrink-0">
                   <item.icon className="w-5 h-5" />
-                  {(showChatBadge || showOrdersBadge) && !sidebarOpen && (
+                  {(showChatBadge || showProductBadge) && !sidebarOpen && (
                     <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
                   )}
                 </div>
@@ -174,9 +174,9 @@ export default function Layout() {
                         {unreadChatCount > 9 ? '9+' : unreadChatCount}
                       </span>
                     )}
-                    {showOrdersBadge && (
+                    {showProductBadge && (
                       <span className="ml-auto min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-scale-in">
-                        {unreadOrderCommentCount > 9 ? '9+' : unreadOrderCommentCount}
+                        {unreadProductCount > 9 ? '9+' : unreadProductCount}
                       </span>
                     )}
                   </span>

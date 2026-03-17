@@ -73,3 +73,31 @@ func (h *NotificationHandler) MarkAllAsRead(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "All marked as read"})
 }
+
+func (h *NotificationHandler) GetUnreadSummary(c *gin.Context) {
+	userID := c.GetUint("user_id")
+	summary, err := services.GetUnreadSummary(userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get summary"})
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}
+
+func (h *NotificationHandler) MarkReadByEntityAndTypes(c *gin.Context) {
+	var req struct {
+		EntityType string   `json:"entity_type" binding:"required"`
+		EntityID   uint     `json:"entity_id"   binding:"required"`
+		Types      []string `json:"types"       binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	userID := c.GetUint("user_id")
+	if err := services.MarkReadByEntityAndTypes(userID, req.EntityType, req.EntityID, req.Types); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to mark as read"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "Marked as read"})
+}

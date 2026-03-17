@@ -4,7 +4,6 @@ import { useAuthStore } from '../store/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../store/toastStore';
 import { useChatStore } from '../store/chatStore';
-import { useOrdersCommentStore } from '../store/ordersCommentStore';
 import { playNotificationSound, playChatSound } from '../utils/sound';
 
 export function useWebSocket() {
@@ -52,13 +51,12 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['comments'] });
             queryClient.invalidateQueries({ queryKey: ['products'] });
             queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-            if (data.payload?.comment?.user_id !== currentUserId) {
-              useOrdersCommentStore.getState().add(data.payload.product_id);
-            }
+            queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
             break;
           case 'attachment_uploaded':
             queryClient.invalidateQueries({ queryKey: ['attachments'] });
             queryClient.invalidateQueries({ queryKey: ['products'] });
+            queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
             break;
           case 'chat_message':
             queryClient.invalidateQueries({ queryKey: ['chat'] });

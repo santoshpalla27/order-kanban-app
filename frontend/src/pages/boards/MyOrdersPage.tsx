@@ -7,7 +7,7 @@ import { Product, STATUS_LABELS, STATUS_ORDER, ProductStatus } from '../../types
 import ProductDetailModal from '../../components/ProductDetailModal';
 import SearchFilters from '../../components/SearchFilters';
 import { Eye, Loader2, ChevronDown } from 'lucide-react';
-import { useOrdersCommentStore } from '../../store/ordersCommentStore';
+import { useProductBadges } from '../../hooks/useProductBadges';
 import { formatDate } from '../../utils/date';
 
 const PAGE_SIZE = 50;
@@ -49,8 +49,7 @@ function useTabCounts(baseFilters: Record<string, string>) {
 
 export default function MyOrdersPage() {
   const { user } = useAuthStore();
-  const unreadProductIds = useOrdersCommentStore((s) => s.unreadProductIds);
-  const clearProduct = useOrdersCommentStore((s) => s.clearProduct);
+  const { hasAny } = useProductBadges();
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -228,7 +227,7 @@ export default function MyOrdersPage() {
                   >
                     <div className="px-4 py-3 flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
-                      {unreadProductIds[product.id] && (
+                      {hasAny(product.id) && (
                         <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New comment" />
                       )}
                     </div>
@@ -239,7 +238,7 @@ export default function MyOrdersPage() {
                     <div className="px-4 py-3 text-sm text-surface-400 truncate hidden lg:block">{product.description || '—'}</div>
                     <div className="px-4 py-3 flex items-center justify-center">
                       <button
-                        onClick={() => { setSelectedProduct(product.id); clearProduct(product.id); }}
+                        onClick={() => { setSelectedProduct(product.id); }}
                         className="p-1.5 rounded-lg text-surface-400 hover:text-brand-400 hover:bg-brand-500/10 transition-colors"
                         title="View details"
                       >

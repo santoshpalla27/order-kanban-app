@@ -193,6 +193,42 @@ func MarkAllAsRead(userID uint) error {
 		Where("user_id = ? AND is_read = ?", userID, false).Update("is_read", true).Error
 }
 
+// GetUnreadSummary returns, for each product with unread notifications,
+// the distinct notification types that are unread.
+// Result is map[entityID][]type — only entity_type = "product" is included.
+func GetUnreadSummary(userID uint) (map[uint][]string, error) {
+	type row struct {
+		EntityID uint
+		Type     string
+	}
+	var rows []row
+	err := database.DB.Model(&models.Notification{}).
+		Select("entity_id, type").
+		Where("user_id = ? AND entity_type = 'product' AND is_read = ?", userID, false).
+		Distinct("entity_id", "type").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	result := map[uint][]string{}
+	for _, r := range rows {
+		result[r.EntityID] = append(result[r.EntityID], r.Type)
+	}
+	return result, nil
+}
+
+// MarkReadByEntityAndTypes marks unread notifications as read for a specific
+// entity + type list (e.g. clear only comment notifications for product 5).
+func MarkReadByEntityAndTypes(userID uint, entityType string, entityID uint, types []string) error {
+	if len(types) == 0 {
+		return nil
+	}
+	return database.DB.Model(&models.Notification{}).
+		Where("user_id = ? AND entity_type = ? AND entity_id = ? AND type IN ? AND is_read = ?",
+			userID, entityType, entityID, types, false).
+		Update("is_read", true).Error
+}
+
 // PurgeOldNotifications hard-deletes notifications older than the given number of days.
 // Called on a background goroutine every 24 hours.
 func PurgeOldNotifications(days int) error {
