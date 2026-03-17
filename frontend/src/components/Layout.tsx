@@ -92,8 +92,9 @@ export default function Layout() {
   });
   const unreadCount = unreadData?.data?.count || 0;
   const unreadChatCount = useChatStore((s) => s.unreadCount);
-  const { totalProducts: unreadProductCount } = useProductBadges();
-  const myOrdersBadgeCount = useMyOrdersBadges(user?.id);
+  const { badges: allBadges } = useProductBadges();
+  const { count: myOrdersBadgeCount, productIds: myOrdersProductIds } = useMyOrdersBadges(user?.id);
+  const unreadProductCount = Object.keys(allBadges).filter(id => !myOrdersProductIds.has(Number(id))).length;
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {

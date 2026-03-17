@@ -41,5 +41,6 @@ export function useMyOrdersBadges(userId: number | undefined) {
   });
   const raw: Record<string, string[]> = (data?.data as any) || {};
   const badges = buildBadges(raw);
-  return Object.keys(badges).length;
+  const productIds = new Set(Object.keys(badges).map(Number));
+  return { count: productIds.size, productIds };
 }
