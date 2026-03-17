@@ -7,6 +7,7 @@ import { Product, STATUS_LABELS, STATUS_ORDER, ProductStatus } from '../../types
 import ProductDetailModal from '../../components/ProductDetailModal';
 import SearchFilters from '../../components/SearchFilters';
 import { Eye, Loader2, ChevronDown } from 'lucide-react';
+import { useOrdersCommentStore } from '../../store/ordersCommentStore';
 import { formatDate } from '../../utils/date';
 
 const PAGE_SIZE = 50;
@@ -48,6 +49,9 @@ function useTabCounts(baseFilters: Record<string, string>) {
 
 export default function MyOrdersPage() {
   const { user } = useAuthStore();
+  const clearOrderComments = useOrdersCommentStore((s) => s.clear);
+
+  useEffect(() => { clearOrderComments(); }, [clearOrderComments]);
   const [filters, setFilters] = useState({
     search: '',
     status: '',
