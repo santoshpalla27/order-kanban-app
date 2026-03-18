@@ -204,3 +204,7 @@ export const profileApi = {
 export const activityApi = {
   getRecent: (limit = 100) => api.get(`/activity?limit=${limit}`),
 };
+
+export const statsApi = {
+  getStats: () => api.get('/stats'),
+};

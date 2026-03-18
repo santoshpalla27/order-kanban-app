@@ -17,6 +17,7 @@ const AdminPanel = lazy(() => import('./pages/admin/AdminPanel'));
 const TrashPage = lazy(() => import('./pages/boards/TrashPage'));
 const ActivityPage = lazy(() => import('./pages/activity/ActivityPage'));
 const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'));
+const StatsPage = lazy(() => import('./pages/stats/StatsPage'));
 
 const PageLoader = () => (
   <div className="flex justify-center items-center py-20">
@@ -44,11 +45,12 @@ const queryClient = new QueryClient({
   },
 });
 
-function ProtectedRoute({ children, adminOnly = false, trashOnly = false }: { children: React.ReactNode; adminOnly?: boolean; trashOnly?: boolean }) {
-  const { token, isAdmin, canAccessTrash } = useAuthStore();
+function ProtectedRoute({ children, adminOnly = false, trashOnly = false, statsOnly = false }: { children: React.ReactNode; adminOnly?: boolean; trashOnly?: boolean; statsOnly?: boolean }) {
+  const { token, isAdmin, canAccessTrash, canViewStats } = useAuthStore();
   if (!token) return <Navigate to="/login" replace />;
   if (adminOnly && !isAdmin()) return <Navigate to="/" replace />;
   if (trashOnly && !canAccessTrash()) return <Navigate to="/" replace />;
+  if (statsOnly && !canViewStats()) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -106,6 +108,14 @@ export default function App() {
                 element={
                   <ProtectedRoute trashOnly>
                     <LazyRoute><TrashPage /></LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/stats"
+                element={
+                  <ProtectedRoute statsOnly>
+                    <LazyRoute><StatsPage /></LazyRoute>
                   </ProtectedRoute>
                 }
               />

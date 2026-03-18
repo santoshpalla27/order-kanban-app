@@ -43,6 +43,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	chatHandler := handlers.NewChatHandler()
 	notificationHandler := handlers.NewNotificationHandler()
 	userHandler := handlers.NewUserHandler()
+	statsHandler := handlers.NewStatsHandler()
 
 	api := r.Group("/api")
 	{
@@ -134,6 +135,9 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 				users.PATCH("/:id/role", userHandler.UpdateRole)
 				users.DELETE("/:id", userHandler.DeleteUser)
 			}
+
+			// Stats — admin and manager only
+			protected.GET("/stats", middleware.RBACMiddleware("admin", "manager"), statsHandler.GetStats)
 
 			// Users list for filters (all authenticated users)
 			protected.GET("/users/list", func(c *gin.Context) {

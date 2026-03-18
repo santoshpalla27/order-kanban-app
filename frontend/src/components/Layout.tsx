@@ -27,6 +27,7 @@ import {
   Activity,
   UserCircle,
   Trash2,
+  BarChart3,
 } from 'lucide-react';
 
 const AVATAR_COLORS = [
@@ -69,7 +70,7 @@ function UserAvatar({ user, size = 'sm' }: { user: { name: string; avatar_url?: 
 }
 
 export default function Layout() {
-  const { user, logout, isAdmin, canAccessTrash } = useAuthStore();
+  const { user, logout, isAdmin, canAccessTrash, canViewStats } = useAuthStore();
   const { theme, toggleTheme } = useThemeStore();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -116,6 +117,7 @@ export default function Layout() {
     { to: '/list', icon: List, label: 'List View' },
     { to: '/my-orders', icon: ClipboardList, label: 'My Orders' },
     { to: '/chat', icon: MessageSquare, label: 'Team Chat' },
+    ...(canViewStats() ? [{ to: '/stats', icon: BarChart3, label: 'Statistics' }] : []),
     ...(isAdmin() ? [{ to: '/admin', icon: Users, label: 'Admin Panel' }] : []),
     ...(canAccessTrash() ? [{ to: '/trash', icon: Trash2, label: 'Trash' }] : []),
   ];

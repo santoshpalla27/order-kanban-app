@@ -22,6 +22,7 @@ interface AuthState {
   canComment: () => boolean;
   canSendChat: () => boolean;
   canAccessTrash: () => boolean;
+  canViewStats: () => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -64,6 +65,10 @@ export const useAuthStore = create<AuthState>()(
         return role === 'admin' || role === 'manager' || role === 'organiser' || role === 'employee';
       },
       canAccessTrash: () => {
+        const role = get().user?.role?.name;
+        return role === 'admin' || role === 'manager';
+      },
+      canViewStats: () => {
         const role = get().user?.role?.name;
         return role === 'admin' || role === 'manager';
       },
