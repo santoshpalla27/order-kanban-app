@@ -94,7 +94,11 @@ services:
     networks:
       - kanban-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kanban} -d ${POSTGRES_DB:-kanban}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-kanban} -d ${POSTGRES_DB:-kanban}",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -112,7 +116,7 @@ services:
 
   backend:
     # Replace with your registry image after pushing
-    image: your-registry/kanban-backend:latest
+    image: santoshpalla27/gift-highway:backend
     container_name: kanban-backend
     restart: unless-stopped
     environment:
@@ -131,12 +135,6 @@ services:
         condition: service_healthy
     networks:
       - kanban-net
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
     labels:
       - traefik.enable=false
     deploy:
@@ -153,12 +151,11 @@ services:
   frontend:
     # Replace with your registry image after pushing (VITE_API_URL must be
     # baked in at build time via --build-arg VITE_API_URL=https://your-domain.com/api)
-    image: your-registry/kanban-frontend:latest
+    image: santoshpalla27/gift-highway:frontend
     container_name: kanban-frontend
     restart: unless-stopped
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     networks:
       - kanban-net
     labels:
