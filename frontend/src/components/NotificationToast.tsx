@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore, Toast } from '../store/toastStore';
-import { commentsApi, chatApi } from '../api/client';
+import { commentsApi, chatApi, notificationsApi } from '../api/client';
 import { X, Send, MessageSquare } from 'lucide-react';
 
 const AVATAR_COLORS = [
@@ -27,6 +28,7 @@ function initials(name: string) {
 function ToastCard({ toast }: { toast: Toast }) {
   const { removeToast } = useToastStore();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -47,6 +49,10 @@ function ToastCard({ toast }: { toast: Toast }) {
     try {
       if (toast.entityType === 'product' && toast.entityId) {
         await commentsApi.create(toast.entityId, text);
+        await notificationsApi.markReadByEntityAndTypes('product', toast.entityId, ['comment_added', 'mention']);
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+        queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
       } else if (isChat) {
         await chatApi.sendMessage(text);
       }
