@@ -15,6 +15,8 @@ data/
 # Uploads
 uploads/
 backend/uploads/
+combined-code.txt
+combine-code.sh
 
 # Environment
 .env
