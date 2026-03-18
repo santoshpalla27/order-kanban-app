@@ -121,6 +121,8 @@ services:
     image: santoshpalla27/gift-highway:backend
     container_name: kanban-backend
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
     environment:
       - PORT=8080
       - LOG_FORMAT=json

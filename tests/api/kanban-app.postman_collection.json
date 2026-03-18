@@ -408,6 +408,7 @@
                   "  pm.expect(j.status).to.equal('yet_to_start');",
                   "  pm.expect(j.customer_name).to.equal('Test Customer');",
                   "  pm.environment.set('newProductId', j.id);",
+                  "  pm.environment.set('productId', j.id);",
                   "  pm.environment.set('newProductOriginalId', j.product_id);",
                   "});"
                 ]
