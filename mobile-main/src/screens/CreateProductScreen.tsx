@@ -24,6 +24,8 @@ export default function CreateProductScreen() {
   const [description, setDescription]   = useState('');
   const [deliveryAt, setDeliveryAt]     = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [androidPickerMode, setAndroidPickerMode] = useState<'date' | 'time'>('date');
+  const [tempDate, setTempDate] = useState<Date | null>(null);
   const [assigneeIds, setAssigneeIds]   = useState<number[]>([]);
   const [users, setUsers]               = useState<User[]>([]);
   const [loading, setLoading]           = useState(false);
@@ -151,38 +153,105 @@ export default function CreateProductScreen() {
           {/* Delivery Date & Time */}
           <View style={s.field}>
             <Text style={s.label}>Delivery Date &amp; Time</Text>
-            <TouchableOpacity style={s.dateBtn} onPress={() => setShowDatePicker(true)}>
-              <Text style={deliveryAt ? s.dateBtnText : s.dateBtnPlaceholder}>
-                {deliveryAt ? formatDateTime(deliveryAt.toISOString()) : 'Pick date & time'}
-              </Text>
-              <Text style={s.dateBtnIcon}>📅</Text>
-            </TouchableOpacity>
-            {deliveryAt && (
-              <TouchableOpacity style={s.clearDate} onPress={() => setDeliveryAt(null)}>
-                <Text style={s.clearDateText}>Clear</Text>
-              </TouchableOpacity>
+
+            {Platform.OS === 'web' ? (
+              /* Web: native HTML datetime-local input */
+              <View>
+                {/* @ts-ignore – HTML input is valid in React Native Web */}
+                <input
+                  type="datetime-local"
+                  min={new Date().toISOString().slice(0, 16)}
+                  value={deliveryAt ? (() => {
+                    const d = deliveryAt;
+                    const pad = (n: number) => String(n).padStart(2, '0');
+                    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                  })() : ''}
+                  onChange={(e: any) => {
+                    const v = e.target.value;
+                    setDeliveryAt(v ? new Date(v) : null);
+                  }}
+                  style={{
+                    backgroundColor: '#1C2130',
+                    border: '1px solid #2D3748',
+                    borderRadius: 12,
+                    color: deliveryAt ? '#F1F5F9' : '#475569',
+                    padding: '13px 16px',
+                    fontSize: 15,
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    colorScheme: 'dark',
+                    outline: 'none',
+                  }}
+                />
+                {deliveryAt && (
+                  <TouchableOpacity style={s.clearDate} onPress={() => setDeliveryAt(null)}>
+                    <Text style={s.clearDateText}>Clear</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              /* Native (iOS / Android): modal picker */
+              <>
+                <TouchableOpacity style={s.dateBtn} onPress={() => { setAndroidPickerMode('date'); setShowDatePicker(true); }}>
+                  <Text style={deliveryAt ? s.dateBtnText : s.dateBtnPlaceholder}>
+                    {deliveryAt ? formatDateTime(deliveryAt.toISOString()) : 'Pick date & time'}
+                  </Text>
+                  <Text style={s.dateBtnIcon}>📅</Text>
+                </TouchableOpacity>
+                {deliveryAt && (
+                  <TouchableOpacity style={s.clearDate} onPress={() => setDeliveryAt(null)}>
+                    <Text style={s.clearDateText}>Clear</Text>
+                  </TouchableOpacity>
+                )}
+                {showDatePicker && Platform.OS === 'ios' && (
+                  <DateTimePicker
+                    mode="datetime"
+                    value={deliveryAt ?? new Date()}
+                    minimumDate={new Date()}
+                    display="inline"
+                    onChange={(_e, selected) => {
+                      if (selected) setDeliveryAt(selected);
+                    }}
+                  />
+                )}
+                {showDatePicker && Platform.OS === 'ios' && (
+                  <TouchableOpacity style={s.doneBtn} onPress={() => setShowDatePicker(false)}>
+                    <Text style={s.doneBtnText}>Done</Text>
+                  </TouchableOpacity>
+                )}
+                {showDatePicker && Platform.OS === 'android' && (
+                  <DateTimePicker
+                    mode={androidPickerMode}
+                    value={androidPickerMode === 'date' ? (deliveryAt ?? new Date()) : (tempDate ?? new Date())}
+                    minimumDate={androidPickerMode === 'date' ? new Date() : undefined}
+                    display="default"
+                    onChange={(_e, selected) => {
+                      if (!selected) {
+                        // user dismissed
+                        setShowDatePicker(false);
+                        setTempDate(null);
+                        setAndroidPickerMode('date');
+                        return;
+                      }
+                      if (androidPickerMode === 'date') {
+                        // step 1: date selected — now show time picker
+                        setTempDate(selected);
+                        setAndroidPickerMode('time');
+                      } else {
+                        // step 2: time selected — merge date+time and finish
+                        const merged = new Date(tempDate!);
+                        merged.setHours(selected.getHours(), selected.getMinutes(), 0, 0);
+                        setDeliveryAt(merged);
+                        setShowDatePicker(false);
+                        setTempDate(null);
+                        setAndroidPickerMode('date');
+                      }
+                    }}
+                  />
+                )}
+              </>
             )}
           </View>
-
-          {/* Native datetime picker */}
-          {showDatePicker && (
-            <DateTimePicker
-              mode="datetime"
-              value={deliveryAt ?? new Date()}
-              minimumDate={new Date()}
-              display={Platform.OS === 'ios' ? 'inline' : 'default'}
-              onChange={(_e, selected) => {
-                if (Platform.OS !== 'ios') setShowDatePicker(false);
-                if (selected) setDeliveryAt(selected);
-              }}
-            />
-          )}
-          {/* iOS: confirm button to close inline picker */}
-          {showDatePicker && Platform.OS === 'ios' && (
-            <TouchableOpacity style={s.doneBtn} onPress={() => setShowDatePicker(false)}>
-              <Text style={s.doneBtnText}>Done</Text>
-            </TouchableOpacity>
-          )}
 
           {/* Assignees */}
           <View style={s.field}>

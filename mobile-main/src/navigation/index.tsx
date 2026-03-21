@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { useNotificationStore } from '../store/notificationStore';
@@ -10,6 +11,7 @@ import { usePushToken } from '../hooks/usePushToken';
 
 import LoginScreen          from '../screens/LoginScreen';
 import ListScreen           from '../screens/ListScreen';
+import MyOrdersScreen       from '../screens/MyOrdersScreen';
 import ProductDetailScreen  from '../screens/ProductDetailScreen';
 import CreateProductScreen  from '../screens/CreateProductScreen';
 import NotificationsScreen  from '../screens/NotificationsScreen';
@@ -17,14 +19,20 @@ import ActivityScreen       from '../screens/ActivityScreen';
 
 export type RootStackParamList = {
   Login:         undefined;
-  List:          undefined;
+  MainTabs:      undefined;
   ProductDetail: { productId: number };
   CreateProduct: undefined;
   Notifications: undefined;
   Activity:      undefined;
 };
 
+export type TabParamList = {
+  List:     undefined;
+  MyOrders: undefined;
+};
+
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab   = createBottomTabNavigator<TabParamList>();
 
 // ── Header right: bell + activity icons ──────────────────────────────────────
 function HeaderIcons() {
@@ -65,18 +73,56 @@ const h = StyleSheet.create({
   badgeText: { fontSize: 9, color: '#fff', fontWeight: '700' },
 });
 
+// ── Bottom tab navigator ───────────────────────────────────────────────────────
+function MainTabs() {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: true,
+        headerStyle: { backgroundColor: '#0F1117' },
+        headerTintColor: '#F1F5F9',
+        headerTitleStyle: { fontWeight: '700' },
+        headerRight: () => <HeaderIcons />,
+        tabBarStyle: {
+          backgroundColor: '#0F1117',
+          borderTopColor: '#1E2535',
+          borderTopWidth: 1,
+        },
+        tabBarActiveTintColor: '#6366F1',
+        tabBarInactiveTintColor: '#64748B',
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+      }}
+    >
+      <Tab.Screen
+        name="List"
+        component={ListScreen}
+        options={{
+          title: 'Products',
+          tabBarLabel: 'Products',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>📦</Text>,
+        }}
+      />
+      <Tab.Screen
+        name="MyOrders"
+        component={MyOrdersScreen}
+        options={{
+          title: 'My Orders',
+          tabBarLabel: 'My Orders',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>📋</Text>,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
+
 // ── App navigator ─────────────────────────────────────────────────────────────
 function AppNavigator() {
   const token = useAuthStore((s) => s.token);
   const { setUnreadCount } = useNotificationStore();
 
-  // WS connection at top level
   useWsEvents();
-
-  // Register device for push notifications (no-op on logout)
   usePushToken();
 
-  // Load initial unread count when logged in
   useEffect(() => {
     if (!token) return;
     notificationsApi.getUnreadCount()
@@ -96,18 +142,7 @@ function AppNavigator() {
         <Stack.Screen name="Login" component={LoginScreen} />
       ) : (
         <>
-          <Stack.Screen
-            name="List"
-            component={ListScreen}
-            options={{
-              headerShown: true,
-              title: 'Products',
-              headerStyle: { backgroundColor: '#0F1117' },
-              headerTintColor: '#F1F5F9',
-              headerTitleStyle: { fontWeight: '700' },
-              headerRight: () => <HeaderIcons />,
-            }}
-          />
+          <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
           <Stack.Screen name="CreateProduct"  component={CreateProductScreen} options={{ presentation: 'modal' }} />
           <Stack.Screen name="Notifications"  component={NotificationsScreen} />

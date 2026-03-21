@@ -12,6 +12,7 @@ interface Props {
   visible: boolean;
   filters: ProductFilters;
   users: User[];
+  hideAssignedTo?: boolean;
   onApply: (f: ProductFilters) => void;
   onClose: () => void;
 }
@@ -103,7 +104,7 @@ const df = StyleSheet.create({
 
 // ─── Main FilterPanel ─────────────────────────────────────────────────────────
 
-export default function FilterPanel({ visible, filters, users, onApply, onClose }: Props) {
+export default function FilterPanel({ visible, filters, users, hideAssignedTo, onApply, onClose }: Props) {
   const [local, setLocal]                 = useState<ProductFilters>(filters);
   const [deliveryPreset, setDeliveryPreset] = useState<DeliveryPreset>('');
 
@@ -137,7 +138,8 @@ export default function FilterPanel({ visible, filters, users, onApply, onClose 
   };
 
   const activeCount = [
-    local.status, local.created_by, local.assigned_to,
+    local.status, local.created_by,
+    ...(hideAssignedTo ? [] : [local.assigned_to]),
     local.date_from, local.date_to, local.delivery_from, local.delivery_to,
   ].filter(Boolean).length;
 
@@ -196,27 +198,30 @@ export default function FilterPanel({ visible, filters, users, onApply, onClose 
 
           <View style={s.divider} />
 
-          {/* ── Assigned To ── */}
-          <View style={s.section}>
-            <Text style={s.sectionLabel}>Assigned To</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={s.chipRow}>
-                {userOptions.map((u) => (
-                  <TouchableOpacity
-                    key={u.id}
-                    style={[s.chip, local.assigned_to === u.id && s.chipActive]}
-                    onPress={() => set({ assigned_to: u.id })}
-                  >
-                    <Text style={[s.chipText, local.assigned_to === u.id && s.chipTextActive]}>
-                      {u.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+          {/* ── Assigned To — hidden in My Orders (locked to current user) ── */}
+          {!hideAssignedTo && (
+            <>
+              <View style={s.section}>
+                <Text style={s.sectionLabel}>Assigned To</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={s.chipRow}>
+                    {userOptions.map((u) => (
+                      <TouchableOpacity
+                        key={u.id}
+                        style={[s.chip, local.assigned_to === u.id && s.chipActive]}
+                        onPress={() => set({ assigned_to: u.id })}
+                      >
+                        <Text style={[s.chipText, local.assigned_to === u.id && s.chipTextActive]}>
+                          {u.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
               </View>
-            </ScrollView>
-          </View>
-
-          <View style={s.divider} />
+              <View style={s.divider} />
+            </>
+          )}
 
           {/* ── Created By ── */}
           <View style={s.section}>

@@ -12,8 +12,9 @@ import {
   DndContext, closestCenter, DragEndEvent, DragOverlay, DragStartEvent,
   PointerSensor, useSensor, useSensors, useDroppable, useDraggable,
 } from '@dnd-kit/core';
-import { Plus, GripVertical, Package, Loader2 } from 'lucide-react';
+import { Plus, GripVertical, Package, Loader2, User, CalendarDays } from 'lucide-react';
 import { useProductBadges } from '../../hooks/useProductBadges';
+import { formatDate } from '../../utils/date';
 
 const PAGE_SIZE = 20;          // cards per page per column
 const CARD_ESTIMATE_PX = 100;  // estimated card height for virtualizer
@@ -346,7 +347,7 @@ function KanbanCard({
     <div
       ref={setNodeRef}
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      className="bg-surface-800/80 border border-surface-700/50 rounded-xl p-3 cursor-pointer card-hover group"
+      className="bg-surface-800/80 border border-surface-700/50 rounded-xl p-4 cursor-pointer card-hover group"
       onClick={onClick}
     >
       <div className="flex items-start gap-2">
@@ -359,18 +360,29 @@ function KanbanCard({
           <GripVertical className="w-4 h-6" />
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          {/* Order ID row */}
+          <div className="flex items-center gap-2 mb-3">
             <Package className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />
             <span className="text-xs font-mono text-brand-400">{product.product_id}</span>
             {hasBadge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
           </div>
-          <h4 className="text-sm font-medium truncate">{product.customer_name}</h4>
-          {product.customer_phone && (
-            <p className="text-xs text-surface-500 mt-0.5">{product.customer_phone}</p>
-          )}
-          {product.description && (
-            <p className="text-xs text-surface-400 mt-1.5 line-clamp-2">{product.description}</p>
-          )}
+          {/* Assignees + delivery date */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1 min-w-0">
+              <User className="w-3 h-3 text-surface-500 flex-shrink-0" />
+              <span className="text-xs text-surface-400 truncate">
+                {product.assignees && product.assignees.length > 0
+                  ? product.assignees.map((a) => a.name).join(', ')
+                  : 'Unassigned'}
+              </span>
+            </div>
+            {product.delivery_at && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <CalendarDays className="w-3 h-3 text-amber-400" />
+                <span className="text-xs text-amber-400">{formatDate(product.delivery_at)}</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -382,11 +394,26 @@ function KanbanCard({
 function KanbanCardOverlay({ product }: { product: Product }) {
   return (
     <div className="bg-surface-800 border border-brand-500/50 rounded-xl p-3 shadow-2xl shadow-brand-500/10 rotate-2">
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-2">
         <Package className="w-3.5 h-3.5 text-brand-400" />
         <span className="text-xs font-mono text-brand-400">{product.product_id}</span>
       </div>
-      <h4 className="text-sm font-medium">{product.customer_name}</h4>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1 min-w-0">
+          <User className="w-3 h-3 text-surface-500 flex-shrink-0" />
+          <span className="text-xs text-surface-400 truncate">
+            {product.assignees && product.assignees.length > 0
+              ? product.assignees.map((a) => a.name).join(', ')
+              : 'Unassigned'}
+          </span>
+        </div>
+        {product.delivery_at && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <CalendarDays className="w-3 h-3 text-amber-400" />
+            <span className="text-xs text-amber-400">{formatDate(product.delivery_at)}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
