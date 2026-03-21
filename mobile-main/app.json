@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "gift-highway",
+    "slug": "gift-highway",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,7 +15,7 @@
       "supportsTablet": true
     },
     "android": {
-      "package": "com.kanbanmobile",
+      "package": "com.gifthighway",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -41,7 +41,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "a1160494-206e-45b2-ac12-aaff31f4347b"
+        "projectId": "30d30831-9618-4bb9-a471-6c1f18a93b7c"
       }
     }
   }
