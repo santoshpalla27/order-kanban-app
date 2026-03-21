@@ -1,17 +1,19 @@
 import React, {
-  useState, useEffect, useRef, useCallback,
+  useState, useEffect, useRef, useCallback, useMemo,
 } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView,
-  ActivityIndicator,
+  ActivityIndicator, ScrollView,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { chatApi } from '../api/services';
+import { chatApi, usersApi, productsApi } from '../api/services';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { RootStackParamList } from '../navigation';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ChatMessage {
   id: number;
@@ -21,27 +23,116 @@ interface ChatMessage {
   created_at: string;
 }
 
-function formatTime(dateStr: string): string {
-  const d = new Date(dateStr);
-  const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) {
-    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-  }
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-    + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+interface UserItem {
+  id: number;
+  name: string;
 }
 
-// Render message text with @[Name] mentions highlighted in indigo
-function MessageText({ text, style }: { text: string; style?: object }) {
-  const parts = text.split(/(@\[[^\]]+\])/g);
+interface OrderItem {
+  id: number;
+  product_id: string;   // display ID e.g. "ABC123"
+  customer_name: string;
+}
+
+type MentionEntry =
+  | { kind: 'user';  item: UserItem  }
+  | { kind: 'order'; item: OrderItem };
+
+interface Processed {
+  msg: ChatMessage;
+  isOwn: boolean;
+  isFirst: boolean;   // first in a consecutive group from same sender
+  isLast: boolean;    // last in a consecutive group from same sender
+  showDate: boolean;
+  dateLabel: string;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 50;
+
+const EMOJIS = ['👍','👎','😄','😢','🎉','🔥','❤️','🚀','👏','✅','❌','💡','⭐','🙏','😂'];
+
+const AVATAR_COLORS = [
+  '#EC4899', '#F97316', '#10B981', '#06B6D4',
+  '#8B5CF6', '#D946EF', '#84CC16', '#EF4444',
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function getAvatarColor(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function formatTime(dateStr: string): string {
+  return new Date(dateStr).toLocaleTimeString(undefined, {
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+function processMessages(msgs: ChatMessage[], myId?: number): Processed[] {
+  let lastDate = '';
+  return msgs.map((msg, idx) => {
+    const isOwn     = msg.user_id === myId;
+    const dateLabel = formatDateLabel(msg.created_at);
+    const showDate  = dateLabel !== lastDate;
+    lastDate = dateLabel;
+
+    const prev = msgs[idx - 1];
+    const next = msgs[idx + 1];
+    const isFirst = !prev || prev.user_id !== msg.user_id ||
+      formatDateLabel(prev.created_at) !== dateLabel;
+    const isLast  = !next || next.user_id !== msg.user_id ||
+      formatDateLabel(next.created_at) !== formatDateLabel(msg.created_at);
+
+    return { msg, isOwn, isFirst, isLast, showDate, dateLabel };
+  });
+}
+
+// ─── Mention-aware text renderer ──────────────────────────────────────────────
+
+function MsgText({
+  text, isOwn, onOrderPress,
+}: {
+  text: string;
+  isOwn: boolean;
+  onOrderPress?: (id: number) => void;
+}) {
+  // Split on both @[Name] and @{id:PROD-ID} tokens
+  const parts = text.split(/(@\[[^\]]+\]|@\{\d+:[^}]+\})/g);
   return (
-    <Text style={style}>
+    <Text style={[st.msgText, isOwn && st.msgTextOwn]}>
       {parts.map((part, i) => {
-        const match = part.match(/^@\[([^\]]+)\]$/);
-        if (match) {
+        const userM  = part.match(/^@\[([^\]]+)\]$/);
+        const orderM = part.match(/^@\{(\d+):([^}]+)\}$/);
+        if (userM) {
           return (
-            <Text key={i} style={s.mention}>@{match[1]}</Text>
+            <Text key={i} style={[st.mention, isOwn && st.mentionOwn]}>
+              @{userM[1]}
+            </Text>
+          );
+        }
+        if (orderM) {
+          return (
+            <Text
+              key={i}
+              style={st.orderMention}
+              onPress={() => onOrderPress?.(Number(orderM[1]))}
+            >
+              @{orderM[2]}
+            </Text>
           );
         }
         return <Text key={i}>{part}</Text>;
@@ -50,203 +141,513 @@ function MessageText({ text, style }: { text: string; style?: object }) {
   );
 }
 
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
 export default function TeamChatScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const user = useAuthStore((st) => st.user);
+  const user       = useAuthStore((s) => s.user);
 
-  const [messages, setMessages]     = useState<ChatMessage[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore]       = useState(false);
-  const [oldestCursor, setOldestCursor] = useState<number | undefined>();
-  const [input, setInput]           = useState('');
-  const [sending, setSending]       = useState(false);
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [messages,     setMessages]     = useState<ChatMessage[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [loadingMore,  setLoadingMore]  = useState(false);
+  const [hasMore,      setHasMore]      = useState(false);
+  const [cursor,       setCursor]       = useState<number | undefined>();
 
-  const listRef = useRef<FlatList<ChatMessage>>(null);
+  const [input,        setInput]        = useState('');
+  const [sending,      setSending]      = useState(false);
+  const [showEmoji,    setShowEmoji]    = useState(false);
+  // After a mention is inserted we want the cursor right after the token.
+  // We store the target position in a ref (avoids triggering re-renders) and
+  // apply it via state only once the TextInput has re-focused.
+  const pendingCursor = useRef<{ start: number; end: number } | null>(null);
+  const [forcedCursor, setForcedCursor] = useState<{ start: number; end: number } | undefined>();
 
-  // ── Initial load ────────────────────────────────────────────────────────────
+  // @mention
+  const [allUsers,      setAllUsers]      = useState<UserItem[]>([]);
+  const [mentionQuery,  setMentionQuery]  = useState<string | null>(null);
+  const [mentionStart,  setMentionStart]  = useState(0);
+  const [orderResults,  setOrderResults]  = useState<OrderItem[]>([]);
+  const [orderLoading,  setOrderLoading]  = useState(false);
+  const orderTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const listRef   = useRef<FlatList<Processed>>(null);
+  const inputRef  = useRef<TextInput>(null);
+  const didScroll = useRef(false);
+
+  // ── Load users for @mention ────────────────────────────────────────────────
+  useEffect(() => {
+    usersApi.getList()
+      .then((res) => {
+        const raw: any[] = Array.isArray(res.data) ? res.data : [];
+        setAllUsers(raw.map((u) => ({ id: u.id, name: u.name })));
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Debounced order search whenever mentionQuery changes ───────────────────
+  useEffect(() => {
+    if (mentionQuery === null) { setOrderResults([]); return; }
+    clearTimeout(orderTimer.current);
+    orderTimer.current = setTimeout(async () => {
+      setOrderLoading(true);
+      try {
+        const res = await productsApi.getPaged(
+          mentionQuery ? { search: mentionQuery } : undefined, 6,
+        );
+        const raw: any[] = res.data?.data ?? [];
+        setOrderResults(raw.map((p) => ({
+          id:            p.id,
+          product_id:    p.product_id,
+          customer_name: p.customer_name,
+        })));
+      } catch { setOrderResults([]); }
+      setOrderLoading(false);
+    }, 250);
+    return () => clearTimeout(orderTimer.current);
+  }, [mentionQuery]);
+
+  // ── Initial load ───────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     try {
-      const res = await chatApi.getMessages(50);
+      const res = await chatApi.getMessages(PAGE_SIZE);
       const data: ChatMessage[] = res.data?.data || [];
       setMessages(data);
       setHasMore(res.data?.has_more || false);
-      if (data.length > 0) {
-        setOldestCursor(data[0].id); // oldest is first after backend reversal
-      }
+      if (res.data?.next_cursor != null) setCursor(res.data.next_cursor);
     } catch {}
     setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
 
-  // Scroll to end after initial load
+  // Scroll to bottom on first load
   useEffect(() => {
-    if (!loading && messages.length > 0) {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 100);
+    if (!loading && messages.length > 0 && !didScroll.current) {
+      didScroll.current = true;
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 120);
     }
-  }, [loading]);
+  }, [loading, messages.length]);
 
-  // ── Load older messages ──────────────────────────────────────────────────────
-  const loadMore = async () => {
-    if (loadingMore || !hasMore || !oldestCursor) return;
+  // ── Load older ─────────────────────────────────────────────────────────────
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || !cursor) return;
     setLoadingMore(true);
     try {
-      const res = await chatApi.getMessages(50, oldestCursor);
-      const older: ChatMessage[] = res.data?.data || [];
-      if (older.length > 0) {
-        setMessages((prev) => [...older, ...prev]);
+      const res  = await chatApi.getMessages(PAGE_SIZE, cursor);
+      const data: ChatMessage[] = res.data?.data || [];
+      if (data.length) {
+        setMessages((prev) => [...data, ...prev]);
         setHasMore(res.data?.has_more || false);
-        setOldestCursor(older[0].id);
+        if (res.data?.next_cursor != null) setCursor(res.data.next_cursor);
+        else setHasMore(false);
       }
     } catch {}
     setLoadingMore(false);
-  };
+  }, [loadingMore, hasMore, cursor]);
 
-  // ── Real-time new messages via WS ────────────────────────────────────────────
-  const onChatMessage = useCallback((msg: ChatMessage) => {
+  // ── Real-time WS ───────────────────────────────────────────────────────────
+  const onChatMessage = useCallback((msg: any) => {
     setMessages((prev) => {
-      // Avoid duplicates (e.g. own message already added optimistically)
+      // Already have this real server id — skip (handles API-before-WS case)
       if (prev.some((m) => m.id === msg.id)) return prev;
-      return [...prev, msg];
+
+      // Our own message: the optimistic placeholder has a negative id.
+      // Replace it directly so we never have two copies.
+      if (msg.user_id === user?.id) {
+        const optIdx = prev.findIndex((m) => m.id < 0);
+        if (optIdx >= 0) {
+          const next = [...prev];
+          next[optIdx] = msg as ChatMessage;
+          return next;
+        }
+      }
+
+      return [...prev, msg as ChatMessage];
     });
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
-  }, []);
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+  }, [user?.id]);
 
   useWsEvents({ onChatMessage });
 
-  // ── Send message ─────────────────────────────────────────────────────────────
+  // ── @mention ───────────────────────────────────────────────────────────────
+  // NOTE: onSelectionChange fires AFTER onChangeText in React Native, so
+  // selection.current is always stale here. Scan text directly instead.
+  const handleInputChange = (text: string) => {
+    setInput(text);
+    const atIdx = text.lastIndexOf('@');
+
+    if (atIdx !== -1) {
+      const query = text.slice(atIdx + 1);
+      // Skip if cursor is inside an already-inserted mention token
+      if (
+        !query.includes('[') && !query.includes(']') &&
+        !query.includes('{') && !query.includes('}') &&
+        query.length <= 30
+      ) {
+        setMentionStart(atIdx);
+        setMentionQuery(query);
+        return;
+      }
+    }
+    setMentionQuery(null);
+  };
+
+  const selectUser = (u: UserItem) => {
+    const mentionEnd = mentionStart + 1 + (mentionQuery?.length ?? 0);
+    const before     = input.slice(0, mentionStart);
+    const after      = input.slice(mentionEnd);
+    const inserted   = `@[${u.name}] `;
+    const newPos     = mentionStart + inserted.length;
+    setInput(`${before}${inserted}${after}`);
+    setMentionQuery(null);
+    // Store target — applied in onFocus once TextInput has re-focused
+    pendingCursor.current = { start: newPos, end: newPos };
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const selectOrder = (p: OrderItem) => {
+    const mentionEnd = mentionStart + 1 + (mentionQuery?.length ?? 0);
+    const before     = input.slice(0, mentionStart);
+    const after      = input.slice(mentionEnd);
+    const token      = `@{${p.id}:${p.product_id}} `;
+    const newPos     = mentionStart + token.length;
+    setInput(`${before}${token}${after}`);
+    setMentionQuery(null);
+    pendingCursor.current = { start: newPos, end: newPos };
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  // Unified mention entries: users first, then orders
+  const mentionEntries = useMemo((): MentionEntry[] => {
+    if (mentionQuery === null) return [];
+    const q = mentionQuery.toLowerCase();
+    const users: MentionEntry[] = allUsers
+      .filter((u) => u.name.toLowerCase().includes(q) && u.id !== user?.id)
+      .slice(0, 5)
+      .map((u) => ({ kind: 'user', item: u }));
+    const orders: MentionEntry[] = orderResults
+      .map((p) => ({ kind: 'order', item: p }));
+    return [...users, ...orders];
+  }, [mentionQuery, allUsers, orderResults, user?.id]);
+
+  const showMentionDropdown = mentionQuery !== null &&
+    (mentionEntries.length > 0 || orderLoading);
+
+  // ── Send ───────────────────────────────────────────────────────────────────
   const send = async () => {
     const text = input.trim();
     if (!text || sending) return;
     setInput('');
+    setMentionQuery(null);
+    setShowEmoji(false);
     setSending(true);
 
-    // Optimistic append
-    const optimistic: ChatMessage = {
-      id:         Date.now(), // temp id
+    const opt: ChatMessage = {
+      id:         -(Date.now()),
       user_id:    user?.id || 0,
       user_name:  user?.name || 'You',
       message:    text,
       created_at: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, optimistic]);
-    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+    setMessages((prev) => [...prev, opt]);
+    setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 60);
 
     try {
-      const res = await chatApi.sendMessage(text);
-      // Replace optimistic message with real one from server
+      const res  = await chatApi.sendMessage(text);
       const real: ChatMessage = {
-        id:         res.data?.id || optimistic.id,
-        user_id:    res.data?.user_id || optimistic.user_id,
-        user_name:  res.data?.user_name || optimistic.user_name,
+        id:         res.data?.id         ?? opt.id,
+        user_id:    res.data?.user_id    ?? opt.user_id,
+        user_name:  res.data?.user_name  ?? opt.user_name,
         message:    text,
-        created_at: res.data?.created_at || optimistic.created_at,
+        created_at: res.data?.created_at ?? opt.created_at,
       };
-      setMessages((prev) =>
-        prev.map((m) => m.id === optimistic.id ? real : m)
-      );
+      setMessages((prev) => prev.map((m) => m.id === opt.id ? real : m));
     } catch {
-      // Remove optimistic on failure
-      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-      setInput(text); // restore input
+      setMessages((prev) => prev.filter((m) => m.id !== opt.id));
+      setInput(text);
     }
     setSending(false);
   };
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-  const renderItem = ({ item, index }: { item: ChatMessage; index: number }) => {
-    const isMe = item.user_id === user?.id;
-    const prevMsg = index > 0 ? messages[index - 1] : null;
-    const showName = !isMe && (
-      !prevMsg || prevMsg.user_id !== item.user_id
-    );
+  // ── Processed list ─────────────────────────────────────────────────────────
+  const processed = useMemo(
+    () => processMessages(messages, user?.id),
+    [messages, user?.id],
+  );
+
+  // ── Render message ─────────────────────────────────────────────────────────
+  const renderItem = useCallback(({ item }: { item: Processed }) => {
+    const { msg, isOwn, isFirst, isLast, showDate, dateLabel } = item;
+    const name  = msg.user_name || 'Unknown';
+    const color = getAvatarColor(name);
 
     return (
-      <View style={[s.msgRow, isMe && s.msgRowMe]}>
-        <View style={[s.bubble, isMe ? s.bubbleMe : s.bubbleThem]}>
-          {showName && (
-            <Text style={s.senderName}>{item.user_name}</Text>
+      <View>
+        {/* ── Date separator ─────────────────────────────────────────────── */}
+        {showDate && (
+          <View style={st.dateSep}>
+            <View style={st.dateLine} />
+            <Text style={st.dateLabel}>{dateLabel}</Text>
+            <View style={st.dateLine} />
+          </View>
+        )}
+
+        {/* ── Message row ────────────────────────────────────────────────── */}
+        <View style={[
+          st.row,
+          isOwn  ? st.rowOwn   : st.rowOther,
+          isLast ? st.rowLast  : st.rowTight,
+        ]}>
+
+          {/* Avatar (left side, others only) */}
+          {!isOwn && (
+            <View style={st.avatarSlot}>
+              {isLast
+                ? <View style={[st.avatar, { backgroundColor: color }]}>
+                    <Text style={st.avatarInitial}>{name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                : <View style={st.avatarEmpty} />
+              }
+            </View>
           )}
-          <MessageText
-            text={item.message}
-            style={[s.msgText, isMe && s.msgTextMe]}
-          />
-          <Text style={[s.msgTime, isMe && s.msgTimeMe]}>
-            {formatTime(item.created_at)}
-          </Text>
+
+          {/* Bubble column */}
+          <View style={[st.col, isOwn && st.colOwn]}>
+
+            {/* Sender name (others, first in group) */}
+            {!isOwn && isFirst && (
+              <Text style={[st.senderName, { color }]}>{name}</Text>
+            )}
+
+            {/* Bubble */}
+            <View style={[
+              st.bubble,
+              isOwn ? st.bubbleOwn : st.bubbleOther,
+              isOwn  && isFirst && st.bubbleOwnFirst,
+              !isOwn && isFirst && st.bubbleOtherFirst,
+            ]}>
+              <MsgText
+                text={msg.message}
+                isOwn={isOwn}
+                onOrderPress={(id) => navigation.navigate('ProductDetail', { productId: id })}
+              />
+              <Text style={[st.timestamp, isOwn && st.timestampOwn]}>
+                {formatTime(msg.created_at)}
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
     );
-  };
+  }, []);
 
+  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={s.screen}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Text style={s.backIcon}>←</Text>
+    <SafeAreaView style={st.screen}>
+
+      {/* ── Header ── */}
+      <View style={st.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
+          <Text style={st.backArrow}>←</Text>
         </TouchableOpacity>
-        <Text style={s.title}>💬  Team Chat</Text>
+
+        <View style={st.hashPill}>
+          <Text style={st.hashText}>#</Text>
+        </View>
+
+        <View style={st.headerInfo}>
+          <Text style={st.headerTitle}>Team Chat</Text>
+          <Text style={st.headerSub}>All members</Text>
+        </View>
       </View>
 
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        style={st.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {/* Message list */}
+        {/* ── Messages ── */}
         {loading ? (
-          <View style={s.center}>
-            <ActivityIndicator color="#6366F1" />
+          <View style={st.center}>
+            <ActivityIndicator color="#6366F1" size="large" />
+            <Text style={st.loadingHint}>Loading messages…</Text>
           </View>
         ) : (
           <FlatList
             ref={listRef}
-            data={messages}
-            keyExtractor={(m) => String(m.id)}
-            contentContainerStyle={s.listContent}
+            data={processed}
+            keyExtractor={(item) => String(item.msg.id)}
+            contentContainerStyle={processed.length === 0 ? st.emptyContainer : st.listContent}
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             onScrollToIndexFailed={() => {}}
             ListHeaderComponent={
               hasMore ? (
-                <TouchableOpacity onPress={loadMore} style={s.loadMoreBtn} disabled={loadingMore}>
+                <TouchableOpacity
+                  onPress={loadMore}
+                  style={st.loadMoreBtn}
+                  disabled={loadingMore}
+                  activeOpacity={0.7}
+                >
                   {loadingMore
                     ? <ActivityIndicator size="small" color="#6366F1" />
-                    : <Text style={s.loadMoreText}>Load older messages</Text>
+                    : <>
+                        <Text style={st.loadMoreArrow}>↑</Text>
+                        <Text style={st.loadMoreText}>Load older messages</Text>
+                      </>
                   }
                 </TouchableOpacity>
               ) : null
             }
             ListEmptyComponent={
-              <View style={s.emptyWrap}>
-                <Text style={{ fontSize: 36 }}>💬</Text>
-                <Text style={s.emptyText}>No messages yet. Say hi!</Text>
+              <View style={st.empty}>
+                <View style={st.emptyIcon}>
+                  <Text style={{ fontSize: 34 }}>💬</Text>
+                </View>
+                <Text style={st.emptyTitle}>No messages yet</Text>
+                <Text style={st.emptySub}>Start the conversation!</Text>
               </View>
             }
             renderItem={renderItem}
           />
         )}
 
-        {/* Input row */}
-        <View style={s.inputRow}>
+        {/* ── @mention dropdown ── */}
+        {showMentionDropdown && (
+          <View style={st.mentionBox}>
+            {/* Header */}
+            <View style={st.mentionHeader}>
+              <Text style={st.mentionHeaderText}>MENTION</Text>
+            </View>
+
+            {/* People section */}
+            {mentionEntries.some((e) => e.kind === 'user') && (
+              <View style={st.mentionSection}>
+                <Text style={st.mentionSectionLabel}>PEOPLE</Text>
+                {mentionEntries
+                  .filter((e): e is MentionEntry & { kind: 'user' } => e.kind === 'user')
+                  .map((e, idx, arr) => (
+                    <TouchableOpacity
+                      key={`u-${e.item.id}`}
+                      style={[st.mentionRow, idx < arr.length - 1 && st.mentionRowBorder]}
+                      onPress={() => selectUser(e.item)}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[st.mentionAvatar, { backgroundColor: getAvatarColor(e.item.name) }]}>
+                        <Text style={st.mentionInitial}>{e.item.name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <Text style={st.mentionName}>{e.item.name}</Text>
+                    </TouchableOpacity>
+                  ))
+                }
+              </View>
+            )}
+
+            {/* Orders section */}
+            {(orderLoading || mentionEntries.some((e) => e.kind === 'order')) && (
+              <View style={[
+                st.mentionSection,
+                mentionEntries.some((e) => e.kind === 'user') && st.mentionSectionBorder,
+              ]}>
+                <Text style={[st.mentionSectionLabel, st.mentionSectionLabelOrder]}>ORDERS</Text>
+                {orderLoading && mentionEntries.filter((e) => e.kind === 'order').length === 0 ? (
+                  <View style={st.mentionOrderLoading}>
+                    <ActivityIndicator size="small" color="#F59E0B" />
+                  </View>
+                ) : (
+                  mentionEntries
+                    .filter((e): e is MentionEntry & { kind: 'order' } => e.kind === 'order')
+                    .map((e, idx, arr) => (
+                      <TouchableOpacity
+                        key={`o-${e.item.id}`}
+                        style={[st.mentionRow, idx < arr.length - 1 && st.mentionRowBorder]}
+                        onPress={() => selectOrder(e.item)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={st.mentionOrderIcon}>
+                          <Text style={st.mentionOrderEmoji}>📦</Text>
+                        </View>
+                        <View style={st.mentionOrderInfo}>
+                          <Text style={st.mentionOrderId}>{e.item.product_id}</Text>
+                          <Text style={st.mentionOrderCustomer} numberOfLines={1}>
+                            {e.item.customer_name}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ── Emoji picker ── */}
+        {showEmoji && (
+          <View style={st.emojiPanel}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <View style={st.emojiRow}>
+                {EMOJIS.map((e) => (
+                  <TouchableOpacity
+                    key={e}
+                    style={st.emojiBtn}
+                    onPress={() => {
+                      setInput((prev) => prev + e);
+                      setShowEmoji(false);
+                      setTimeout(() => inputRef.current?.focus(), 50);
+                    }}
+                  >
+                    <Text style={st.emojiText}>{e}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── Input bar ── */}
+        <View style={st.inputBar}>
+          {/* Emoji toggle */}
+          <TouchableOpacity
+            style={[st.inputIconBtn, showEmoji && st.inputIconBtnActive]}
+            onPress={() => { setShowEmoji((v) => !v); setMentionQuery(null); }}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: 20 }}>😊</Text>
+          </TouchableOpacity>
+
+          {/* Text field */}
           <TextInput
-            style={s.input}
-            placeholder="Message team…"
+            ref={inputRef}
+            style={st.textInput}
+            placeholder="Message team… (@name to mention)"
             placeholderTextColor="#4B5563"
             value={input}
-            onChangeText={setInput}
+            onChangeText={handleInputChange}
+            selection={forcedCursor}
+            onFocus={() => {
+              if (pendingCursor.current) {
+                const sel = pendingCursor.current;
+                pendingCursor.current = null;
+                // Small delay so the TextInput fully settles before repositioning
+                setTimeout(() => setForcedCursor(sel), 20);
+              }
+            }}
+            onSelectionChange={() => setForcedCursor(undefined)}
             multiline
             maxLength={2000}
             returnKeyType="default"
+            blurOnSubmit={false}
           />
+
+          {/* Send */}
           <TouchableOpacity
-            style={[s.sendBtn, (!input.trim() || sending) && s.sendBtnDisabled]}
+            style={[st.sendBtn, (!input.trim() || sending) && st.sendBtnOff]}
             onPress={send}
             disabled={!input.trim() || sending}
+            activeOpacity={0.85}
           >
             {sending
               ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={s.sendText}>↑</Text>
+              : <Text style={st.sendArrow}>↑</Text>
             }
           </TouchableOpacity>
         </View>
@@ -255,83 +656,209 @@ export default function TeamChatScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0D14' },
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
+const st = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: '#0A0D14' },
+  flex:   { flex: 1 },
+
+  // ── Header ─────────────────────────────────────────────────────────────────
   header: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingVertical: 13,
     borderBottomWidth: 1, borderBottomColor: '#1E2535',
+    backgroundColor: '#0F1117',
   },
-  backBtn:  { padding: 4 },
-  backIcon: { fontSize: 22, color: '#94A3B8' },
-  title:    { fontSize: 17, fontWeight: '700', color: '#F1F5F9' },
-
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  listContent: { paddingVertical: 12, paddingHorizontal: 12, gap: 4 },
-
-  loadMoreBtn: {
-    alignSelf: 'center', marginBottom: 12,
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderRadius: 99, borderWidth: 1, borderColor: '#1E2535',
-  },
-  loadMoreText: { fontSize: 12, color: '#64748B' },
-
-  emptyWrap: { alignItems: 'center', paddingTop: 80, gap: 8 },
-  emptyText: { fontSize: 14, color: '#64748B' },
-
-  // Message bubbles
-  msgRow:   { flexDirection: 'row', marginVertical: 2 },
-  msgRowMe: { justifyContent: 'flex-end' },
-
-  bubble: {
-    maxWidth: '78%',
-    borderRadius: 16,
-    paddingHorizontal: 12, paddingVertical: 8,
-  },
-  bubbleThem: {
-    backgroundColor: '#141824',
-    borderBottomLeftRadius: 4,
-  },
-  bubbleMe: {
+  backBtn:    { padding: 4 },
+  backArrow:  { fontSize: 22, color: '#94A3B8' },
+  hashPill: {
+    width: 38, height: 38, borderRadius: 11,
     backgroundColor: '#4F46E5',
-    borderBottomRightRadius: 4,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+  },
+  hashText:    { fontSize: 20, color: '#fff', fontWeight: '800' },
+  headerInfo:  { flex: 1 },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: '#F1F5F9' },
+  headerSub:   { fontSize: 11, color: '#4B5563', marginTop: 1 },
+
+  // ── Loading / Empty ─────────────────────────────────────────────────────────
+  center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingHint: { fontSize: 13, color: '#4B5563' },
+
+  emptyContainer: { flex: 1, justifyContent: 'center' },
+  empty:    { alignItems: 'center', gap: 10, paddingVertical: 60 },
+  emptyIcon: {
+    width: 72, height: 72, borderRadius: 36,
+    backgroundColor: '#141824', borderWidth: 1, borderColor: '#1E2535',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyTitle: { fontSize: 15, fontWeight: '600', color: '#94A3B8' },
+  emptySub:   { fontSize: 12, color: '#4B5563' },
+
+  // ── List ───────────────────────────────────────────────────────────────────
+  listContent: { paddingTop: 12, paddingBottom: 8, paddingHorizontal: 12 },
+
+  // Load older
+  loadMoreBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'center', marginBottom: 18,
+    paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 99,
+    backgroundColor: '#141824',
+    borderWidth: 1, borderColor: '#1E2535',
+  },
+  loadMoreArrow: { fontSize: 12, color: '#64748B' },
+  loadMoreText:  { fontSize: 12, color: '#64748B' },
+
+  // ── Date separator ─────────────────────────────────────────────────────────
+  dateSep: { flexDirection: 'row', alignItems: 'center', marginVertical: 18, gap: 8 },
+  dateLine: { flex: 1, height: 1, backgroundColor: '#1E2535' },
+  dateLabel: {
+    fontSize: 11, fontWeight: '600', color: '#4B5563',
+    paddingHorizontal: 10, paddingVertical: 3,
+    borderRadius: 99, backgroundColor: '#141824',
+    borderWidth: 1, borderColor: '#1E2535',
+    overflow: 'hidden',
   },
 
-  senderName: {
-    fontSize: 11, fontWeight: '700', color: '#818CF8',
-    marginBottom: 3,
-  },
-  msgText:    { fontSize: 14, color: '#E2E8F0', lineHeight: 20 },
-  msgTextMe:  { color: '#fff' },
-  mention:    { color: '#818CF8', fontWeight: '600' },
-  msgTime:    { fontSize: 10, color: '#64748B', marginTop: 4, alignSelf: 'flex-end' },
-  msgTimeMe:  { color: 'rgba(255,255,255,0.5)' },
+  // ── Message row ────────────────────────────────────────────────────────────
+  row:       { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  rowOwn:    { justifyContent: 'flex-end' },
+  rowOther:  { justifyContent: 'flex-start' },
+  rowLast:   { marginBottom: 8 },
+  rowTight:  { marginBottom: 2 },
 
-  // Input
-  inputRow: {
+  // Avatar
+  avatarSlot:    { width: 30, alignItems: 'center' },
+  avatar:        { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: 11, color: '#fff', fontWeight: '700' },
+  avatarEmpty:   { width: 28, height: 28 },
+
+  // Bubble column
+  col:    { maxWidth: '78%', alignItems: 'flex-start' },
+  colOwn: { alignItems: 'flex-end' },
+
+  senderName: { fontSize: 11, fontWeight: '700', marginBottom: 3, paddingLeft: 2 },
+
+  // Bubble
+  bubble: {
+    borderRadius: 18,
+    paddingHorizontal: 13, paddingVertical: 9,
+  },
+  bubbleOwn: {
+    backgroundColor: '#4F46E5',
+    borderBottomRightRadius: 5,
+  },
+  bubbleOther: {
+    backgroundColor: '#141824',
+    borderWidth: 1, borderColor: '#1E2535',
+    borderBottomLeftRadius: 5,
+  },
+  bubbleOwnFirst:   { borderTopRightRadius: 5 },
+  bubbleOtherFirst: { borderTopLeftRadius: 5 },
+
+  // Text
+  msgText:      { fontSize: 14, color: '#D1D5DB', lineHeight: 20 },
+  msgTextOwn:   { color: '#fff' },
+  mention:      { color: '#818CF8', fontWeight: '600' },
+  mentionOwn:   { color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
+  orderMention: { color: '#F59E0B', fontWeight: '600' },
+
+  timestamp:    { fontSize: 10, color: '#64748B', marginTop: 4, alignSelf: 'flex-end' },
+  timestampOwn: { color: 'rgba(255,255,255,0.45)' },
+
+  // ── @mention dropdown ──────────────────────────────────────────────────────
+  mentionBox: {
+    backgroundColor: '#0F1117',
+    borderTopWidth: 1, borderTopColor: '#1E2535',
+    maxHeight: 280,
+  },
+  mentionHeader: {
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderBottomWidth: 1, borderBottomColor: '#1E2535',
+  },
+  mentionHeaderText: {
+    fontSize: 9, color: '#4B5563', fontWeight: '700', letterSpacing: 1,
+  },
+  mentionSection:      { },
+  mentionSectionBorder:{ borderTopWidth: 1, borderTopColor: '#1E2535' },
+  mentionSectionLabel: {
+    fontSize: 9, color: '#4B5563', fontWeight: '700', letterSpacing: 1,
+    paddingHorizontal: 14, paddingTop: 7, paddingBottom: 2,
+  },
+  mentionSectionLabelOrder: { color: '#92400E' },
+
+  mentionRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, paddingVertical: 9,
+  },
+  mentionRowBorder: { borderBottomWidth: 1, borderBottomColor: '#1A2030' },
+  mentionAvatar: {
+    width: 30, height: 30, borderRadius: 15,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mentionInitial: { fontSize: 12, color: '#fff', fontWeight: '700' },
+  mentionName:    { flex: 1, fontSize: 14, color: '#E2E8F0' },
+
+  // Order rows in mention dropdown
+  mentionOrderLoading: { paddingVertical: 10, alignItems: 'center' },
+  mentionOrderIcon: {
+    width: 30, height: 30, borderRadius: 8,
+    backgroundColor: 'rgba(245,158,11,0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  mentionOrderEmoji:    { fontSize: 14 },
+  mentionOrderInfo:     { flex: 1 },
+  mentionOrderId:       { fontSize: 13, color: '#F59E0B', fontWeight: '700', fontVariant: ['tabular-nums'] },
+  mentionOrderCustomer: { fontSize: 11, color: '#64748B', marginTop: 1 },
+
+  // ── Emoji panel ────────────────────────────────────────────────────────────
+  emojiPanel: {
+    backgroundColor: '#0F1117',
+    borderTopWidth: 1, borderTopColor: '#1E2535',
+    paddingVertical: 8,
+  },
+  emojiRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 2 },
+  emojiBtn: { padding: 7 },
+  emojiText: { fontSize: 24 },
+
+  // ── Input bar ──────────────────────────────────────────────────────────────
+  inputBar: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     paddingHorizontal: 12, paddingVertical: 10,
     borderTopWidth: 1, borderTopColor: '#1E2535',
-    backgroundColor: '#0A0D14',
+    backgroundColor: '#0F1117',
   },
-  input: {
+  inputIconBtn: {
+    width: 40, height: 40, borderRadius: 11,
+    backgroundColor: '#141824',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  inputIconBtnActive: { backgroundColor: 'rgba(99,102,241,0.15)' },
+
+  textInput: {
     flex: 1,
     minHeight: 40, maxHeight: 120,
     backgroundColor: '#141824',
-    borderRadius: 12,
-    borderWidth: 1, borderColor: '#1E2535',
+    borderRadius: 12, borderWidth: 1, borderColor: '#1E2535',
     paddingHorizontal: 12,
-    paddingTop: Platform.OS === 'ios' ? 10 : 8,
+    paddingTop:    Platform.OS === 'ios' ? 10 : 8,
     paddingBottom: Platform.OS === 'ios' ? 10 : 8,
     fontSize: 14, color: '#E2E8F0',
   },
+
   sendBtn: {
-    width: 40, height: 40, borderRadius: 12,
+    width: 42, height: 42, borderRadius: 21,
     backgroundColor: '#6366F1',
     alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
   },
-  sendBtnDisabled: { opacity: 0.4 },
-  sendText: { fontSize: 18, color: '#fff', fontWeight: '700' },
+  sendBtnOff: {
+    backgroundColor: '#1E2535',
+    shadowOpacity: 0, elevation: 0,
+  },
+  sendArrow: { fontSize: 20, color: '#fff', fontWeight: '700' },
 });

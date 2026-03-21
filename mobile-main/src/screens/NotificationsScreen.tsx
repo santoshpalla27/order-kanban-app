@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator, SafeAreaView, TextInput, ScrollView,
+  ActivityIndicator, SafeAreaView, TextInput, Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -30,8 +30,17 @@ function formatFull(dateStr: string): string {
     + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  comment_added:       'Comment Added',
+  attachment_uploaded: 'Attachment Uploaded',
+  mention:             'Mention',
+  chat_message:        'Chat Message',
+  status_changed:      'Status Changed',
+  activity:            'Activity',
+};
+
 function humanizeType(type: string): string {
-  return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return TYPE_LABELS[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function NotificationsScreen() {
@@ -41,9 +50,10 @@ export default function NotificationsScreen() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [search, setSearch]         = useState('');
+  const [search, setSearch]             = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [typeFilter, setTypeFilter]     = useState('all');
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
 
   const load = useCallback(async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -178,34 +188,47 @@ export default function NotificationsScreen() {
         ))}
       </View>
 
-      {/* ── Type filter pills ── */}
-      {uniqueTypes.length > 0 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.typeRow}
+      {/* ── Type filter dropdown ── */}
+      <View style={s.dropdownRow}>
+        <TouchableOpacity
+          style={s.dropdownBtn}
+          onPress={() => setTypeDropdownOpen(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={s.dropdownLabel}>
+            {typeFilter === 'all' ? 'All types' : humanizeType(typeFilter)}
+          </Text>
+          <Text style={s.dropdownChevron}>▾</Text>
+        </TouchableOpacity>
+
+        <Modal
+          transparent
+          visible={typeDropdownOpen}
+          animationType="fade"
+          onRequestClose={() => setTypeDropdownOpen(false)}
         >
           <TouchableOpacity
-            style={[s.typePill, typeFilter === 'all' && s.typePillActive]}
-            onPress={() => setTypeFilter('all')}
+            style={s.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setTypeDropdownOpen(false)}
           >
-            <Text style={[s.typePillText, typeFilter === 'all' && s.typePillTextActive]}>
-              All types
-            </Text>
+            <View style={s.dropdownMenu}>
+              {(['all', ...uniqueTypes] as string[]).map((t) => (
+                <TouchableOpacity
+                  key={t}
+                  style={[s.dropdownOption, typeFilter === t && s.dropdownOptionActive]}
+                  onPress={() => { setTypeFilter(t); setTypeDropdownOpen(false); }}
+                >
+                  <Text style={[s.dropdownOptionText, typeFilter === t && s.dropdownOptionTextActive]}>
+                    {t === 'all' ? 'All types' : humanizeType(t)}
+                  </Text>
+                  {typeFilter === t && <Text style={s.dropdownCheck}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </View>
           </TouchableOpacity>
-          {uniqueTypes.map((t) => (
-            <TouchableOpacity
-              key={t}
-              style={[s.typePill, typeFilter === t && s.typePillActive]}
-              onPress={() => setTypeFilter(t)}
-            >
-              <Text style={[s.typePillText, typeFilter === t && s.typePillTextActive]}>
-                {humanizeType(t)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
+        </Modal>
+      </View>
 
       {/* ── Results count ── */}
       <View style={s.countRow}>
@@ -347,21 +370,42 @@ const s = StyleSheet.create({
   tabText:   { fontSize: 13, color: '#64748B', fontWeight: '600' },
   tabTextActive: { color: '#fff' },
 
-  // Type pills
-  typeRow: {
-    paddingHorizontal: 16, paddingVertical: 10, gap: 8,
-    flexDirection: 'row',
+  // Type dropdown
+  dropdownRow: {
+    paddingHorizontal: 16, paddingVertical: 8,
     borderBottomWidth: 1, borderBottomColor: '#1E2535',
   },
-  typePill: {
-    paddingHorizontal: 12, paddingVertical: 5,
-    borderRadius: 99,
+  dropdownBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    height: 38,
     backgroundColor: '#141824',
+    borderRadius: 10,
     borderWidth: 1, borderColor: '#1E2535',
+    paddingHorizontal: 12,
   },
-  typePillActive: { backgroundColor: 'rgba(99,102,241,0.15)', borderColor: '#6366F1' },
-  typePillText:   { fontSize: 12, color: '#64748B', fontWeight: '500' },
-  typePillTextActive: { color: '#818CF8' },
+  dropdownLabel:   { fontSize: 14, color: '#E2E8F0', flex: 1 },
+  dropdownChevron: { fontSize: 14, color: '#64748B', marginLeft: 6 },
+
+  // Dropdown modal
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', paddingHorizontal: 32,
+  },
+  dropdownMenu: {
+    backgroundColor: '#141824',
+    borderRadius: 12,
+    borderWidth: 1, borderColor: '#1E2535',
+    overflow: 'hidden',
+  },
+  dropdownOption: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 13,
+    borderBottomWidth: 1, borderBottomColor: '#1E2535',
+  },
+  dropdownOptionActive:     { backgroundColor: 'rgba(99,102,241,0.12)' },
+  dropdownOptionText:       { fontSize: 14, color: '#94A3B8' },
+  dropdownOptionTextActive: { color: '#6366F1', fontWeight: '600' },
+  dropdownCheck:            { fontSize: 14, color: '#6366F1', fontWeight: '700' },
 
   // Count row
   countRow: { paddingHorizontal: 16, paddingVertical: 6 },

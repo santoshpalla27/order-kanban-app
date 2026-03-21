@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Alert, Modal, SafeAreaView, FlatList,
@@ -868,6 +868,88 @@ function CommentsTab({
   // Attachment lightbox inside comments
   const [attLightbox, setAttLightbox] = useState<{ url: string; name: string; id?: number } | null>(null);
 
+  // @mention state
+  const inputRef = useRef<TextInput>(null);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionStart, setMentionStart] = useState(0);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [orderResults, setOrderResults] = useState<any[]>([]);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const orderTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const pendingCursor = useRef<{ start: number; end: number } | null>(null);
+  const [forcedCursor, setForcedCursor] = useState<{ start: number; end: number } | undefined>();
+
+  useEffect(() => {
+    usersApi.getList().then((res: any) => setAllUsers(res.data || [])).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (mentionQuery === null) { setOrderResults([]); return; }
+    clearTimeout(orderTimer.current);
+    orderTimer.current = setTimeout(async () => {
+      setOrderLoading(true);
+      try {
+        const res = await productsApi.getPaged(mentionQuery ? { search: mentionQuery } : undefined, 6);
+        setOrderResults((res as any)?.data?.data ?? []);
+      } catch { setOrderResults([]); }
+      setOrderLoading(false);
+    }, 250);
+  }, [mentionQuery]);
+
+  const filteredUsers = useMemo(() =>
+    mentionQuery !== null
+      ? allUsers.filter((u) => u.name.toLowerCase().includes(mentionQuery.toLowerCase())).slice(0, 5)
+      : [],
+    [mentionQuery, allUsers],
+  );
+
+  type MentionEntry = { kind: 'user'; user: User } | { kind: 'order'; product: any };
+  const mentionEntries: MentionEntry[] = [
+    ...filteredUsers.map((u): MentionEntry => ({ kind: 'user', user: u })),
+    ...orderResults.map((p): MentionEntry => ({ kind: 'order', product: p })),
+  ];
+  const showMentionDropdown = mentionQuery !== null && (mentionEntries.length > 0 || orderLoading);
+
+  const handleInputChange = (text: string) => {
+    setMessage(text);
+    const atIdx = text.lastIndexOf('@');
+    if (atIdx !== -1) {
+      const query = text.slice(atIdx + 1);
+      if (!query.includes('[') && !query.includes(']') &&
+          !query.includes('{') && !query.includes('}') &&
+          query.length <= 30) {
+        setMentionStart(atIdx);
+        setMentionQuery(query);
+        return;
+      }
+    }
+    setMentionQuery(null);
+  };
+
+  const selectMentionUser = (u: User) => {
+    const mentionEnd = mentionStart + 1 + (mentionQuery?.length ?? 0);
+    const before = message.slice(0, mentionStart);
+    const after = message.slice(mentionEnd);
+    const inserted = `@[${u.name}] `;
+    const newPos = mentionStart + inserted.length;
+    setMessage(`${before}${inserted}${after}`);
+    setMentionQuery(null);
+    pendingCursor.current = { start: newPos, end: newPos };
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const selectMentionOrder = (product: any) => {
+    const mentionEnd = mentionStart + 1 + (mentionQuery?.length ?? 0);
+    const before = message.slice(0, mentionStart);
+    const after = message.slice(mentionEnd);
+    const token = `@{${product.id}:${product.product_id}} `;
+    const newPos = mentionStart + token.length;
+    setMessage(`${before}${token}${after}`);
+    setMentionQuery(null);
+    pendingCursor.current = { start: newPos, end: newPos };
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
   const load = useCallback(async () => {
     try {
       const res = await commentsApi.getByProduct(productId);
@@ -1071,13 +1153,70 @@ function CommentsTab({
         </View>
       )}
 
+      {/* @mention dropdown */}
+      {showMentionDropdown && (
+        <View style={cm.mentionDropdown}>
+          <Text style={cm.mentionHeader}>Mention</Text>
+          {filteredUsers.length > 0 && (
+            <>
+              <Text style={cm.mentionSection}>PEOPLE</Text>
+              {filteredUsers.map((u) => (
+                <TouchableOpacity
+                  key={`u-${u.id}`}
+                  style={cm.mentionItem}
+                  onPress={() => selectMentionUser(u)}
+                >
+                  <View style={cm.mentionAvatar}>
+                    <Text style={cm.mentionAvatarText}>{u.name.charAt(0).toUpperCase()}</Text>
+                  </View>
+                  <Text style={cm.mentionName}>{u.name}</Text>
+                  {u.role && <Text style={cm.mentionRole}>{(u.role as any).name}</Text>}
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+          {(orderResults.length > 0 || orderLoading) && (
+            <>
+              <Text style={[cm.mentionSection, filteredUsers.length > 0 && cm.mentionSectionBorder]}>ORDERS</Text>
+              {orderLoading && orderResults.length === 0 ? (
+                <ActivityIndicator color="#F59E0B" size="small" style={{ marginVertical: 8 }} />
+              ) : orderResults.map((p) => (
+                <TouchableOpacity
+                  key={`o-${p.id}`}
+                  style={cm.mentionItem}
+                  onPress={() => selectMentionOrder(p)}
+                >
+                  <View style={cm.mentionOrderIcon}>
+                    <Text style={{ fontSize: 12 }}>📦</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={cm.mentionOrderId}>{p.product_id}</Text>
+                    <Text style={cm.mentionOrderCustomer} numberOfLines={1}>{p.customer_name}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </View>
+      )}
+
       {canComment && (
         <View style={cm.inputBar}>
           <TextInput
+            ref={inputRef}
             style={cm.input}
             value={message}
-            onChangeText={setMessage}
-            placeholder={replyTo ? `Reply to ${replyTo.name}…` : 'Write a comment...'}
+            onChangeText={handleInputChange}
+            selection={forcedCursor}
+            onFocus={() => {
+              if (pendingCursor.current) {
+                const sel = pendingCursor.current;
+                pendingCursor.current = null;
+                setTimeout(() => setForcedCursor(sel), 20);
+              }
+            }}
+            onSelectionChange={() => setForcedCursor(undefined)}
+            placeholder={replyTo ? `Reply to ${replyTo.name}…` : 'Write a comment... (@name to mention)'}
             placeholderTextColor="#64748B"
             multiline
           />
@@ -1277,6 +1416,47 @@ const cm = StyleSheet.create({
   attFileIcon:  { fontSize: 20 },
   attFileName:  { fontSize: 12, color: '#94A3B8', flex: 1 },
   attFileNameOwn: { color: 'rgba(255,255,255,0.85)' },
+
+  // Mention dropdown
+  mentionDropdown: {
+    marginHorizontal: 12, marginBottom: 4,
+    backgroundColor: '#131720', borderRadius: 14,
+    borderWidth: 1, borderColor: '#2D3748',
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.3, shadowRadius: 8,
+    elevation: 8,
+  },
+  mentionHeader: {
+    fontSize: 10, fontWeight: '700', color: '#475569',
+    letterSpacing: 1, textTransform: 'uppercase',
+    paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4,
+    borderBottomWidth: 1, borderBottomColor: '#1E2535',
+  },
+  mentionSection: {
+    fontSize: 9, fontWeight: '700', color: '#475569',
+    letterSpacing: 1.5, textTransform: 'uppercase',
+    paddingHorizontal: 12, paddingTop: 8, paddingBottom: 2,
+  },
+  mentionSectionBorder: {
+    borderTopWidth: 1, borderTopColor: '#1E2535', marginTop: 4,
+  },
+  mentionItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 12, paddingVertical: 9,
+  },
+  mentionAvatar: {
+    width: 28, height: 28, borderRadius: 14,
+    backgroundColor: '#4F46E5', alignItems: 'center', justifyContent: 'center',
+  },
+  mentionAvatarText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  mentionName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#E2E8F0' },
+  mentionRole: { fontSize: 11, color: '#64748B' },
+  mentionOrderIcon: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: 'rgba(245,158,11,0.15)', alignItems: 'center', justifyContent: 'center',
+  },
+  mentionOrderId: { fontSize: 12, fontWeight: '700', color: '#F59E0B', fontVariant: ['tabular-nums'] as any },
+  mentionOrderCustomer: { fontSize: 11, color: '#64748B' },
 
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 10,
