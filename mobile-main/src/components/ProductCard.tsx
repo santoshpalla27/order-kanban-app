@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Product } from '../types';
 import StatusChip from './StatusChip';
 import { formatDate } from '../utils/helpers';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 interface Props {
   product: Product;
@@ -12,6 +14,10 @@ interface Props {
 }
 
 export default function ProductCard({ product, onPress, showStatus = true, hasBadge = false }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeStyles(c), [c]);
+
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.75}>
       {/* Top row: order ID + badge */}
@@ -40,66 +46,68 @@ export default function ProductCard({ product, onPress, showStatus = true, hasBa
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#1C2130',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#2D3748',
-    gap: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  idRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  productId: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#818CF8',
-    fontFamily: 'monospace',
-  },
-  badge: {
-    width: 8,
-    height: 8,
-    borderRadius: 99,
-    backgroundColor: '#EF4444',
-  },
-  customerName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#F1F5F9',
-  },
-  meta: {
-    fontSize: 12,
-    color: '#94A3B8',
-    flex: 1,
-  },
-  description: {
-    fontSize: 12,
-    color: '#64748B',
-    lineHeight: 17,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 6,
-  },
-  assignees: {
-    fontSize: 12,
-    color: '#94A3B8',
-    flex: 1,
-  },
-  delivery: {
-    fontSize: 11,
-    color: '#FBBF24',
-  },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: c.surface,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: c.border2,
+      gap: 10,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    idRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    productId: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: c.brandLight,
+      fontFamily: 'monospace',
+    },
+    badge: {
+      width: 8,
+      height: 8,
+      borderRadius: 99,
+      backgroundColor: '#EF4444',
+    },
+    customerName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: c.text,
+    },
+    meta: {
+      fontSize: 12,
+      color: c.textSec,
+      flex: 1,
+    },
+    description: {
+      fontSize: 12,
+      color: c.textMuted,
+      lineHeight: 17,
+    },
+    footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 6,
+    },
+    assignees: {
+      fontSize: 12,
+      color: c.textSec,
+      flex: 1,
+    },
+    delivery: {
+      fontSize: 11,
+      color: '#FBBF24',
+    },
+  });
+}

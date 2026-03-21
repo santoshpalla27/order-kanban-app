@@ -1,12 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../api/services';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 export default function LoginScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeStyles(c), [c]);
+
   const [mode, setMode]         = useState<'login' | 'register'>('login');
   const [name, setName]         = useState('');
   const [email, setEmail]       = useState('');
@@ -70,7 +76,7 @@ export default function LoginScreen() {
                 value={name}
                 onChangeText={setName}
                 placeholder="Your name"
-                placeholderTextColor="#64748B"
+                placeholderTextColor={c.textMuted}
                 autoCapitalize="words"
               />
             </View>
@@ -83,7 +89,7 @@ export default function LoginScreen() {
               value={email}
               onChangeText={setEmail}
               placeholder="you@example.com"
-              placeholderTextColor="#64748B"
+              placeholderTextColor={c.textMuted}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -97,7 +103,7 @@ export default function LoginScreen() {
               value={password}
               onChangeText={setPassword}
               placeholder="••••••••"
-              placeholderTextColor="#64748B"
+              placeholderTextColor={c.textMuted}
               secureTextEntry
             />
           </View>
@@ -129,52 +135,54 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0D14' },
-  container: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 32 },
-  logoArea: { alignItems: 'center', gap: 8 },
-  logoIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 18,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  logoEmoji: { fontSize: 32 },
-  appName: { fontSize: 26, fontWeight: '800', color: '#F1F5F9', letterSpacing: -0.5 },
-  tagline: { fontSize: 13, color: '#64748B' },
-  card: {
-    backgroundColor: '#131720',
-    borderRadius: 20,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#1E2535',
-    gap: 16,
-  },
-  heading: { fontSize: 18, fontWeight: '700', color: '#F1F5F9', marginBottom: 4 },
-  field: { gap: 6 },
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
-  input: {
-    backgroundColor: '#1C2130',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2D3748',
-    color: '#F1F5F9',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    fontSize: 15,
-  },
-  submitBtn: {
-    backgroundColor: '#6366F1',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  submitBtnDisabled: { opacity: 0.6 },
-  submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  switchMode: { alignItems: 'center', paddingVertical: 4 },
-  switchText: { fontSize: 13, color: '#818CF8' },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    container: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 32 },
+    logoArea: { alignItems: 'center', gap: 8 },
+    logoIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 18,
+      backgroundColor: c.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 4,
+    },
+    logoEmoji: { fontSize: 32 },
+    appName: { fontSize: 26, fontWeight: '800', color: c.text, letterSpacing: -0.5 },
+    tagline: { fontSize: 13, color: c.textMuted },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: 20,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: c.surface2,
+      gap: 16,
+    },
+    heading: { fontSize: 18, fontWeight: '700', color: c.text, marginBottom: 4 },
+    field: { gap: 6 },
+    fieldLabel: { fontSize: 13, fontWeight: '600', color: c.textSec },
+    input: {
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.border2,
+      color: c.text,
+      paddingHorizontal: 16,
+      paddingVertical: 13,
+      fontSize: 15,
+    },
+    submitBtn: {
+      backgroundColor: c.brand,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    submitBtnDisabled: { opacity: 0.6 },
+    submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    switchMode: { alignItems: 'center', paddingVertical: 4 },
+    switchText: { fontSize: 13, color: c.brandLight },
+  });
+}

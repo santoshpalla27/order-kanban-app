@@ -12,6 +12,8 @@ import { chatApi, usersApi, productsApi } from '../api/services';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { RootStackParamList } from '../navigation';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,11 +106,12 @@ function processMessages(msgs: ChatMessage[], myId?: number): Processed[] {
 // ─── Mention-aware text renderer ──────────────────────────────────────────────
 
 function MsgText({
-  text, isOwn, onOrderPress,
+  text, isOwn, onOrderPress, st,
 }: {
   text: string;
   isOwn: boolean;
   onOrderPress?: (id: number) => void;
+  st: ReturnType<typeof makeStyles>;
 }) {
   // Split on both @[Name] and @{id:PROD-ID} tokens
   const parts = text.split(/(@\[[^\]]+\]|@\{\d+:[^}]+\})/g);
@@ -146,6 +149,10 @@ function MsgText({
 export default function TeamChatScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user       = useAuthStore((s) => s.user);
+
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const st = useMemo(() => makeStyles(c), [c]);
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [messages,     setMessages]     = useState<ChatMessage[]>([]);
@@ -431,6 +438,7 @@ export default function TeamChatScreen() {
                 text={msg.message}
                 isOwn={isOwn}
                 onOrderPress={(id) => navigation.navigate('ProductDetail', { productId: id })}
+                st={st}
               />
               <Text style={[st.timestamp, isOwn && st.timestampOwn]}>
                 {formatTime(msg.created_at)}
@@ -440,7 +448,7 @@ export default function TeamChatScreen() {
         </View>
       </View>
     );
-  }, []);
+  }, [st]);
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -469,7 +477,7 @@ export default function TeamChatScreen() {
         {/* ── Messages ── */}
         {loading ? (
           <View style={st.center}>
-            <ActivityIndicator color="#6366F1" size="large" />
+            <ActivityIndicator color={c.brand} size="large" />
             <Text style={st.loadingHint}>Loading messages…</Text>
           </View>
         ) : (
@@ -489,7 +497,7 @@ export default function TeamChatScreen() {
                   activeOpacity={0.7}
                 >
                   {loadingMore
-                    ? <ActivityIndicator size="small" color="#6366F1" />
+                    ? <ActivityIndicator size="small" color={c.brand} />
                     : <>
                         <Text style={st.loadMoreArrow}>↑</Text>
                         <Text style={st.loadMoreText}>Load older messages</Text>
@@ -619,7 +627,7 @@ export default function TeamChatScreen() {
             ref={inputRef}
             style={st.textInput}
             placeholder="Message team… (@name to mention)"
-            placeholderTextColor="#4B5563"
+            placeholderTextColor={c.textMuted}
             value={input}
             onChangeText={handleInputChange}
             selection={forcedCursor}
@@ -658,207 +666,209 @@ export default function TeamChatScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const st = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0D14' },
-  flex:   { flex: 1 },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    flex:   { flex: 1 },
 
-  // ── Header ─────────────────────────────────────────────────────────────────
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 13,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-    backgroundColor: '#0F1117',
-  },
-  backBtn:    { padding: 4 },
-  backArrow:  { fontSize: 22, color: '#94A3B8' },
-  hashPill: {
-    width: 38, height: 38, borderRadius: 11,
-    backgroundColor: '#4F46E5',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
-  },
-  hashText:    { fontSize: 20, color: '#fff', fontWeight: '800' },
-  headerInfo:  { flex: 1 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: '#F1F5F9' },
-  headerSub:   { fontSize: 11, color: '#4B5563', marginTop: 1 },
+    // ── Header ─────────────────────────────────────────────────────────────────
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingHorizontal: 16, paddingVertical: 13,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+      backgroundColor: c.headerBg,
+    },
+    backBtn:    { padding: 4 },
+    backArrow:  { fontSize: 22, color: c.textSec },
+    hashPill: {
+      width: 38, height: 38, borderRadius: 11,
+      backgroundColor: '#4F46E5',
+      alignItems: 'center', justifyContent: 'center',
+      shadowColor: c.brand, shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.35, shadowRadius: 6, elevation: 4,
+    },
+    hashText:    { fontSize: 20, color: '#fff', fontWeight: '800' },
+    headerInfo:  { flex: 1 },
+    headerTitle: { fontSize: 16, fontWeight: '700', color: c.text },
+    headerSub:   { fontSize: 11, color: c.textMuted, marginTop: 1 },
 
-  // ── Loading / Empty ─────────────────────────────────────────────────────────
-  center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingHint: { fontSize: 13, color: '#4B5563' },
+    // ── Loading / Empty ─────────────────────────────────────────────────────────
+    center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    loadingHint: { fontSize: 13, color: c.textMuted },
 
-  emptyContainer: { flex: 1, justifyContent: 'center' },
-  empty:    { alignItems: 'center', gap: 10, paddingVertical: 60 },
-  emptyIcon: {
-    width: 72, height: 72, borderRadius: 36,
-    backgroundColor: '#141824', borderWidth: 1, borderColor: '#1E2535',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  emptyTitle: { fontSize: 15, fontWeight: '600', color: '#94A3B8' },
-  emptySub:   { fontSize: 12, color: '#4B5563' },
+    emptyContainer: { flex: 1, justifyContent: 'center' },
+    empty:    { alignItems: 'center', gap: 10, paddingVertical: 60 },
+    emptyIcon: {
+      width: 72, height: 72, borderRadius: 36,
+      backgroundColor: c.card, borderWidth: 1, borderColor: c.surface2,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    emptyTitle: { fontSize: 15, fontWeight: '600', color: c.textSec },
+    emptySub:   { fontSize: 12, color: c.textMuted },
 
-  // ── List ───────────────────────────────────────────────────────────────────
-  listContent: { paddingTop: 12, paddingBottom: 8, paddingHorizontal: 12 },
+    // ── List ───────────────────────────────────────────────────────────────────
+    listContent: { paddingTop: 12, paddingBottom: 8, paddingHorizontal: 12 },
 
-  // Load older
-  loadMoreBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    alignSelf: 'center', marginBottom: 18,
-    paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: 99,
-    backgroundColor: '#141824',
-    borderWidth: 1, borderColor: '#1E2535',
-  },
-  loadMoreArrow: { fontSize: 12, color: '#64748B' },
-  loadMoreText:  { fontSize: 12, color: '#64748B' },
+    // Load older
+    loadMoreBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      alignSelf: 'center', marginBottom: 18,
+      paddingHorizontal: 14, paddingVertical: 7,
+      borderRadius: 99,
+      backgroundColor: c.card,
+      borderWidth: 1, borderColor: c.surface2,
+    },
+    loadMoreArrow: { fontSize: 12, color: c.textMuted },
+    loadMoreText:  { fontSize: 12, color: c.textMuted },
 
-  // ── Date separator ─────────────────────────────────────────────────────────
-  dateSep: { flexDirection: 'row', alignItems: 'center', marginVertical: 18, gap: 8 },
-  dateLine: { flex: 1, height: 1, backgroundColor: '#1E2535' },
-  dateLabel: {
-    fontSize: 11, fontWeight: '600', color: '#4B5563',
-    paddingHorizontal: 10, paddingVertical: 3,
-    borderRadius: 99, backgroundColor: '#141824',
-    borderWidth: 1, borderColor: '#1E2535',
-    overflow: 'hidden',
-  },
+    // ── Date separator ─────────────────────────────────────────────────────────
+    dateSep: { flexDirection: 'row', alignItems: 'center', marginVertical: 18, gap: 8 },
+    dateLine: { flex: 1, height: 1, backgroundColor: c.surface2 },
+    dateLabel: {
+      fontSize: 11, fontWeight: '600', color: c.textMuted,
+      paddingHorizontal: 10, paddingVertical: 3,
+      borderRadius: 99, backgroundColor: c.card,
+      borderWidth: 1, borderColor: c.surface2,
+      overflow: 'hidden',
+    },
 
-  // ── Message row ────────────────────────────────────────────────────────────
-  row:       { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
-  rowOwn:    { justifyContent: 'flex-end' },
-  rowOther:  { justifyContent: 'flex-start' },
-  rowLast:   { marginBottom: 8 },
-  rowTight:  { marginBottom: 2 },
+    // ── Message row ────────────────────────────────────────────────────────────
+    row:       { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+    rowOwn:    { justifyContent: 'flex-end' },
+    rowOther:  { justifyContent: 'flex-start' },
+    rowLast:   { marginBottom: 8 },
+    rowTight:  { marginBottom: 2 },
 
-  // Avatar
-  avatarSlot:    { width: 30, alignItems: 'center' },
-  avatar:        { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { fontSize: 11, color: '#fff', fontWeight: '700' },
-  avatarEmpty:   { width: 28, height: 28 },
+    // Avatar
+    avatarSlot:    { width: 30, alignItems: 'center' },
+    avatar:        { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    avatarInitial: { fontSize: 11, color: '#fff', fontWeight: '700' },
+    avatarEmpty:   { width: 28, height: 28 },
 
-  // Bubble column
-  col:    { maxWidth: '78%', alignItems: 'flex-start' },
-  colOwn: { alignItems: 'flex-end' },
+    // Bubble column
+    col:    { maxWidth: '78%', alignItems: 'flex-start' },
+    colOwn: { alignItems: 'flex-end' },
 
-  senderName: { fontSize: 11, fontWeight: '700', marginBottom: 3, paddingLeft: 2 },
+    senderName: { fontSize: 11, fontWeight: '700', marginBottom: 3, paddingLeft: 2 },
 
-  // Bubble
-  bubble: {
-    borderRadius: 18,
-    paddingHorizontal: 13, paddingVertical: 9,
-  },
-  bubbleOwn: {
-    backgroundColor: '#4F46E5',
-    borderBottomRightRadius: 5,
-  },
-  bubbleOther: {
-    backgroundColor: '#141824',
-    borderWidth: 1, borderColor: '#1E2535',
-    borderBottomLeftRadius: 5,
-  },
-  bubbleOwnFirst:   { borderTopRightRadius: 5 },
-  bubbleOtherFirst: { borderTopLeftRadius: 5 },
+    // Bubble
+    bubble: {
+      borderRadius: 18,
+      paddingHorizontal: 13, paddingVertical: 9,
+    },
+    bubbleOwn: {
+      backgroundColor: '#4F46E5',
+      borderBottomRightRadius: 5,
+    },
+    bubbleOther: {
+      backgroundColor: c.card,
+      borderWidth: 1, borderColor: c.surface2,
+      borderBottomLeftRadius: 5,
+    },
+    bubbleOwnFirst:   { borderTopRightRadius: 5 },
+    bubbleOtherFirst: { borderTopLeftRadius: 5 },
 
-  // Text
-  msgText:      { fontSize: 14, color: '#D1D5DB', lineHeight: 20 },
-  msgTextOwn:   { color: '#fff' },
-  mention:      { color: '#818CF8', fontWeight: '600' },
-  mentionOwn:   { color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
-  orderMention: { color: '#F59E0B', fontWeight: '600' },
+    // Text
+    msgText:      { fontSize: 14, color: c.textSec, lineHeight: 20 },
+    msgTextOwn:   { color: '#fff' },
+    mention:      { color: c.brandLight, fontWeight: '600' },
+    mentionOwn:   { color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
+    orderMention: { color: '#F59E0B', fontWeight: '600' },
 
-  timestamp:    { fontSize: 10, color: '#64748B', marginTop: 4, alignSelf: 'flex-end' },
-  timestampOwn: { color: 'rgba(255,255,255,0.45)' },
+    timestamp:    { fontSize: 10, color: c.textMuted, marginTop: 4, alignSelf: 'flex-end' },
+    timestampOwn: { color: 'rgba(255,255,255,0.45)' },
 
-  // ── @mention dropdown ──────────────────────────────────────────────────────
-  mentionBox: {
-    backgroundColor: '#0F1117',
-    borderTopWidth: 1, borderTopColor: '#1E2535',
-    maxHeight: 280,
-  },
-  mentionHeader: {
-    paddingHorizontal: 14, paddingVertical: 6,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  mentionHeaderText: {
-    fontSize: 9, color: '#4B5563', fontWeight: '700', letterSpacing: 1,
-  },
-  mentionSection:      { },
-  mentionSectionBorder:{ borderTopWidth: 1, borderTopColor: '#1E2535' },
-  mentionSectionLabel: {
-    fontSize: 9, color: '#4B5563', fontWeight: '700', letterSpacing: 1,
-    paddingHorizontal: 14, paddingTop: 7, paddingBottom: 2,
-  },
-  mentionSectionLabelOrder: { color: '#92400E' },
+    // ── @mention dropdown ──────────────────────────────────────────────────────
+    mentionBox: {
+      backgroundColor: c.headerBg,
+      borderTopWidth: 1, borderTopColor: c.surface2,
+      maxHeight: 280,
+    },
+    mentionHeader: {
+      paddingHorizontal: 14, paddingVertical: 6,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    mentionHeaderText: {
+      fontSize: 9, color: c.textMuted, fontWeight: '700', letterSpacing: 1,
+    },
+    mentionSection:      { },
+    mentionSectionBorder:{ borderTopWidth: 1, borderTopColor: c.surface2 },
+    mentionSectionLabel: {
+      fontSize: 9, color: c.textMuted, fontWeight: '700', letterSpacing: 1,
+      paddingHorizontal: 14, paddingTop: 7, paddingBottom: 2,
+    },
+    mentionSectionLabelOrder: { color: '#92400E' },
 
-  mentionRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 9,
-  },
-  mentionRowBorder: { borderBottomWidth: 1, borderBottomColor: '#1A2030' },
-  mentionAvatar: {
-    width: 30, height: 30, borderRadius: 15,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  mentionInitial: { fontSize: 12, color: '#fff', fontWeight: '700' },
-  mentionName:    { flex: 1, fontSize: 14, color: '#E2E8F0' },
+    mentionRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 14, paddingVertical: 9,
+    },
+    mentionRowBorder: { borderBottomWidth: 1, borderBottomColor: c.border },
+    mentionAvatar: {
+      width: 30, height: 30, borderRadius: 15,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    mentionInitial: { fontSize: 12, color: '#fff', fontWeight: '700' },
+    mentionName:    { flex: 1, fontSize: 14, color: c.text },
 
-  // Order rows in mention dropdown
-  mentionOrderLoading: { paddingVertical: 10, alignItems: 'center' },
-  mentionOrderIcon: {
-    width: 30, height: 30, borderRadius: 8,
-    backgroundColor: 'rgba(245,158,11,0.15)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  mentionOrderEmoji:    { fontSize: 14 },
-  mentionOrderInfo:     { flex: 1 },
-  mentionOrderId:       { fontSize: 13, color: '#F59E0B', fontWeight: '700', fontVariant: ['tabular-nums'] },
-  mentionOrderCustomer: { fontSize: 11, color: '#64748B', marginTop: 1 },
+    // Order rows in mention dropdown
+    mentionOrderLoading: { paddingVertical: 10, alignItems: 'center' },
+    mentionOrderIcon: {
+      width: 30, height: 30, borderRadius: 8,
+      backgroundColor: 'rgba(245,158,11,0.15)',
+      alignItems: 'center', justifyContent: 'center',
+    },
+    mentionOrderEmoji:    { fontSize: 14 },
+    mentionOrderInfo:     { flex: 1 },
+    mentionOrderId:       { fontSize: 13, color: '#F59E0B', fontWeight: '700', fontVariant: ['tabular-nums'] },
+    mentionOrderCustomer: { fontSize: 11, color: c.textMuted, marginTop: 1 },
 
-  // ── Emoji panel ────────────────────────────────────────────────────────────
-  emojiPanel: {
-    backgroundColor: '#0F1117',
-    borderTopWidth: 1, borderTopColor: '#1E2535',
-    paddingVertical: 8,
-  },
-  emojiRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 2 },
-  emojiBtn: { padding: 7 },
-  emojiText: { fontSize: 24 },
+    // ── Emoji panel ────────────────────────────────────────────────────────────
+    emojiPanel: {
+      backgroundColor: c.headerBg,
+      borderTopWidth: 1, borderTopColor: c.surface2,
+      paddingVertical: 8,
+    },
+    emojiRow: { flexDirection: 'row', paddingHorizontal: 10, gap: 2 },
+    emojiBtn: { padding: 7 },
+    emojiText: { fontSize: 24 },
 
-  // ── Input bar ──────────────────────────────────────────────────────────────
-  inputBar: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 8,
-    paddingHorizontal: 12, paddingVertical: 10,
-    borderTopWidth: 1, borderTopColor: '#1E2535',
-    backgroundColor: '#0F1117',
-  },
-  inputIconBtn: {
-    width: 40, height: 40, borderRadius: 11,
-    backgroundColor: '#141824',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  inputIconBtnActive: { backgroundColor: 'rgba(99,102,241,0.15)' },
+    // ── Input bar ──────────────────────────────────────────────────────────────
+    inputBar: {
+      flexDirection: 'row', alignItems: 'flex-end', gap: 8,
+      paddingHorizontal: 12, paddingVertical: 10,
+      borderTopWidth: 1, borderTopColor: c.surface2,
+      backgroundColor: c.headerBg,
+    },
+    inputIconBtn: {
+      width: 40, height: 40, borderRadius: 11,
+      backgroundColor: c.card,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    inputIconBtnActive: { backgroundColor: 'rgba(99,102,241,0.15)' },
 
-  textInput: {
-    flex: 1,
-    minHeight: 40, maxHeight: 120,
-    backgroundColor: '#141824',
-    borderRadius: 12, borderWidth: 1, borderColor: '#1E2535',
-    paddingHorizontal: 12,
-    paddingTop:    Platform.OS === 'ios' ? 10 : 8,
-    paddingBottom: Platform.OS === 'ios' ? 10 : 8,
-    fontSize: 14, color: '#E2E8F0',
-  },
+    textInput: {
+      flex: 1,
+      minHeight: 40, maxHeight: 120,
+      backgroundColor: c.card,
+      borderRadius: 12, borderWidth: 1, borderColor: c.surface2,
+      paddingHorizontal: 12,
+      paddingTop:    Platform.OS === 'ios' ? 10 : 8,
+      paddingBottom: Platform.OS === 'ios' ? 10 : 8,
+      fontSize: 14, color: c.text,
+    },
 
-  sendBtn: {
-    width: 42, height: 42, borderRadius: 21,
-    backgroundColor: '#6366F1',
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
-  },
-  sendBtnOff: {
-    backgroundColor: '#1E2535',
-    shadowOpacity: 0, elevation: 0,
-  },
-  sendArrow: { fontSize: 20, color: '#fff', fontWeight: '700' },
-});
+    sendBtn: {
+      width: 42, height: 42, borderRadius: 21,
+      backgroundColor: c.brand,
+      alignItems: 'center', justifyContent: 'center',
+      shadowColor: c.brand, shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.4, shadowRadius: 6, elevation: 5,
+    },
+    sendBtnOff: {
+      backgroundColor: c.surface2,
+      shadowOpacity: 0, elevation: 0,
+    },
+    sendArrow: { fontSize: 20, color: '#fff', fontWeight: '700' },
+  });
+}

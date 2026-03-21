@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Alert, ActivityIndicator, Image, Modal, SafeAreaView,
+  TextInput, Alert, ActivityIndicator, Image, Modal, SafeAreaView, Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 import { profileApi, authApi } from '../api/services';
 
 const ROLE_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -32,13 +34,16 @@ function formatSince(dateStr: string) {
 
 export default function ProfileScreen() {
   const { user, updateUser, logout } = useAuthStore();
+  const { isDark, toggle: toggleTheme } = useThemeStore();
+  const c = isDark ? darkColors : lightColors;
+  const s = useMemo(() => makeStyles(c), [c]);
 
-  const [editingName, setEditingName]     = useState(false);
-  const [nameInput, setNameInput]         = useState(user?.name ?? '');
-  const [savingName, setSavingName]       = useState(false);
-  const [uploadingAvatar, setUploading]   = useState(false);
-  const [uploadProgress, setProgress]     = useState(0);
-  const [showLogout, setShowLogout]       = useState(false);
+  const [editingName, setEditingName]   = useState(false);
+  const [nameInput, setNameInput]       = useState(user?.name ?? '');
+  const [savingName, setSavingName]     = useState(false);
+  const [uploadingAvatar, setUploading] = useState(false);
+  const [uploadProgress, setProgress]  = useState(0);
+  const [showLogout, setShowLogout]     = useState(false);
 
   const roleName = user?.role?.name ?? 'employee';
   const meta     = ROLE_META[roleName] ?? ROLE_META.employee;
@@ -120,7 +125,6 @@ export default function ProfileScreen() {
 
         {/* ── Avatar + name header ─────────────────────────────────── */}
         <View style={s.header}>
-          {/* Avatar */}
           <TouchableOpacity style={s.avatarWrap} onPress={pickAvatar} disabled={uploadingAvatar}>
             {user?.avatar_url
               ? <Image source={{ uri: user.avatar_url }} style={s.avatar} />
@@ -129,15 +133,11 @@ export default function ProfileScreen() {
                   <Text style={s.initials}>{initials}</Text>
                 </View>
               )}
-
-            {/* Camera overlay */}
             <View style={s.cameraOverlay}>
               {uploadingAvatar
                 ? <ActivityIndicator color="#fff" size="small" />
                 : <Text style={{ fontSize: 15 }}>📷</Text>}
             </View>
-
-            {/* Progress badge */}
             {uploadingAvatar && uploadProgress > 0 && (
               <View style={s.progressBadge}>
                 <Text style={s.progressText}>{uploadProgress}%</Text>
@@ -145,7 +145,6 @@ export default function ProfileScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Name */}
           <Text style={s.displayName}>{user?.name ?? 'Unknown'}</Text>
           <View style={[s.rolePill, { backgroundColor: meta.bg }]}>
             <Text style={[s.rolePillText, { color: meta.color }]}>{meta.label}</Text>
@@ -155,24 +154,23 @@ export default function ProfileScreen() {
         {/* ── Info card ────────────────────────────────────────────── */}
         <View style={s.card}>
 
-          {/* Full Name row */}
+          {/* Full Name */}
           <View style={s.row}>
             <View style={s.rowLeft}>
               <Text style={s.rowIcon}>👤</Text>
               <View>
                 <Text style={s.rowLabel}>Full Name</Text>
                 {editingName ? (
-                  <View style={s.nameEditRow}>
-                    <TextInput
-                      style={s.nameInput}
-                      value={nameInput}
-                      onChangeText={setNameInput}
-                      autoFocus
-                      returnKeyType="done"
-                      onSubmitEditing={saveName}
-                      selectTextOnFocus
-                    />
-                  </View>
+                  <TextInput
+                    style={s.nameInput}
+                    value={nameInput}
+                    onChangeText={setNameInput}
+                    autoFocus
+                    returnKeyType="done"
+                    onSubmitEditing={saveName}
+                    selectTextOnFocus
+                    placeholderTextColor={c.textMuted}
+                  />
                 ) : (
                   <Text style={s.rowValue}>{user?.name ?? '—'}</Text>
                 )}
@@ -201,7 +199,7 @@ export default function ProfileScreen() {
 
           <View style={s.divider} />
 
-          {/* Email row */}
+          {/* Email */}
           <View style={s.row}>
             <View style={s.rowLeft}>
               <Text style={s.rowIcon}>✉️</Text>
@@ -214,7 +212,7 @@ export default function ProfileScreen() {
 
           <View style={s.divider} />
 
-          {/* Role row */}
+          {/* Role */}
           <View style={s.row}>
             <View style={s.rowLeft}>
               <Text style={s.rowIcon}>🎖️</Text>
@@ -223,6 +221,25 @@ export default function ProfileScreen() {
                 <Text style={[s.rowValue, { color: meta.color }]}>{meta.label}</Text>
               </View>
             </View>
+          </View>
+
+          <View style={s.divider} />
+
+          {/* Theme toggle */}
+          <View style={s.row}>
+            <View style={s.rowLeft}>
+              <Text style={s.rowIcon}>{isDark ? '🌙' : '☀️'}</Text>
+              <View>
+                <Text style={s.rowLabel}>Appearance</Text>
+                <Text style={s.rowValue}>{isDark ? 'Dark Mode' : 'Light Mode'}</Text>
+              </View>
+            </View>
+            <Switch
+              value={isDark}
+              onValueChange={toggleTheme}
+              trackColor={{ false: '#CBD5E1', true: '#6366F1' }}
+              thumbColor="#fff"
+            />
           </View>
         </View>
 
@@ -254,108 +271,109 @@ export default function ProfileScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  safe:    { flex: 1, backgroundColor: '#0A0D14' },
-  content: { paddingHorizontal: 20, paddingTop: 32, paddingBottom: 48, gap: 14 },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    safe:    { flex: 1, backgroundColor: c.bg },
+    content: { paddingHorizontal: 20, paddingTop: 32, paddingBottom: 48, gap: 14 },
 
-  // ── Header
-  header: { alignItems: 'center', marginBottom: 8, gap: 12 },
+    // ── Header
+    header: { alignItems: 'center', marginBottom: 8, gap: 12 },
 
-  avatarWrap: { position: 'relative' },
-  avatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: '#6366F1' },
-  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
-  initials: { fontSize: 38, fontWeight: '800', color: '#fff', letterSpacing: 1 },
+    avatarWrap: { position: 'relative' },
+    avatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: c.brand },
+    avatarFallback: { alignItems: 'center', justifyContent: 'center' },
+    initials: { fontSize: 38, fontWeight: '800', color: '#fff', letterSpacing: 1 },
 
-  cameraOverlay: {
-    position: 'absolute', bottom: 2, right: 2,
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#6366F1', borderWidth: 2, borderColor: '#0A0D14',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  progressBadge: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    borderRadius: 55, backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  progressText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+    cameraOverlay: {
+      position: 'absolute', bottom: 2, right: 2,
+      width: 34, height: 34, borderRadius: 17,
+      backgroundColor: c.brand, borderWidth: 2, borderColor: c.bg,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    progressBadge: {
+      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+      borderRadius: 55, backgroundColor: 'rgba(0,0,0,0.6)',
+      alignItems: 'center', justifyContent: 'center',
+    },
+    progressText: { fontSize: 14, fontWeight: '800', color: '#fff' },
 
-  displayName: { fontSize: 24, fontWeight: '800', color: '#F1F5F9', letterSpacing: -0.4 },
+    displayName: { fontSize: 24, fontWeight: '800', color: c.text, letterSpacing: -0.4 },
 
-  rolePill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 99 },
-  rolePillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+    rolePill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 99 },
+    rolePillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
 
-  // ── Card
-  card: {
-    backgroundColor: '#131720', borderRadius: 20,
-    borderWidth: 1, borderColor: '#1E2535',
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25, shadowRadius: 10, elevation: 5,
-  },
-  divider: { height: 1, backgroundColor: '#1A2030', marginHorizontal: 16 },
+    // ── Card
+    card: {
+      backgroundColor: c.card, borderRadius: 20,
+      borderWidth: 1, borderColor: c.border,
+      overflow: 'hidden',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: c.isDark ? 0.25 : 0.08, shadowRadius: 10, elevation: 5,
+    },
+    divider: { height: 1, backgroundColor: c.border, marginHorizontal: 16 },
 
-  row: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 18, paddingVertical: 16,
-  },
-  rowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
-  rowIcon:  { fontSize: 20, width: 28, textAlign: 'center' },
-  rowLabel: { fontSize: 11, color: '#475569', fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 3 },
-  rowValue: { fontSize: 15, color: '#E2E8F0', fontWeight: '600' },
+    row: {
+      flexDirection: 'row', alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 18, paddingVertical: 16,
+    },
+    rowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
+    rowIcon:  { fontSize: 20, width: 28, textAlign: 'center' },
+    rowLabel: { fontSize: 11, color: c.textMuted, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 3 },
+    rowValue: { fontSize: 15, color: c.text, fontWeight: '600' },
 
-  // Name edit
-  nameEditRow: { marginTop: 2 },
-  nameInput: {
-    backgroundColor: '#0E1118', borderRadius: 8, borderWidth: 1,
-    borderColor: '#6366F1', color: '#F1F5F9', paddingHorizontal: 10,
-    paddingVertical: 6, fontSize: 15, fontWeight: '600', minWidth: 140,
-  },
-  editActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  saveBtn: {
-    backgroundColor: '#6366F1', paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: 9, minWidth: 52, alignItems: 'center',
-  },
-  saveBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  cancelTxt:  { color: '#64748B', fontWeight: '700', fontSize: 17, paddingHorizontal: 4 },
+    // Name edit
+    nameInput: {
+      backgroundColor: c.surface, borderRadius: 8, borderWidth: 1,
+      borderColor: c.brand, color: c.text, paddingHorizontal: 10,
+      paddingVertical: 6, fontSize: 15, fontWeight: '600', minWidth: 140,
+    },
+    editActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    saveBtn: {
+      backgroundColor: c.brand, paddingHorizontal: 14, paddingVertical: 7,
+      borderRadius: 9, minWidth: 52, alignItems: 'center',
+    },
+    saveBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+    cancelTxt:  { color: c.textMuted, fontWeight: '700', fontSize: 17, paddingHorizontal: 4 },
 
-  editChip: {
-    backgroundColor: 'rgba(99,102,241,0.12)', paddingHorizontal: 12,
-    paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)',
-  },
-  editChipTxt: { fontSize: 12, fontWeight: '700', color: '#818CF8' },
+    editChip: {
+      backgroundColor: 'rgba(99,102,241,0.12)', paddingHorizontal: 12,
+      paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)',
+    },
+    editChipTxt: { fontSize: 12, fontWeight: '700', color: c.brandLight },
 
-  // ── Logout button
-  logoutBtn: {
-    backgroundColor: 'rgba(239,68,68,0.07)', borderRadius: 16, borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.18)', flexDirection: 'row',
-    alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 15, gap: 10,
-  },
-  logoutIcon: { fontSize: 20 },
-  logoutTxt:  { fontSize: 15, fontWeight: '700', color: '#EF4444' },
+    // ── Logout button
+    logoutBtn: {
+      backgroundColor: 'rgba(239,68,68,0.07)', borderRadius: 16, borderWidth: 1,
+      borderColor: 'rgba(239,68,68,0.18)', flexDirection: 'row',
+      alignItems: 'center', justifyContent: 'center',
+      paddingVertical: 15, gap: 10,
+    },
+    logoutIcon: { fontSize: 20 },
+    logoutTxt:  { fontSize: 15, fontWeight: '700', color: '#EF4444' },
 
-  // ── Logout modal
-  overlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.72)',
-    alignItems: 'center', justifyContent: 'center', padding: 28,
-  },
-  logoutModal: {
-    backgroundColor: '#131720', borderRadius: 26, borderWidth: 1,
-    borderColor: '#1E2535', padding: 30, width: '100%', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4, shadowRadius: 24, elevation: 14,
-  },
-  logoutTitle: { fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8 },
-  logoutSub:   { fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 28, lineHeight: 20 },
-  logoutConfirm: {
-    backgroundColor: '#EF4444', width: '100%', paddingVertical: 15,
-    borderRadius: 14, alignItems: 'center', marginBottom: 10,
-  },
-  logoutConfirmTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
-  logoutCancel: {
-    backgroundColor: '#1A2030', width: '100%', paddingVertical: 15,
-    borderRadius: 14, alignItems: 'center',
-  },
-  logoutCancelTxt: { fontSize: 15, fontWeight: '600', color: '#64748B' },
-});
+    // ── Logout modal
+    overlay: {
+      flex: 1, backgroundColor: 'rgba(0,0,0,0.72)',
+      alignItems: 'center', justifyContent: 'center', padding: 28,
+    },
+    logoutModal: {
+      backgroundColor: c.card, borderRadius: 26, borderWidth: 1,
+      borderColor: c.border, padding: 30, width: '100%', alignItems: 'center',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.4, shadowRadius: 24, elevation: 14,
+    },
+    logoutTitle: { fontSize: 22, fontWeight: '800', color: c.text, marginBottom: 8 },
+    logoutSub:   { fontSize: 14, color: c.textMuted, textAlign: 'center', marginBottom: 28, lineHeight: 20 },
+    logoutConfirm: {
+      backgroundColor: '#EF4444', width: '100%', paddingVertical: 15,
+      borderRadius: 14, alignItems: 'center', marginBottom: 10,
+    },
+    logoutConfirmTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
+    logoutCancel: {
+      backgroundColor: c.surface, width: '100%', paddingVertical: 15,
+      borderRadius: 14, alignItems: 'center',
+    },
+    logoutCancelTxt: { fontSize: 15, fontWeight: '600', color: c.textMuted },
+  });
+}

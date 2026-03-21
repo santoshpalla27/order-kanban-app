@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, ActivityIndicator,
   StyleSheet, TextInput, RefreshControl, Alert,
@@ -16,6 +16,8 @@ import ProductCard from '../components/ProductCard';
 import FilterPanel from '../components/FilterPanel';
 import { ProductFilters } from '../store/boardStore';
 import { RootStackParamList } from '../navigation';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 const PAGE_SIZE = 50;
 
@@ -38,6 +40,10 @@ const TAB_COLORS: Record<string, string> = {
 export default function ListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { canCreateProduct, canDeleteProduct } = useAuthStore();
+
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeStyles(c), [c]);
 
   const [filters, setFilters] = useState<ProductFilters>({
     search: '', status: '', created_by: '', assigned_to: '',
@@ -199,7 +205,7 @@ export default function ListScreen() {
           value={filters.search}
           onChangeText={(v) => setFilters((f) => ({ ...f, search: v }))}
           placeholder="Search products..."
-          placeholderTextColor="#64748B"
+          placeholderTextColor={c.textMuted}
           returnKeyType="search"
         />
         <TouchableOpacity
@@ -247,7 +253,7 @@ export default function ListScreen() {
       {/* Product list */}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#6366F1" size="large" />
+          <ActivityIndicator color={c.brand} size="large" />
         </View>
       ) : (
         <FlatList
@@ -256,7 +262,7 @@ export default function ListScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#6366F1" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={c.brand} />
           }
           onEndReached={handleLoadMore}
           onEndReachedThreshold={0.3}
@@ -277,7 +283,7 @@ export default function ListScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.loadMoreSpinner}>
-                <ActivityIndicator color="#6366F1" />
+                <ActivityIndicator color={c.brand} />
               </View>
             ) : hasMore ? (
               <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore}>
@@ -320,78 +326,80 @@ export default function ListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0D14' },
-  searchRow: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: '#1C2130',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2D3748',
-    color: '#F1F5F9',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-  },
-  filterBtn: {
-    backgroundColor: '#1C2130',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2D3748',
-    paddingHorizontal: 14,
-    justifyContent: 'center',
-  },
-  filterBtnActive: { borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.12)' },
-  filterBtnText: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
-  tabsWrapper: { borderBottomWidth: 1, borderBottomColor: '#1E2535' },
-  tabs: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 99,
-    borderWidth: 1,
-    borderColor: '#2D3748',
-  },
-  tabText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
-  countBadge: {
-    backgroundColor: '#1E2535',
-    borderRadius: 99,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  countText: { fontSize: 11, fontWeight: '700', color: '#64748B' },
-  listContent: { padding: 16, paddingBottom: 100 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  empty: { alignItems: 'center', paddingTop: 80, gap: 8 },
-  emptyIcon: { fontSize: 48 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#94A3B8' },
-  emptySubtitle: { fontSize: 13, color: '#64748B' },
-  totalText: { fontSize: 12, color: '#64748B', marginBottom: 10 },
-  loadMoreSpinner: { paddingVertical: 16, alignItems: 'center' },
-  loadMoreBtn: { paddingVertical: 14, alignItems: 'center' },
-  loadMoreText: { color: '#6366F1', fontWeight: '600', fontSize: 14 },
-  allLoaded: { textAlign: 'center', color: '#374151', fontSize: 12, paddingVertical: 12 },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-  },
-  fabText: { color: '#fff', fontSize: 28, lineHeight: 30 },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    searchRow: {
+      flexDirection: 'row',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 8,
+    },
+    searchInput: {
+      flex: 1,
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.border2,
+      color: c.text,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      fontSize: 14,
+    },
+    filterBtn: {
+      backgroundColor: c.surface,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: c.border2,
+      paddingHorizontal: 14,
+      justifyContent: 'center',
+    },
+    filterBtnActive: { borderColor: c.brand, backgroundColor: 'rgba(99,102,241,0.12)' },
+    filterBtnText: { color: c.textSec, fontSize: 13, fontWeight: '600' },
+    tabsWrapper: { borderBottomWidth: 1, borderBottomColor: c.surface2 },
+    tabs: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+    tab: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 99,
+      borderWidth: 1,
+      borderColor: c.border2,
+    },
+    tabText: { fontSize: 13, fontWeight: '600', color: c.textMuted },
+    countBadge: {
+      backgroundColor: c.surface2,
+      borderRadius: 99,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+    },
+    countText: { fontSize: 11, fontWeight: '700', color: c.textMuted },
+    listContent: { padding: 16, paddingBottom: 100 },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    empty: { alignItems: 'center', paddingTop: 80, gap: 8 },
+    emptyIcon: { fontSize: 48 },
+    emptyTitle: { fontSize: 16, fontWeight: '600', color: c.textSec },
+    emptySubtitle: { fontSize: 13, color: c.textMuted },
+    totalText: { fontSize: 12, color: c.textMuted, marginBottom: 10 },
+    loadMoreSpinner: { paddingVertical: 16, alignItems: 'center' },
+    loadMoreBtn: { paddingVertical: 14, alignItems: 'center' },
+    loadMoreText: { color: c.brand, fontWeight: '600', fontSize: 14 },
+    allLoaded: { textAlign: 'center', color: c.textDim, fontSize: 12, paddingVertical: 12 },
+    fab: {
+      position: 'absolute',
+      bottom: 24,
+      right: 20,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: c.brand,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 6,
+    },
+    fabText: { color: '#fff', fontSize: 28, lineHeight: 30 },
+  });
+}

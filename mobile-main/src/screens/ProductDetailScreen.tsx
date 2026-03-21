@@ -22,6 +22,8 @@ import { formatDateTime, formatRelative, formatFileSize, stripMentions } from '.
 import Avatar from '../components/Avatar';
 import StatusChip from '../components/StatusChip';
 import { RootStackParamList } from '../navigation';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 type RouteT = RouteProp<RootStackParamList, 'ProductDetail'>;
 
@@ -32,25 +34,29 @@ type TabId = 'details' | 'attachments' | 'comments';
 function StatusPickerModal({
   current, visible, onSelect, onClose,
 }: { current: ProductStatus; visible: boolean; onSelect: (s: ProductStatus) => void; onClose: () => void }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeModalStyles(c), [c]);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <TouchableOpacity style={modal.backdrop} onPress={onClose} activeOpacity={1}>
-        <View style={modal.sheet}>
-          <Text style={modal.title}>Change Status</Text>
+      <TouchableOpacity style={styles.backdrop} onPress={onClose} activeOpacity={1}>
+        <View style={styles.sheet}>
+          <Text style={styles.title}>Change Status</Text>
           {STATUS_ORDER.map((s) => {
             const colors = STATUS_COLORS[s];
             const active = s === current;
             return (
               <TouchableOpacity
                 key={s}
-                style={[modal.option, active && { backgroundColor: colors.bg }]}
+                style={[styles.option, active && { backgroundColor: colors.bg }]}
                 onPress={() => { onSelect(s); onClose(); }}
               >
-                <View style={[modal.dot, { backgroundColor: colors.dot }]} />
-                <Text style={[modal.optionText, { color: active ? colors.text : '#CBD5E1' }]}>
+                <View style={[styles.dot, { backgroundColor: colors.dot }]} />
+                <Text style={[styles.optionText, { color: active ? colors.text : '#CBD5E1' }]}>
                   {STATUS_LABELS[s]}
                 </Text>
-                {active && <Text style={[modal.check, { color: colors.text }]}>✓</Text>}
+                {active && <Text style={[styles.check, { color: colors.text }]}>✓</Text>}
               </TouchableOpacity>
             );
           })}
@@ -60,21 +66,27 @@ function StatusPickerModal({
   );
 }
 
-const modal = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#131720', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4 },
-  title: { fontSize: 15, fontWeight: '700', color: '#94A3B8', marginBottom: 10, textAlign: 'center' },
-  option: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12 },
-  dot: { width: 10, height: 10, borderRadius: 99 },
-  optionText: { fontSize: 15, fontWeight: '600', flex: 1 },
-  check: { fontSize: 16, fontWeight: '700' },
-});
+function makeModalStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+    sheet: { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 4 },
+    title: { fontSize: 15, fontWeight: '700', color: c.textSec, marginBottom: 10, textAlign: 'center' },
+    option: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 12 },
+    dot: { width: 10, height: 10, borderRadius: 99 },
+    optionText: { fontSize: 15, fontWeight: '600', flex: 1 },
+    check: { fontSize: 16, fontWeight: '700' },
+  });
+}
 
 // ─── Details tab ────────────────────────────────────────────────────────────
 
 function DetailsTab({
   product, users, canEdit, onProductUpdated,
 }: { product: Product; users: User[]; canEdit: boolean; onProductUpdated: (p: Product) => void }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeDetailsStyles(c), [c]);
+
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
     product_id: product.product_id,
@@ -117,8 +129,8 @@ function DetailsTab({
 
   if (editing) {
     return (
-      <ScrollView style={dt.scroll} contentContainerStyle={{ gap: 16, paddingBottom: 40 }}>
-        <Text style={dt.sectionTitle}>Edit Product</Text>
+      <ScrollView style={styles.scroll} contentContainerStyle={{ gap: 16, paddingBottom: 40 }}>
+        <Text style={styles.sectionTitle}>Edit Product</Text>
 
         {[
           { label: 'Product ID *', key: 'product_id', placeholder: 'e.g. PRD-001' },
@@ -126,53 +138,53 @@ function DetailsTab({
           { label: 'Customer Phone', key: 'customer_phone', placeholder: '+1 234 567 8900' },
         ].map(({ label, key, placeholder }) => (
           <View key={key}>
-            <Text style={dt.label}>{label}</Text>
+            <Text style={styles.label}>{label}</Text>
             <TextInput
-              style={dt.input}
+              style={styles.input}
               value={(form as any)[key]}
               onChangeText={(v) => setForm((f) => ({ ...f, [key]: v }))}
               placeholder={placeholder}
-              placeholderTextColor="#64748B"
+              placeholderTextColor={c.textMuted}
             />
           </View>
         ))}
 
         <View>
-          <Text style={dt.label}>Description</Text>
+          <Text style={styles.label}>Description</Text>
           <TextInput
-            style={[dt.input, { minHeight: 80, textAlignVertical: 'top' }]}
+            style={[styles.input, { minHeight: 80, textAlignVertical: 'top' }]}
             value={form.description}
             onChangeText={(v) => setForm((f) => ({ ...f, description: v }))}
             placeholder="Description..."
-            placeholderTextColor="#64748B"
+            placeholderTextColor={c.textMuted}
             multiline
           />
         </View>
 
         <View>
-          <Text style={dt.label}>Assign To</Text>
-          <View style={dt.chipWrap}>
+          <Text style={styles.label}>Assign To</Text>
+          <View style={styles.chipWrap}>
             {users.map((u) => {
               const sel = form.assignee_ids.includes(u.id);
               return (
                 <TouchableOpacity
                   key={u.id}
-                  style={[dt.assigneeChip, sel && dt.assigneeChipSel]}
+                  style={[styles.assigneeChip, sel && styles.assigneeChipSel]}
                   onPress={() => toggleAssignee(u.id)}
                 >
-                  <Text style={[dt.assigneeChipText, sel && dt.assigneeChipTextSel]}>{u.name}</Text>
+                  <Text style={[styles.assigneeChipText, sel && styles.assigneeChipTextSel]}>{u.name}</Text>
                 </TouchableOpacity>
               );
             })}
           </View>
         </View>
 
-        <View style={dt.editActions}>
-          <TouchableOpacity style={dt.cancelBtn} onPress={() => setEditing(false)} disabled={saving}>
-            <Text style={dt.cancelText}>Cancel</Text>
+        <View style={styles.editActions}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => setEditing(false)} disabled={saving}>
+            <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[dt.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={dt.saveText}>Save Changes</Text>}
+          <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
+            {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveText}>Save Changes</Text>}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -180,10 +192,10 @@ function DetailsTab({
   }
 
   return (
-    <ScrollView style={dt.scroll} contentContainerStyle={{ gap: 16, paddingBottom: 40 }}>
+    <ScrollView style={styles.scroll} contentContainerStyle={{ gap: 16, paddingBottom: 40 }}>
       {canEdit && (
-        <TouchableOpacity style={dt.editBtn} onPress={() => setEditing(true)}>
-          <Text style={dt.editBtnText}>✏ Edit</Text>
+        <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
+          <Text style={styles.editBtnText}>✏ Edit</Text>
         </TouchableOpacity>
       )}
 
@@ -196,23 +208,23 @@ function DetailsTab({
         { label: 'Created', value: formatDateTime(product.created_at) },
         { label: 'Created By', value: product.creator?.name || '—' },
       ].map(({ label, value }) => (
-        <View key={label} style={dt.row}>
-          <Text style={dt.rowLabel}>{label}</Text>
-          <Text style={dt.rowValue}>{value}</Text>
+        <View key={label} style={styles.row}>
+          <Text style={styles.rowLabel}>{label}</Text>
+          <Text style={styles.rowValue}>{value}</Text>
         </View>
       ))}
 
-      <View style={dt.row}>
-        <Text style={dt.rowLabel}>Assignees</Text>
+      <View style={styles.row}>
+        <Text style={styles.rowLabel}>Assignees</Text>
         <View style={{ flex: 1, gap: 6 }}>
           {product.assignees && product.assignees.length > 0
             ? product.assignees.map((a) => (
-                <View key={a.id} style={dt.assigneeRow}>
+                <View key={a.id} style={styles.assigneeRow}>
                   <Avatar name={a.name} avatarUrl={a.avatar_url} size={24} />
-                  <Text style={dt.rowValue}>{a.name}</Text>
+                  <Text style={styles.rowValue}>{a.name}</Text>
                 </View>
               ))
-            : <Text style={dt.rowValue}>—</Text>
+            : <Text style={styles.rowValue}>—</Text>
           }
         </View>
       </View>
@@ -220,37 +232,39 @@ function DetailsTab({
   );
 }
 
-const dt = StyleSheet.create({
-  scroll: { flex: 1, padding: 16 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#F1F5F9', marginBottom: 4 },
-  label: { fontSize: 12, fontWeight: '600', color: '#64748B', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
-  input: {
-    backgroundColor: '#1C2130', borderRadius: 10, borderWidth: 1,
-    borderColor: '#2D3748', color: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 11, fontSize: 14,
-  },
-  row: { flexDirection: 'row', gap: 12 },
-  rowLabel: { fontSize: 13, color: '#64748B', width: 90 },
-  rowValue: { fontSize: 13, color: '#E2E8F0', flex: 1, flexWrap: 'wrap' },
-  assigneeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  editBtn: {
-    alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 7,
-    borderRadius: 10, borderWidth: 1, borderColor: '#2D3748',
-  },
-  editBtnText: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  assigneeChip: {
-    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99,
-    borderWidth: 1, borderColor: '#2D3748', backgroundColor: '#1C2130',
-  },
-  assigneeChipSel: { borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.15)' },
-  assigneeChipText: { fontSize: 13, color: '#94A3B8' },
-  assigneeChipTextSel: { color: '#A5B4FC', fontWeight: '600' },
-  editActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  cancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: '#2D3748', alignItems: 'center' },
-  cancelText: { color: '#94A3B8', fontSize: 14, fontWeight: '600' },
-  saveBtn: { flex: 2, paddingVertical: 13, borderRadius: 12, backgroundColor: '#6366F1', alignItems: 'center' },
-  saveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-});
+function makeDetailsStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    scroll: { flex: 1, padding: 16 },
+    sectionTitle: { fontSize: 16, fontWeight: '700', color: c.text, marginBottom: 4 },
+    label: { fontSize: 12, fontWeight: '600', color: c.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+    input: {
+      backgroundColor: c.surface, borderRadius: 10, borderWidth: 1,
+      borderColor: c.border2, color: c.text, paddingHorizontal: 14, paddingVertical: 11, fontSize: 14,
+    },
+    row: { flexDirection: 'row', gap: 12 },
+    rowLabel: { fontSize: 13, color: c.textMuted, width: 90 },
+    rowValue: { fontSize: 13, color: c.text, flex: 1, flexWrap: 'wrap' },
+    assigneeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    editBtn: {
+      alignSelf: 'flex-end', paddingHorizontal: 16, paddingVertical: 7,
+      borderRadius: 10, borderWidth: 1, borderColor: c.border2,
+    },
+    editBtnText: { color: c.textSec, fontSize: 13, fontWeight: '600' },
+    chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    assigneeChip: {
+      paddingHorizontal: 12, paddingVertical: 7, borderRadius: 99,
+      borderWidth: 1, borderColor: c.border2, backgroundColor: c.surface,
+    },
+    assigneeChipSel: { borderColor: c.brand, backgroundColor: 'rgba(99,102,241,0.15)' },
+    assigneeChipText: { fontSize: 13, color: c.textSec },
+    assigneeChipTextSel: { color: '#A5B4FC', fontWeight: '600' },
+    editActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+    cancelBtn: { flex: 1, paddingVertical: 13, borderRadius: 12, borderWidth: 1, borderColor: c.border2, alignItems: 'center' },
+    cancelText: { color: c.textSec, fontSize: 14, fontWeight: '600' },
+    saveBtn: { flex: 2, paddingVertical: 13, borderRadius: 12, backgroundColor: c.brand, alignItems: 'center' },
+    saveText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  });
+}
 
 // ─── Attachments tab ─────────────────────────────────────────────────────────
 
@@ -277,32 +291,36 @@ interface FileUploadState {
 function UploadProgressModal({
   files, onClose,
 }: { files: FileUploadState[]; onClose: () => void }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeUploadStyles(c), [c]);
+
   const done       = files.filter((f) => f.status === 'done').length;
   const allSettled = files.every((f) => ['done', 'error'].includes(f.status));
 
   return (
     <Modal visible transparent animationType="fade">
-      <View style={up.backdrop}>
-        <View style={up.sheet}>
-          <View style={up.header}>
+      <View style={styles.backdrop}>
+        <View style={styles.sheet}>
+          <View style={styles.header}>
             <View>
-              <Text style={up.title}>{allSettled ? 'Upload Complete' : 'Uploading Files'}</Text>
-              <Text style={up.sub}>{done} of {files.length} done</Text>
+              <Text style={styles.title}>{allSettled ? 'Upload Complete' : 'Uploading Files'}</Text>
+              <Text style={styles.sub}>{done} of {files.length} done</Text>
             </View>
             {allSettled && (
-              <TouchableOpacity style={up.closeBtn} onPress={onClose}>
-                <Text style={up.closeTxt}>Done</Text>
+              <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
+                <Text style={styles.closeTxt}>Done</Text>
               </TouchableOpacity>
             )}
           </View>
           <ScrollView style={{ maxHeight: 240 }} contentContainerStyle={{ gap: 14, padding: 16 }}>
             {files.map((f, i) => (
               <View key={i}>
-                <View style={up.row}>
-                  <Text style={up.fname} numberOfLines={1}>{f.name}</Text>
-                  <Text style={[up.status,
-                    f.status === 'done'  ? up.statusDone  :
-                    f.status === 'error' ? up.statusErr   : up.statusActive,
+                <View style={styles.row}>
+                  <Text style={styles.fname} numberOfLines={1}>{f.name}</Text>
+                  <Text style={[styles.status,
+                    f.status === 'done'  ? styles.statusDone  :
+                    f.status === 'error' ? styles.statusErr   : styles.statusActive,
                   ]}>
                     {f.status === 'done'     ? '✓ Done'   :
                      f.status === 'error'    ? '✗ Failed' :
@@ -310,10 +328,10 @@ function UploadProgressModal({
                      `${f.progress}%`}
                   </Text>
                 </View>
-                <View style={up.track}>
-                  <View style={[up.fill, { width: `${f.progress}%` as any },
-                    f.status === 'done'  ? up.fillDone :
-                    f.status === 'error' ? up.fillErr  : {},
+                <View style={styles.track}>
+                  <View style={[styles.fill, { width: `${f.progress}%` as any },
+                    f.status === 'done'  ? styles.fillDone :
+                    f.status === 'error' ? styles.fillErr  : {},
                   ]} />
                 </View>
               </View>
@@ -325,25 +343,27 @@ function UploadProgressModal({
   );
 }
 
-const up = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  sheet:    { width: '100%', backgroundColor: '#131720', borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: '#2D3748' },
-  header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1E2535' },
-  title:    { fontSize: 15, fontWeight: '700', color: '#F1F5F9' },
-  sub:      { fontSize: 12, color: '#64748B', marginTop: 2 },
-  closeBtn: { backgroundColor: '#6366F1', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
-  closeTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  row:      { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  fname:    { flex: 1, fontSize: 13, color: '#E2E8F0' },
-  status:   { fontSize: 12, marginLeft: 8 },
-  statusDone:   { color: '#34D399' },
-  statusErr:    { color: '#EF4444' },
-  statusActive: { color: '#818CF8' },
-  track:    { height: 4, backgroundColor: '#1E2535', borderRadius: 99, overflow: 'hidden' },
-  fill:     { height: '100%', backgroundColor: '#6366F1', borderRadius: 99 },
-  fillDone: { backgroundColor: '#34D399' },
-  fillErr:  { backgroundColor: '#EF4444' },
-});
+function makeUploadStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+    sheet:    { width: '100%', backgroundColor: c.card, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: c.border2 },
+    header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: c.surface2 },
+    title:    { fontSize: 15, fontWeight: '700', color: c.text },
+    sub:      { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    closeBtn: { backgroundColor: c.brand, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8 },
+    closeTxt: { color: '#fff', fontSize: 13, fontWeight: '700' },
+    row:      { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+    fname:    { flex: 1, fontSize: 13, color: c.text },
+    status:   { fontSize: 12, marginLeft: 8 },
+    statusDone:   { color: '#34D399' },
+    statusErr:    { color: '#EF4444' },
+    statusActive: { color: c.brandLight },
+    track:    { height: 4, backgroundColor: c.surface2, borderRadius: 99, overflow: 'hidden' },
+    fill:     { height: '100%', backgroundColor: c.brand, borderRadius: 99 },
+    fillDone: { backgroundColor: '#34D399' },
+    fillErr:  { backgroundColor: '#EF4444' },
+  });
+}
 
 // ── Image Lightbox ─────────────────────────────────────────────────────────────
 function ImageLightbox({
@@ -375,6 +395,7 @@ function ImageLightbox({
   );
 }
 
+// ImageLightbox uses fixed overlay colors — kept as-is (modal overlay)
 const lb = StyleSheet.create({
   backdrop: { backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
   img:      { width: '100%', height: '80%' },
@@ -388,6 +409,10 @@ const lb = StyleSheet.create({
 function AttachmentCommentModal({
   att, productId, onClose,
 }: { att: Attachment; productId: number; onClose: () => void }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeAttCommentStyles(c), [c]);
+
   const [comment, setComment] = useState('');
   const [sending, setSending] = useState(false);
 
@@ -408,50 +433,50 @@ function AttachmentCommentModal({
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         {/* Dim area above the sheet — tapping it closes the modal */}
-        <TouchableOpacity style={ac.dimArea} activeOpacity={1} onPress={onClose} />
+        <TouchableOpacity style={styles.dimArea} activeOpacity={1} onPress={onClose} />
 
         {/* Sheet — fully isolated from the dim area */}
-        <View style={ac.sheet}>
-          <View style={ac.header}>
-            <Text style={ac.title}>💬  Comment on Attachment</Text>
-            <TouchableOpacity onPress={onClose}><Text style={ac.close}>✕</Text></TouchableOpacity>
+        <View style={styles.sheet}>
+          <View style={styles.header}>
+            <Text style={styles.title}>💬  Comment on Attachment</Text>
+            <TouchableOpacity onPress={onClose}><Text style={styles.close}>✕</Text></TouchableOpacity>
           </View>
 
           {/* File preview */}
           {isImage(att.file_type) && att.view_url ? (
-            <Image source={{ uri: att.view_url }} style={ac.preview} resizeMode="cover" />
+            <Image source={{ uri: att.view_url }} style={styles.preview} resizeMode="cover" />
           ) : (
-            <View style={ac.fileRow}>
-              <Text style={ac.fileIcon}>{fileEmoji(att.file_type)}</Text>
+            <View style={styles.fileRow}>
+              <Text style={styles.fileIcon}>{fileEmoji(att.file_type)}</Text>
               <View style={{ flex: 1 }}>
-                <Text style={ac.fileName} numberOfLines={1}>{att.file_name}</Text>
-                <Text style={ac.fileMeta}>{formatFileSize(att.file_size)}</Text>
+                <Text style={styles.fileName} numberOfLines={1}>{att.file_name}</Text>
+                <Text style={styles.fileMeta}>{formatFileSize(att.file_size)}</Text>
               </View>
             </View>
           )}
-          <Text style={ac.meta}>{att.file_name} · {formatFileSize(att.file_size)}</Text>
+          <Text style={styles.meta}>{att.file_name} · {formatFileSize(att.file_size)}</Text>
 
           <TextInput
-            style={ac.input}
+            style={styles.input}
             value={comment}
             onChangeText={setComment}
             placeholder="Write your comment about this attachment..."
-            placeholderTextColor="#475569"
+            placeholderTextColor={c.textDim}
             multiline
             autoFocus
           />
-          <View style={ac.actions}>
-            <TouchableOpacity style={ac.cancelBtn} onPress={onClose}>
-              <Text style={ac.cancelTxt}>Cancel</Text>
+          <View style={styles.actions}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
+              <Text style={styles.cancelTxt}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[ac.sendBtn, (!comment.trim() || sending) && { opacity: 0.5 }]}
+              style={[styles.sendBtn, (!comment.trim() || sending) && { opacity: 0.5 }]}
               onPress={handleSubmit}
               disabled={!comment.trim() || sending}
             >
               {sending
                 ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={ac.sendTxt}>Post Comment</Text>
+                : <Text style={styles.sendTxt}>Post Comment</Text>
               }
             </TouchableOpacity>
           </View>
@@ -461,30 +486,36 @@ function AttachmentCommentModal({
   );
 }
 
-const ac = StyleSheet.create({
-  dimArea:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
-  sheet:    { backgroundColor: '#131720', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12, borderWidth: 1, borderColor: '#2D3748' },
-  header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title:    { fontSize: 15, fontWeight: '700', color: '#F1F5F9' },
-  close:    { fontSize: 18, color: '#94A3B8', padding: 4 },
-  preview:  { width: '100%', height: 180, borderRadius: 12, backgroundColor: '#1C2130' },
-  fileRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: '#1C2130', borderRadius: 12 },
-  fileIcon: { fontSize: 28 },
-  fileName: { fontSize: 14, fontWeight: '600', color: '#E2E8F0' },
-  fileMeta: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  meta:     { fontSize: 11, color: '#64748B' },
-  input:    { backgroundColor: '#1C2130', borderRadius: 12, borderWidth: 1, borderColor: '#2D3748', color: '#F1F5F9', paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, minHeight: 90, textAlignVertical: 'top' },
-  actions:  { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
-  cancelBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: '#2D3748' },
-  cancelTxt: { color: '#94A3B8', fontSize: 14 },
-  sendBtn:  { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: '#6366F1', flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sendTxt:  { color: '#fff', fontSize: 14, fontWeight: '700' },
-});
+function makeAttCommentStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    dimArea:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)' },
+    sheet:    { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12, borderWidth: 1, borderColor: c.border2 },
+    header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    title:    { fontSize: 15, fontWeight: '700', color: c.text },
+    close:    { fontSize: 18, color: c.textSec, padding: 4 },
+    preview:  { width: '100%', height: 180, borderRadius: 12, backgroundColor: c.surface },
+    fileRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: c.surface, borderRadius: 12 },
+    fileIcon: { fontSize: 28 },
+    fileName: { fontSize: 14, fontWeight: '600', color: c.text },
+    fileMeta: { fontSize: 12, color: c.textMuted, marginTop: 2 },
+    meta:     { fontSize: 11, color: c.textMuted },
+    input:    { backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border2, color: c.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, minHeight: 90, textAlignVertical: 'top' },
+    actions:  { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
+    cancelBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: c.border2 },
+    cancelTxt: { color: c.textSec, fontSize: 14 },
+    sendBtn:  { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10, backgroundColor: c.brand, flexDirection: 'row', alignItems: 'center', gap: 6 },
+    sendTxt:  { color: '#fff', fontSize: 14, fontWeight: '700' },
+  });
+}
 
 // ── AttachmentsTab ─────────────────────────────────────────────────────────────
 function AttachmentsTab({
   productId, canUpload, canDelete, userId, attachments, onAttachmentsChanged,
 }: { productId: number; canUpload: boolean; canDelete: boolean; userId: number; attachments: Attachment[]; onAttachmentsChanged: () => void }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeAttachmentsStyles(c), [c]);
+
   // Upload progress
   const [uploadFiles, setUploadFiles]         = useState<FileUploadState[]>([]);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -578,59 +609,59 @@ function AttachmentsTab({
 
   return (
     <View style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={at.scroll}>
+      <ScrollView contentContainerStyle={styles.scroll}>
 
         {/* Upload + Download All buttons */}
         {canUpload && (
-          <View style={at.topRow}>
-            <TouchableOpacity style={at.uploadBtn} onPress={handleUpload}>
-              <Text style={at.uploadBtnText}>📎  Upload Files</Text>
+          <View style={styles.topRow}>
+            <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
+              <Text style={styles.uploadBtnText}>📎  Upload Files</Text>
             </TouchableOpacity>
             {attachments.length > 0 && (
-              <TouchableOpacity style={at.dlAllBtn} onPress={handleDownloadAll}>
-                <Text style={at.dlAllTxt}>⬇ All</Text>
+              <TouchableOpacity style={styles.dlAllBtn} onPress={handleDownloadAll}>
+                <Text style={styles.dlAllTxt}>⬇ All</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
 
         {attachments.length === 0 ? (
-          <TouchableOpacity style={at.emptyBox} onPress={canUpload ? handleUpload : undefined} activeOpacity={canUpload ? 0.7 : 1}>
+          <TouchableOpacity style={styles.emptyBox} onPress={canUpload ? handleUpload : undefined} activeOpacity={canUpload ? 0.7 : 1}>
             <Text style={{ fontSize: 32 }}>📎</Text>
-            <Text style={at.empty}>No attachments{canUpload ? ' — tap to upload' : ''}</Text>
+            <Text style={styles.empty}>No attachments{canUpload ? ' — tap to upload' : ''}</Text>
           </TouchableOpacity>
         ) : (
           <>
             {/* ── Image gallery grid ── */}
             {images.length > 0 && (
-              <View style={at.grid}>
+              <View style={styles.grid}>
                 {images.map((att) => (
-                  <View key={att.id} style={at.gridCell}>
+                  <View key={att.id} style={styles.gridCell}>
                     <TouchableOpacity
                       activeOpacity={0.85}
                       onPress={() => att.view_url && setLightbox({ url: att.view_url, name: att.file_name, id: att.id })}
-                      style={at.thumb}
+                      style={styles.thumb}
                     >
                       {att.view_url ? (
-                        <Image source={{ uri: att.view_url }} style={at.thumbImg} resizeMode="cover" />
+                        <Image source={{ uri: att.view_url }} style={styles.thumbImg} resizeMode="cover" />
                       ) : (
-                        <View style={[at.thumbImg, at.thumbPlaceholder]}>
+                        <View style={[styles.thumbImg, styles.thumbPlaceholder]}>
                           <Text style={{ fontSize: 28 }}>🖼</Text>
                         </View>
                       )}
                       {/* Overlay actions */}
-                      <View style={at.thumbOverlay}>
-                        <Text style={at.thumbName} numberOfLines={1}>{att.file_name}</Text>
-                        <View style={at.thumbActions}>
-                          <TouchableOpacity style={at.thumbBtn} onPress={() => handleDownload(att)}>
-                            <Text style={at.thumbBtnTxt}>⬇</Text>
+                      <View style={styles.thumbOverlay}>
+                        <Text style={styles.thumbName} numberOfLines={1}>{att.file_name}</Text>
+                        <View style={styles.thumbActions}>
+                          <TouchableOpacity style={styles.thumbBtn} onPress={() => handleDownload(att)}>
+                            <Text style={styles.thumbBtnTxt}>⬇</Text>
                           </TouchableOpacity>
-                          <TouchableOpacity style={at.thumbBtn} onPress={() => setCommentingAtt(att)}>
-                            <Text style={at.thumbBtnTxt}>💬</Text>
+                          <TouchableOpacity style={styles.thumbBtn} onPress={() => setCommentingAtt(att)}>
+                            <Text style={styles.thumbBtnTxt}>💬</Text>
                           </TouchableOpacity>
                           {(canDelete || att.uploaded_by === userId) && (
-                            <TouchableOpacity style={[at.thumbBtn, at.thumbBtnDanger]} onPress={() => { setDeleteConfirmId(att.id); setDeleteError(''); }}>
-                              <Text style={at.thumbBtnTxt}>🗑</Text>
+                            <TouchableOpacity style={[styles.thumbBtn, styles.thumbBtnDanger]} onPress={() => { setDeleteConfirmId(att.id); setDeleteError(''); }}>
+                              <Text style={styles.thumbBtnTxt}>🗑</Text>
                             </TouchableOpacity>
                           )}
                         </View>
@@ -643,27 +674,27 @@ function AttachmentsTab({
 
             {/* ── Non-image files ── */}
             {files.length > 0 && (
-              <View style={at.fileList}>
-                {images.length > 0 && <Text style={at.sectionLabel}>Other Files</Text>}
+              <View style={styles.fileList}>
+                {images.length > 0 && <Text style={styles.sectionLabel}>Other Files</Text>}
                 {files.map((att) => (
-                  <View key={att.id} style={at.card}>
-                    <Text style={at.cardIcon}>{fileEmoji(att.file_type)}</Text>
+                  <View key={att.id} style={styles.card}>
+                    <Text style={styles.cardIcon}>{fileEmoji(att.file_type)}</Text>
                     <View style={{ flex: 1 }}>
-                      <Text style={at.name} numberOfLines={1}>{att.file_name}</Text>
-                      <Text style={at.meta}>{formatFileSize(att.file_size)} · {att.uploader?.name} · {formatRelative(att.uploaded_at)}</Text>
+                      <Text style={styles.name} numberOfLines={1}>{att.file_name}</Text>
+                      <Text style={styles.meta}>{formatFileSize(att.file_size)} · {att.uploader?.name} · {formatRelative(att.uploaded_at)}</Text>
                     </View>
-                    <TouchableOpacity style={at.action} onPress={() => setCommentingAtt(att)}>
-                      <Text style={at.actionText}>💬</Text>
+                    <TouchableOpacity style={styles.action} onPress={() => setCommentingAtt(att)}>
+                      <Text style={styles.actionText}>💬</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={at.action} onPress={() => handleDownload(att)}>
-                      <Text style={at.actionText}>⬇</Text>
+                    <TouchableOpacity style={styles.action} onPress={() => handleDownload(att)}>
+                      <Text style={styles.actionText}>⬇</Text>
                     </TouchableOpacity>
                     {(canDelete || att.uploaded_by === userId) && (
                       <TouchableOpacity
-                        style={[at.action, at.deleteAction]}
+                        style={[styles.action, styles.deleteAction]}
                         onPress={() => { setDeleteConfirmId(att.id); setDeleteError(''); }}
                       >
-                        <Text style={at.deleteText}>🗑</Text>
+                        <Text style={styles.deleteText}>🗑</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -707,23 +738,23 @@ function AttachmentsTab({
 
       {/* Inline delete confirmation */}
       <Modal visible={!!deleteConfirmId} transparent animationType="fade" onRequestClose={() => setDeleteConfirmId(null)}>
-        <TouchableOpacity style={at.modalBackdrop} activeOpacity={1} onPress={() => !deleting && setDeleteConfirmId(null)}>
-          <View style={at.modalSheet}>
-            <Text style={at.modalTitle}>Delete Attachment?</Text>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => !deleting && setDeleteConfirmId(null)}>
+          <View style={styles.modalSheet}>
+            <Text style={styles.modalTitle}>Delete Attachment?</Text>
             {deleteError ? (
-              <View style={at.errorBox}><Text style={at.errorTxt}>{deleteError}</Text></View>
+              <View style={styles.errorBox}><Text style={styles.errorTxt}>{deleteError}</Text></View>
             ) : (
-              <Text style={at.modalSub}>This action cannot be undone.</Text>
+              <Text style={styles.modalSub}>This action cannot be undone.</Text>
             )}
-            <View style={at.modalActions}>
-              <TouchableOpacity style={at.modalCancel} onPress={() => { setDeleteConfirmId(null); setDeleteError(''); }} disabled={deleting}>
-                <Text style={at.modalCancelTxt}>Cancel</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalCancel} onPress={() => { setDeleteConfirmId(null); setDeleteError(''); }} disabled={deleting}>
+                <Text style={styles.modalCancelTxt}>Cancel</Text>
               </TouchableOpacity>
               {!deleteError && (
-                <TouchableOpacity style={at.modalDelete} onPress={confirmDelete} disabled={deleting}>
+                <TouchableOpacity style={styles.modalDelete} onPress={confirmDelete} disabled={deleting}>
                   {deleting
                     ? <ActivityIndicator color="#fff" size="small" />
-                    : <Text style={at.modalDeleteTxt}>Delete</Text>
+                    : <Text style={styles.modalDeleteTxt}>Delete</Text>
                   }
                 </TouchableOpacity>
               )}
@@ -735,77 +766,79 @@ function AttachmentsTab({
   );
 }
 
-const at = StyleSheet.create({
-  scroll:  { padding: 16, gap: 14, paddingBottom: 40 },
-  center:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  empty:   { fontSize: 14, color: '#64748B' },
+function makeAttachmentsStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    scroll:  { padding: 16, gap: 14, paddingBottom: 40 },
+    center:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+    empty:   { fontSize: 14, color: c.textMuted },
 
-  topRow:  { flexDirection: 'row', gap: 10 },
-  uploadBtn: {
-    flex: 1, backgroundColor: 'rgba(99,102,241,0.15)', borderRadius: 12,
-    borderWidth: 1, borderColor: '#6366F1', paddingVertical: 12, alignItems: 'center',
-  },
-  uploadBtnText: { color: '#818CF8', fontSize: 14, fontWeight: '600' },
-  dlAllBtn: {
-    backgroundColor: '#1C2130', borderRadius: 12, borderWidth: 1,
-    borderColor: '#2D3748', paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
-  },
-  dlAllTxt: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
+    topRow:  { flexDirection: 'row', gap: 10 },
+    uploadBtn: {
+      flex: 1, backgroundColor: 'rgba(99,102,241,0.15)', borderRadius: 12,
+      borderWidth: 1, borderColor: c.brand, paddingVertical: 12, alignItems: 'center',
+    },
+    uploadBtnText: { color: c.brandLight, fontSize: 14, fontWeight: '600' },
+    dlAllBtn: {
+      backgroundColor: c.surface, borderRadius: 12, borderWidth: 1,
+      borderColor: c.border2, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
+    },
+    dlAllTxt: { color: c.textSec, fontSize: 13, fontWeight: '600' },
 
-  emptyBox: {
-    borderWidth: 2, borderStyle: 'dashed', borderColor: '#1E2535',
-    borderRadius: 14, padding: 40, alignItems: 'center', gap: 8,
-  },
+    emptyBox: {
+      borderWidth: 2, borderStyle: 'dashed', borderColor: c.surface2,
+      borderRadius: 14, padding: 40, alignItems: 'center', gap: 8,
+    },
 
-  // Image grid
-  grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  gridCell: { width: '48%' },
-  thumb:    { aspectRatio: 4/3, borderRadius: 12, overflow: 'hidden', backgroundColor: '#1C2130', borderWidth: 1, borderColor: '#2D3748' },
-  thumbImg: { width: '100%', height: '100%' },
-  thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  thumbOverlay: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingHorizontal: 8, paddingVertical: 6,
-    backgroundColor: 'rgba(0,0,0,0.65)',
-  },
-  thumbName:    { fontSize: 10, color: '#fff', marginBottom: 4 },
-  thumbActions: { flexDirection: 'row', gap: 4 },
-  thumbBtn: {
-    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  thumbBtnDanger: { backgroundColor: 'rgba(239,68,68,0.4)', marginLeft: 'auto' },
-  thumbBtnTxt:    { fontSize: 11, color: '#fff' },
+    // Image grid
+    grid:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    gridCell: { width: '48%' },
+    thumb:    { aspectRatio: 4/3, borderRadius: 12, overflow: 'hidden', backgroundColor: c.surface, borderWidth: 1, borderColor: c.border2 },
+    thumbImg: { width: '100%', height: '100%' },
+    thumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+    thumbOverlay: {
+      position: 'absolute', bottom: 0, left: 0, right: 0,
+      paddingHorizontal: 8, paddingVertical: 6,
+      backgroundColor: 'rgba(0,0,0,0.65)',
+    },
+    thumbName:    { fontSize: 10, color: '#fff', marginBottom: 4 },
+    thumbActions: { flexDirection: 'row', gap: 4 },
+    thumbBtn: {
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+    },
+    thumbBtnDanger: { backgroundColor: 'rgba(239,68,68,0.4)', marginLeft: 'auto' },
+    thumbBtnTxt:    { fontSize: 11, color: '#fff' },
 
-  // File list
-  fileList:    { gap: 8 },
-  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
-  card: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#1C2130', borderRadius: 12, padding: 12,
-    borderWidth: 1, borderColor: '#2D3748',
-  },
-  cardIcon: { fontSize: 24 },
-  name:     { fontSize: 14, fontWeight: '600', color: '#E2E8F0' },
-  meta:     { fontSize: 11, color: '#64748B', marginTop: 2 },
-  action:   { width: 36, height: 36, borderRadius: 10, backgroundColor: '#131720', alignItems: 'center', justifyContent: 'center' },
-  actionText:   { fontSize: 16 },
-  deleteAction: { backgroundColor: 'rgba(239,68,68,0.1)' },
-  deleteText:   { fontSize: 16 },
+    // File list
+    fileList:    { gap: 8 },
+    sectionLabel: { fontSize: 11, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+    card: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      backgroundColor: c.surface, borderRadius: 12, padding: 12,
+      borderWidth: 1, borderColor: c.border2,
+    },
+    cardIcon: { fontSize: 24 },
+    name:     { fontSize: 14, fontWeight: '600', color: c.text },
+    meta:     { fontSize: 11, color: c.textMuted, marginTop: 2 },
+    action:   { width: 36, height: 36, borderRadius: 10, backgroundColor: c.card, alignItems: 'center', justifyContent: 'center' },
+    actionText:   { fontSize: 16 },
+    deleteAction: { backgroundColor: 'rgba(239,68,68,0.1)' },
+    deleteText:   { fontSize: 16 },
 
-  // Delete modal
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
-  modalSheet:    { width: '100%', backgroundColor: '#131720', borderRadius: 20, padding: 24, alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#2D3748' },
-  modalTitle:    { fontSize: 17, fontWeight: '700', color: '#F1F5F9' },
-  modalSub:      { fontSize: 13, color: '#64748B', textAlign: 'center' },
-  errorBox:      { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', padding: 10, width: '100%' },
-  errorTxt:      { color: '#FCA5A5', fontSize: 13, textAlign: 'center' },
-  modalActions:  { flexDirection: 'row', gap: 12, marginTop: 4 },
-  modalCancel:   { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#2D3748', alignItems: 'center' },
-  modalCancelTxt: { color: '#94A3B8', fontWeight: '600' },
-  modalDelete:   { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center' },
-  modalDeleteTxt: { color: '#fff', fontWeight: '700' },
-});
+    // Delete modal
+    modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    modalSheet:    { width: '100%', backgroundColor: c.card, borderRadius: 20, padding: 24, alignItems: 'center', gap: 12, borderWidth: 1, borderColor: c.border2 },
+    modalTitle:    { fontSize: 17, fontWeight: '700', color: c.text },
+    modalSub:      { fontSize: 13, color: c.textMuted, textAlign: 'center' },
+    errorBox:      { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 10, borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', padding: 10, width: '100%' },
+    errorTxt:      { color: '#FCA5A5', fontSize: 13, textAlign: 'center' },
+    modalActions:  { flexDirection: 'row', gap: 12, marginTop: 4 },
+    modalCancel:   { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: c.border2, alignItems: 'center' },
+    modalCancelTxt: { color: c.textSec, fontWeight: '600' },
+    modalDelete:   { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: '#EF4444', alignItems: 'center' },
+    modalDeleteTxt: { color: '#fff', fontWeight: '700' },
+  });
+}
 
 // ─── Comments tab ─────────────────────────────────────────────────────────────
 
@@ -850,6 +883,10 @@ interface MenuState { commentId: number; isOwn: boolean; text: string; authorNam
 function CommentsTab({
   productId, canComment, userId, attachments,
 }: { productId: number; canComment: boolean; userId: number; attachments: Attachment[] }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeCommentsStyles(c), [c]);
+
   const [comments, setComments]   = useState<Comment[]>([]);
   const [loading, setLoading]     = useState(true);
   const [message, setMessage]     = useState('');
@@ -1004,7 +1041,7 @@ function CommentsTab({
   };
 
   if (loading) {
-    return <View style={cm.center}><ActivityIndicator color="#6366F1" /></View>;
+    return <View style={styles.center}><ActivityIndicator color={c.brand} /></View>;
   }
 
   return (
@@ -1016,12 +1053,12 @@ function CommentsTab({
       <FlatList
         data={comments}
         keyExtractor={(c) => String(c.id)}
-        contentContainerStyle={cm.list}
+        contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
-          <View style={cm.center}>
+          <View style={styles.center}>
             <Text style={{ fontSize: 32 }}>💬</Text>
-            <Text style={cm.empty}>No comments yet</Text>
+            <Text style={styles.empty}>No comments yet</Text>
           </View>
         }
         renderItem={({ item: c }) => {
@@ -1031,21 +1068,21 @@ function CommentsTab({
           // Inline edit mode
           if (editId === c.id) {
             return (
-              <View style={[cm.row, isOwn ? cm.rowOwn : cm.rowOther]}>
-                <View style={[cm.editBubble, { maxWidth: '85%' }]}>
+              <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
+                <View style={[styles.editBubble, { maxWidth: '85%' }]}>
                   <TextInput
-                    style={cm.editInput}
+                    style={styles.editInput}
                     value={editText}
                     onChangeText={setEditText}
                     multiline
                     autoFocus
                   />
-                  <View style={cm.editActions}>
+                  <View style={styles.editActions}>
                     <TouchableOpacity onPress={() => { setEditId(null); setEditText(''); }}>
-                      <Text style={cm.editCancel}>Cancel</Text>
+                      <Text style={styles.editCancel}>Cancel</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleEdit(c.id)}>
-                      <Text style={cm.editSave}>Save</Text>
+                      <Text style={styles.editSave}>Save</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1054,16 +1091,16 @@ function CommentsTab({
           }
 
           return (
-            <View style={[cm.row, isOwn ? cm.rowOwn : cm.rowOther]}>
+            <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
               {/* Avatar — others only */}
               {!isOwn && (
-                <View style={cm.avatarWrap}>
+                <View style={styles.avatarWrap}>
                   <Avatar name={name} avatarUrl={c.user?.avatar_url} size={30} />
                 </View>
               )}
 
-              <View style={[cm.bubbleWrap, isOwn ? cm.bubbleWrapOwn : cm.bubbleWrapOther]}>
-                {!isOwn && <Text style={cm.senderName}>{name}</Text>}
+              <View style={[styles.bubbleWrap, isOwn ? styles.bubbleWrapOwn : styles.bubbleWrapOther]}>
+                {!isOwn && <Text style={styles.senderName}>{name}</Text>}
 
                 {/* Long-press bubble to open menu */}
                 <TouchableOpacity
@@ -1082,17 +1119,17 @@ function CommentsTab({
                       : /\.(jpg|jpeg|png|gif|webp|heic|bmp)(\?|$)/i.test(attUrl);
 
                     return (
-                      <View style={[cm.bubble, isOwn ? cm.bubbleOwn : cm.bubbleOther]}>
+                      <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
                         {/* Reply quote */}
                         {parsed.replyPreview && (
-                          <View style={[cm.replyQuote, isOwn ? cm.replyQuoteOwn : cm.replyQuoteOther]}>
-                            <Text style={cm.replyQuoteText} numberOfLines={1}>{parsed.replyPreview}</Text>
+                          <View style={[styles.replyQuote, isOwn ? styles.replyQuoteOwn : styles.replyQuoteOther]}>
+                            <Text style={styles.replyQuoteText} numberOfLines={1}>{parsed.replyPreview}</Text>
                           </View>
                         )}
 
                         {/* Main text */}
                         {!!parsed.text && (
-                          <Text style={[cm.msgText, isOwn ? cm.msgTextOwn : cm.msgTextOther]}>
+                          <Text style={[styles.msgText, isOwn ? styles.msgTextOwn : styles.msgTextOther]}>
                             {stripMentions(parsed.text)}
                           </Text>
                         )}
@@ -1100,14 +1137,14 @@ function CommentsTab({
                         {/* Attachment — image thumbnail */}
                         {attUrl && attIsImage && (
                           <TouchableOpacity
-                            style={cm.attThumb}
+                            style={styles.attThumb}
                             onPress={() => setAttLightbox({ url: attUrl, name: parsed.attachmentName || 'image', id: parsed.attachmentId })}
                             activeOpacity={0.85}
                           >
-                            <Image source={{ uri: attUrl }} style={cm.attThumbImg} resizeMode="cover" />
+                            <Image source={{ uri: attUrl }} style={styles.attThumbImg} resizeMode="cover" />
                             {parsed.attachmentName && (
-                              <View style={cm.attThumbOverlay}>
-                                <Text style={cm.attThumbName} numberOfLines={1}>{parsed.attachmentName}</Text>
+                              <View style={styles.attThumbOverlay}>
+                                <Text style={styles.attThumbName} numberOfLines={1}>{parsed.attachmentName}</Text>
                               </View>
                             )}
                           </TouchableOpacity>
@@ -1115,17 +1152,17 @@ function CommentsTab({
 
                         {/* Attachment — non-image file chip */}
                         {attUrl && !attIsImage && (
-                          <View style={[cm.attFile, isOwn ? cm.attFileOwn : cm.attFileOther]}>
-                            <Text style={cm.attFileIcon}>
+                          <View style={[styles.attFile, isOwn ? styles.attFileOwn : styles.attFileOther]}>
+                            <Text style={styles.attFileIcon}>
                               {fileEmoji(resolvedAtt?.file_type || parsed.attachmentName?.match(/\.\w+$/)?.[0] || '')}
                             </Text>
-                            <Text style={[cm.attFileName, isOwn ? cm.attFileNameOwn : {}]} numberOfLines={1}>
+                            <Text style={[styles.attFileName, isOwn ? styles.attFileNameOwn : {}]} numberOfLines={1}>
                               {parsed.attachmentName || 'File'}
                             </Text>
                           </View>
                         )}
 
-                        <Text style={[cm.timestamp, isOwn ? cm.timestampOwn : cm.timestampOther]}>
+                        <Text style={[styles.timestamp, isOwn ? styles.timestampOwn : styles.timestampOther]}>
                           {formatRelative(c.created_at)}
                         </Text>
                       </View>
@@ -1140,58 +1177,58 @@ function CommentsTab({
 
       {/* Reply preview bar */}
       {replyTo && (
-        <View style={cm.replyBar}>
-          <View style={cm.replyContent}>
-            <Text style={cm.replyLabel}>↩ Replying to {replyTo.name}</Text>
-            <Text style={cm.replyText} numberOfLines={1}>
+        <View style={styles.replyBar}>
+          <View style={styles.replyContent}>
+            <Text style={styles.replyLabel}>↩ Replying to {replyTo.name}</Text>
+            <Text style={styles.replyText} numberOfLines={1}>
               {stripMentions(replyTo.text).slice(0, 80)}
             </Text>
           </View>
-          <TouchableOpacity onPress={() => setReplyTo(null)} style={cm.replyClear}>
-            <Text style={cm.replyClearText}>✕</Text>
+          <TouchableOpacity onPress={() => setReplyTo(null)} style={styles.replyClear}>
+            <Text style={styles.replyClearText}>✕</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {/* @mention dropdown */}
       {showMentionDropdown && (
-        <View style={cm.mentionDropdown}>
-          <Text style={cm.mentionHeader}>Mention</Text>
+        <View style={styles.mentionDropdown}>
+          <Text style={styles.mentionHeader}>Mention</Text>
           {filteredUsers.length > 0 && (
             <>
-              <Text style={cm.mentionSection}>PEOPLE</Text>
+              <Text style={styles.mentionSection}>PEOPLE</Text>
               {filteredUsers.map((u) => (
                 <TouchableOpacity
                   key={`u-${u.id}`}
-                  style={cm.mentionItem}
+                  style={styles.mentionItem}
                   onPress={() => selectMentionUser(u)}
                 >
-                  <View style={cm.mentionAvatar}>
-                    <Text style={cm.mentionAvatarText}>{u.name.charAt(0).toUpperCase()}</Text>
+                  <View style={styles.mentionAvatar}>
+                    <Text style={styles.mentionAvatarText}>{u.name.charAt(0).toUpperCase()}</Text>
                   </View>
-                  <Text style={cm.mentionName}>{u.name}</Text>
-                  {u.role && <Text style={cm.mentionRole}>{(u.role as any).name}</Text>}
+                  <Text style={styles.mentionName}>{u.name}</Text>
+                  {u.role && <Text style={styles.mentionRole}>{(u.role as any).name}</Text>}
                 </TouchableOpacity>
               ))}
             </>
           )}
           {(orderResults.length > 0 || orderLoading) && (
             <>
-              <Text style={[cm.mentionSection, filteredUsers.length > 0 && cm.mentionSectionBorder]}>ORDERS</Text>
+              <Text style={[styles.mentionSection, filteredUsers.length > 0 && styles.mentionSectionBorder]}>ORDERS</Text>
               {orderLoading && orderResults.length === 0 ? (
                 <ActivityIndicator color="#F59E0B" size="small" style={{ marginVertical: 8 }} />
               ) : orderResults.map((p) => (
                 <TouchableOpacity
                   key={`o-${p.id}`}
-                  style={cm.mentionItem}
+                  style={styles.mentionItem}
                   onPress={() => selectMentionOrder(p)}
                 >
-                  <View style={cm.mentionOrderIcon}>
+                  <View style={styles.mentionOrderIcon}>
                     <Text style={{ fontSize: 12 }}>📦</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={cm.mentionOrderId}>{p.product_id}</Text>
-                    <Text style={cm.mentionOrderCustomer} numberOfLines={1}>{p.customer_name}</Text>
+                    <Text style={styles.mentionOrderId}>{p.product_id}</Text>
+                    <Text style={styles.mentionOrderCustomer} numberOfLines={1}>{p.customer_name}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -1201,10 +1238,10 @@ function CommentsTab({
       )}
 
       {canComment && (
-        <View style={cm.inputBar}>
+        <View style={styles.inputBar}>
           <TextInput
             ref={inputRef}
-            style={cm.input}
+            style={styles.input}
             value={message}
             onChangeText={handleInputChange}
             selection={forcedCursor}
@@ -1217,17 +1254,17 @@ function CommentsTab({
             }}
             onSelectionChange={() => setForcedCursor(undefined)}
             placeholder={replyTo ? `Reply to ${replyTo.name}…` : 'Write a comment... (@name to mention)'}
-            placeholderTextColor="#64748B"
+            placeholderTextColor={c.textMuted}
             multiline
           />
           <TouchableOpacity
-            style={[cm.sendBtn, (!message.trim() || sending) && cm.sendBtnDisabled]}
+            style={[styles.sendBtn, (!message.trim() || sending) && styles.sendBtnDisabled]}
             onPress={handleSend}
             disabled={!message.trim() || sending}
           >
             {sending
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={cm.sendIcon}>➤</Text>
+              : <Text style={styles.sendIcon}>➤</Text>
             }
           </TouchableOpacity>
         </View>
@@ -1241,27 +1278,27 @@ function CommentsTab({
         onRequestClose={() => { setMenu(null); setConfirmingDelete(null); }}
       >
         <TouchableOpacity
-          style={cm.menuBackdrop}
+          style={styles.menuBackdrop}
           activeOpacity={1}
           onPress={() => { setMenu(null); setConfirmingDelete(null); }}
         >
-          <View style={cm.menuSheet}>
-            <View style={cm.menuHandle} />
+          <View style={styles.menuSheet}>
+            <View style={styles.menuHandle} />
 
             {confirmingDelete !== null ? (
               /* ── Inline delete confirmation ── */
               <>
-                <Text style={cm.menuConfirmTitle}>Delete this comment?</Text>
-                <Text style={cm.menuConfirmSub}>This cannot be undone.</Text>
+                <Text style={styles.menuConfirmTitle}>Delete this comment?</Text>
+                <Text style={styles.menuConfirmSub}>This cannot be undone.</Text>
                 <TouchableOpacity
-                  style={[cm.menuItem, cm.menuItemDanger]}
+                  style={[styles.menuItem, styles.menuItemDanger]}
                   onPress={() => doDelete(confirmingDelete)}
                 >
-                  <Text style={cm.menuIcon}>🗑️</Text>
-                  <Text style={[cm.menuLabel, cm.menuLabelDanger]}>Yes, Delete</Text>
+                  <Text style={styles.menuIcon}>🗑️</Text>
+                  <Text style={[styles.menuLabel, styles.menuLabelDanger]}>Yes, Delete</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={cm.menuCancel} onPress={() => setConfirmingDelete(null)}>
-                  <Text style={cm.menuCancelText}>Cancel</Text>
+                <TouchableOpacity style={styles.menuCancel} onPress={() => setConfirmingDelete(null)}>
+                  <Text style={styles.menuCancelText}>Cancel</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -1269,44 +1306,44 @@ function CommentsTab({
               <>
                 {/* Reply — always available */}
                 <TouchableOpacity
-                  style={cm.menuItem}
+                  style={styles.menuItem}
                   onPress={() => {
                     setReplyTo({ id: menu!.commentId, name: menu!.authorName, text: menu!.text });
                     setMenu(null);
                   }}
                 >
-                  <Text style={cm.menuIcon}>↩</Text>
-                  <Text style={cm.menuLabel}>Reply</Text>
+                  <Text style={styles.menuIcon}>↩</Text>
+                  <Text style={styles.menuLabel}>Reply</Text>
                 </TouchableOpacity>
 
                 {/* Edit — own only */}
                 {menu?.isOwn && (
                   <TouchableOpacity
-                    style={cm.menuItem}
+                    style={styles.menuItem}
                     onPress={() => {
                       setEditId(menu!.commentId);
                       setEditText(menu!.text);
                       setMenu(null);
                     }}
                   >
-                    <Text style={cm.menuIcon}>✏️</Text>
-                    <Text style={cm.menuLabel}>Edit</Text>
+                    <Text style={styles.menuIcon}>✏️</Text>
+                    <Text style={styles.menuLabel}>Edit</Text>
                   </TouchableOpacity>
                 )}
 
                 {/* Delete — own only */}
                 {menu?.isOwn && (
                   <TouchableOpacity
-                    style={[cm.menuItem, cm.menuItemDanger]}
+                    style={[styles.menuItem, styles.menuItemDanger]}
                     onPress={() => setConfirmingDelete(menu!.commentId)}
                   >
-                    <Text style={cm.menuIcon}>🗑️</Text>
-                    <Text style={[cm.menuLabel, cm.menuLabelDanger]}>Delete</Text>
+                    <Text style={styles.menuIcon}>🗑️</Text>
+                    <Text style={[styles.menuLabel, styles.menuLabelDanger]}>Delete</Text>
                   </TouchableOpacity>
                 )}
 
-                <TouchableOpacity style={cm.menuCancel} onPress={() => setMenu(null)}>
-                  <Text style={cm.menuCancelText}>Cancel</Text>
+                <TouchableOpacity style={styles.menuCancel} onPress={() => setMenu(null)}>
+                  <Text style={styles.menuCancelText}>Cancel</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -1338,185 +1375,187 @@ function CommentsTab({
   );
 }
 
-const cm = StyleSheet.create({
-  list: { padding: 12, paddingBottom: 20 },
-  center: { alignItems: 'center', padding: 32, gap: 8 },
-  empty: { fontSize: 14, color: '#64748B' },
+function makeCommentsStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    list: { padding: 12, paddingBottom: 20 },
+    center: { alignItems: 'center', padding: 32, gap: 8 },
+    empty: { fontSize: 14, color: c.textMuted },
 
-  // Row layout
-  row: { flexDirection: 'row', marginBottom: 6, alignItems: 'flex-end' },
-  rowOwn:   { justifyContent: 'flex-end' },
-  rowOther: { justifyContent: 'flex-start' },
+    // Row layout
+    row: { flexDirection: 'row', marginBottom: 6, alignItems: 'flex-end' },
+    rowOwn:   { justifyContent: 'flex-end' },
+    rowOther: { justifyContent: 'flex-start' },
 
-  // Avatar
-  avatarWrap: { marginRight: 6, marginBottom: 2 },
+    // Avatar
+    avatarWrap: { marginRight: 6, marginBottom: 2 },
 
-  // Bubble container
-  bubbleWrap: { maxWidth: '78%', gap: 3 },
-  bubbleWrapOwn:   { alignItems: 'flex-end' },
-  bubbleWrapOther: { alignItems: 'flex-start' },
+    // Bubble container
+    bubbleWrap: { maxWidth: '78%', gap: 3 },
+    bubbleWrapOwn:   { alignItems: 'flex-end' },
+    bubbleWrapOther: { alignItems: 'flex-start' },
 
-  senderName: { fontSize: 11, fontWeight: '700', color: '#818CF8', marginLeft: 4, marginBottom: 1 },
+    senderName: { fontSize: 11, fontWeight: '700', color: c.brandLight, marginLeft: 4, marginBottom: 1 },
 
-  // Bubble itself
-  bubble: { borderRadius: 18, paddingHorizontal: 13, paddingVertical: 8, paddingBottom: 6 },
-  bubbleOwn: {
-    backgroundColor: '#4F46E5',
-    borderBottomRightRadius: 4,
-  },
-  bubbleOther: {
-    backgroundColor: '#1E2535',
-    borderWidth: 1,
-    borderColor: '#2D3748',
-    borderBottomLeftRadius: 4,
-  },
-  editBubble: { backgroundColor: '#1E2535', borderWidth: 1, borderColor: '#2D3748', padding: 10, borderRadius: 14 },
+    // Bubble itself
+    bubble: { borderRadius: 18, paddingHorizontal: 13, paddingVertical: 8, paddingBottom: 6 },
+    bubbleOwn: {
+      backgroundColor: c.brand,
+      borderBottomRightRadius: 4,
+    },
+    bubbleOther: {
+      backgroundColor: c.surface2,
+      borderWidth: 1,
+      borderColor: c.border2,
+      borderBottomLeftRadius: 4,
+    },
+    editBubble: { backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border2, padding: 10, borderRadius: 14 },
 
-  msgText: { fontSize: 14, lineHeight: 20 },
-  msgTextOwn:   { color: '#FFFFFF' },
-  msgTextOther: { color: '#E2E8F0' },
+    msgText: { fontSize: 14, lineHeight: 20 },
+    msgTextOwn:   { color: '#FFFFFF' },
+    msgTextOther: { color: c.text },
 
-  timestamp: { fontSize: 10, marginTop: 3, textAlign: 'right' },
-  timestampOwn:   { color: 'rgba(255,255,255,0.55)' },
-  timestampOther: { color: '#64748B' },
+    timestamp: { fontSize: 10, marginTop: 3, textAlign: 'right' },
+    timestampOwn:   { color: 'rgba(255,255,255,0.55)' },
+    timestampOther: { color: c.textMuted },
 
-  // Own message actions (below bubble)
-  ownActions: { flexDirection: 'row', gap: 4, marginRight: 2 },
-  actionBtn: { padding: 3 },
-  actionIcon: { fontSize: 12, color: '#64748B' },
+    // Own message actions (below bubble)
+    ownActions: { flexDirection: 'row', gap: 4, marginRight: 2 },
+    actionBtn: { padding: 3 },
+    actionIcon: { fontSize: 12, color: c.textMuted },
 
-  // Edit mode
-  editInput: {
-    backgroundColor: '#131720', borderRadius: 8, borderWidth: 1,
-    borderColor: '#2D3748', color: '#F1F5F9', padding: 10, fontSize: 14, minWidth: 200,
-  },
-  editActions: { flexDirection: 'row', gap: 14, justifyContent: 'flex-end', marginTop: 6 },
-  editCancel: { color: '#64748B', fontSize: 13 },
-  editSave: { color: '#818CF8', fontSize: 13, fontWeight: '700' },
+    // Edit mode
+    editInput: {
+      backgroundColor: c.card, borderRadius: 8, borderWidth: 1,
+      borderColor: c.border2, color: c.text, padding: 10, fontSize: 14, minWidth: 200,
+    },
+    editActions: { flexDirection: 'row', gap: 14, justifyContent: 'flex-end', marginTop: 6 },
+    editCancel: { color: c.textMuted, fontSize: 13 },
+    editSave: { color: c.brandLight, fontSize: 13, fontWeight: '700' },
 
-  // Reply quote inside bubble
-  replyQuote: { borderLeftWidth: 3, paddingLeft: 8, marginBottom: 6, borderRadius: 4, paddingVertical: 3 },
-  replyQuoteOwn:   { borderLeftColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.08)' },
-  replyQuoteOther: { borderLeftColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.08)' },
-  replyQuoteText:  { fontSize: 11, color: '#94A3B8', fontStyle: 'italic' },
+    // Reply quote inside bubble
+    replyQuote: { borderLeftWidth: 3, paddingLeft: 8, marginBottom: 6, borderRadius: 4, paddingVertical: 3 },
+    replyQuoteOwn:   { borderLeftColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.08)' },
+    replyQuoteOther: { borderLeftColor: c.brand, backgroundColor: 'rgba(99,102,241,0.08)' },
+    replyQuoteText:  { fontSize: 11, color: c.textSec, fontStyle: 'italic' },
 
-  // Attachment image thumbnail inside bubble
-  attThumb: { borderRadius: 10, overflow: 'hidden', marginTop: 4, marginBottom: 4 },
-  attThumbImg: { width: 200, height: 140 },
-  attThumbOverlay: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 8, paddingVertical: 4,
-  },
-  attThumbName: { fontSize: 10, color: '#fff' },
+    // Attachment image thumbnail inside bubble
+    attThumb: { borderRadius: 10, overflow: 'hidden', marginTop: 4, marginBottom: 4 },
+    attThumbImg: { width: 200, height: 140 },
+    attThumbOverlay: {
+      position: 'absolute', bottom: 0, left: 0, right: 0,
+      backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 8, paddingVertical: 4,
+    },
+    attThumbName: { fontSize: 10, color: '#fff' },
 
-  // Attachment file chip inside bubble
-  attFile: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 8, marginTop: 4 },
-  attFileOwn:   { backgroundColor: 'rgba(255,255,255,0.1)' },
-  attFileOther: { backgroundColor: 'rgba(99,102,241,0.12)' },
-  attFileIcon:  { fontSize: 20 },
-  attFileName:  { fontSize: 12, color: '#94A3B8', flex: 1 },
-  attFileNameOwn: { color: 'rgba(255,255,255,0.85)' },
+    // Attachment file chip inside bubble
+    attFile: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 8, marginTop: 4 },
+    attFileOwn:   { backgroundColor: 'rgba(255,255,255,0.1)' },
+    attFileOther: { backgroundColor: 'rgba(99,102,241,0.12)' },
+    attFileIcon:  { fontSize: 20 },
+    attFileName:  { fontSize: 12, color: c.textSec, flex: 1 },
+    attFileNameOwn: { color: 'rgba(255,255,255,0.85)' },
 
-  // Mention dropdown
-  mentionDropdown: {
-    marginHorizontal: 12, marginBottom: 4,
-    backgroundColor: '#131720', borderRadius: 14,
-    borderWidth: 1, borderColor: '#2D3748',
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.3, shadowRadius: 8,
-    elevation: 8,
-  },
-  mentionHeader: {
-    fontSize: 10, fontWeight: '700', color: '#475569',
-    letterSpacing: 1, textTransform: 'uppercase',
-    paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  mentionSection: {
-    fontSize: 9, fontWeight: '700', color: '#475569',
-    letterSpacing: 1.5, textTransform: 'uppercase',
-    paddingHorizontal: 12, paddingTop: 8, paddingBottom: 2,
-  },
-  mentionSectionBorder: {
-    borderTopWidth: 1, borderTopColor: '#1E2535', marginTop: 4,
-  },
-  mentionItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 12, paddingVertical: 9,
-  },
-  mentionAvatar: {
-    width: 28, height: 28, borderRadius: 14,
-    backgroundColor: '#4F46E5', alignItems: 'center', justifyContent: 'center',
-  },
-  mentionAvatarText: { fontSize: 11, fontWeight: '700', color: '#fff' },
-  mentionName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#E2E8F0' },
-  mentionRole: { fontSize: 11, color: '#64748B' },
-  mentionOrderIcon: {
-    width: 28, height: 28, borderRadius: 8,
-    backgroundColor: 'rgba(245,158,11,0.15)', alignItems: 'center', justifyContent: 'center',
-  },
-  mentionOrderId: { fontSize: 12, fontWeight: '700', color: '#F59E0B', fontVariant: ['tabular-nums'] as any },
-  mentionOrderCustomer: { fontSize: 11, color: '#64748B' },
+    // Mention dropdown
+    mentionDropdown: {
+      marginHorizontal: 12, marginBottom: 4,
+      backgroundColor: c.card, borderRadius: 14,
+      borderWidth: 1, borderColor: c.border2,
+      overflow: 'hidden',
+      shadowColor: '#000', shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.3, shadowRadius: 8,
+      elevation: 8,
+    },
+    mentionHeader: {
+      fontSize: 10, fontWeight: '700', color: c.textDim,
+      letterSpacing: 1, textTransform: 'uppercase',
+      paddingHorizontal: 12, paddingTop: 10, paddingBottom: 4,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    mentionSection: {
+      fontSize: 9, fontWeight: '700', color: c.textDim,
+      letterSpacing: 1.5, textTransform: 'uppercase',
+      paddingHorizontal: 12, paddingTop: 8, paddingBottom: 2,
+    },
+    mentionSectionBorder: {
+      borderTopWidth: 1, borderTopColor: c.surface2, marginTop: 4,
+    },
+    mentionItem: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingHorizontal: 12, paddingVertical: 9,
+    },
+    mentionAvatar: {
+      width: 28, height: 28, borderRadius: 14,
+      backgroundColor: c.brand, alignItems: 'center', justifyContent: 'center',
+    },
+    mentionAvatarText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+    mentionName: { flex: 1, fontSize: 13, fontWeight: '600', color: c.text },
+    mentionRole: { fontSize: 11, color: c.textMuted },
+    mentionOrderIcon: {
+      width: 28, height: 28, borderRadius: 8,
+      backgroundColor: 'rgba(245,158,11,0.15)', alignItems: 'center', justifyContent: 'center',
+    },
+    mentionOrderId: { fontSize: 12, fontWeight: '700', color: '#F59E0B', fontVariant: ['tabular-nums'] as any },
+    mentionOrderCustomer: { fontSize: 11, color: c.textMuted },
 
-  inputBar: {
-    flexDirection: 'row', alignItems: 'flex-end', gap: 10,
-    padding: 12, borderTopWidth: 1, borderTopColor: '#1E2535',
-  },
-  input: {
-    flex: 1, backgroundColor: '#1C2130', borderRadius: 12, borderWidth: 1,
-    borderColor: '#2D3748', color: '#F1F5F9', paddingHorizontal: 14,
-    paddingVertical: 10, fontSize: 14, maxHeight: 100,
-  },
-  sendBtn: {
-    width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#6366F1', alignItems: 'center', justifyContent: 'center',
-  },
-  sendBtnDisabled: { opacity: 0.4 },
-  sendIcon: { color: '#fff', fontSize: 16 },
+    inputBar: {
+      flexDirection: 'row', alignItems: 'flex-end', gap: 10,
+      padding: 12, borderTopWidth: 1, borderTopColor: c.surface2,
+    },
+    input: {
+      flex: 1, backgroundColor: c.surface, borderRadius: 12, borderWidth: 1,
+      borderColor: c.border2, color: c.text, paddingHorizontal: 14,
+      paddingVertical: 10, fontSize: 14, maxHeight: 100,
+    },
+    sendBtn: {
+      width: 40, height: 40, borderRadius: 20,
+      backgroundColor: c.brand, alignItems: 'center', justifyContent: 'center',
+    },
+    sendBtnDisabled: { opacity: 0.4 },
+    sendIcon: { color: '#fff', fontSize: 16 },
 
-  // Reply bar
-  replyBar: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 12, paddingVertical: 8,
-    borderTopWidth: 1, borderTopColor: '#1E2535',
-    backgroundColor: '#0E1118',
-  },
-  replyContent: { flex: 1, borderLeftWidth: 3, borderLeftColor: '#6366F1', paddingLeft: 8, gap: 2 },
-  replyLabel: { fontSize: 11, fontWeight: '700', color: '#818CF8' },
-  replyText: { fontSize: 12, color: '#94A3B8' },
-  replyClear: { padding: 6 },
-  replyClearText: { color: '#64748B', fontSize: 16 },
+    // Reply bar
+    replyBar: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingHorizontal: 12, paddingVertical: 8,
+      borderTopWidth: 1, borderTopColor: c.surface2,
+      backgroundColor: c.headerBg,
+    },
+    replyContent: { flex: 1, borderLeftWidth: 3, borderLeftColor: c.brand, paddingLeft: 8, gap: 2 },
+    replyLabel: { fontSize: 11, fontWeight: '700', color: c.brandLight },
+    replyText: { fontSize: 12, color: c.textSec },
+    replyClear: { padding: 6 },
+    replyClearText: { color: c.textMuted, fontSize: 16 },
 
-  // Context menu sheet
-  menuBackdrop: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  menuSheet: {
-    backgroundColor: '#131720',
-    borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    paddingTop: 12, paddingBottom: 28, paddingHorizontal: 16, gap: 4,
-  },
-  menuHandle: {
-    width: 40, height: 4, borderRadius: 99,
-    backgroundColor: '#2D3748', alignSelf: 'center', marginBottom: 12,
-  },
-  menuItem: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingVertical: 14, paddingHorizontal: 8, borderRadius: 12,
-  },
-  menuItemDanger: { backgroundColor: 'rgba(239,68,68,0.08)' },
-  menuIcon: { fontSize: 18, width: 24, textAlign: 'center' },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: '#E2E8F0' },
-  menuLabelDanger: { color: '#EF4444' },
-  menuCancel: {
-    marginTop: 8, paddingVertical: 14, alignItems: 'center',
-    backgroundColor: '#1E2535', borderRadius: 14,
-  },
-  menuCancelText: { fontSize: 15, fontWeight: '700', color: '#94A3B8' },
-  menuConfirmTitle: { fontSize: 16, fontWeight: '700', color: '#F1F5F9', textAlign: 'center', marginBottom: 4 },
-  menuConfirmSub: { fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 8 },
-});
+    // Context menu sheet
+    menuBackdrop: {
+      flex: 1, backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'flex-end',
+    },
+    menuSheet: {
+      backgroundColor: c.card,
+      borderTopLeftRadius: 20, borderTopRightRadius: 20,
+      paddingTop: 12, paddingBottom: 28, paddingHorizontal: 16, gap: 4,
+    },
+    menuHandle: {
+      width: 40, height: 4, borderRadius: 99,
+      backgroundColor: c.border2, alignSelf: 'center', marginBottom: 12,
+    },
+    menuItem: {
+      flexDirection: 'row', alignItems: 'center', gap: 14,
+      paddingVertical: 14, paddingHorizontal: 8, borderRadius: 12,
+    },
+    menuItemDanger: { backgroundColor: 'rgba(239,68,68,0.08)' },
+    menuIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+    menuLabel: { fontSize: 15, fontWeight: '600', color: c.text },
+    menuLabelDanger: { color: '#EF4444' },
+    menuCancel: {
+      marginTop: 8, paddingVertical: 14, alignItems: 'center',
+      backgroundColor: c.surface2, borderRadius: 14,
+    },
+    menuCancelText: { fontSize: 15, fontWeight: '700', color: c.textSec },
+    menuConfirmTitle: { fontSize: 16, fontWeight: '700', color: c.text, textAlign: 'center', marginBottom: 4 },
+    menuConfirmSub: { fontSize: 13, color: c.textMuted, textAlign: 'center', marginBottom: 8 },
+  });
+}
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
@@ -1524,6 +1563,10 @@ export default function ProductDetailScreen() {
   const route     = useRoute<RouteT>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { productId } = route.params;
+
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeScreenStyles(c), [c]);
 
   const { user, canChangeStatus, canCreateProduct, canDeleteProduct, canUploadAttachment, canComment } = useAuthStore();
 
@@ -1612,9 +1655,9 @@ export default function ProductDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={s.screen}>
-        <View style={s.center}>
-          <ActivityIndicator color="#6366F1" size="large" />
+      <SafeAreaView style={styles.screen}>
+        <View style={styles.center}>
+          <ActivityIndicator color={c.brand} size="large" />
         </View>
       </SafeAreaView>
     );
@@ -1629,17 +1672,17 @@ export default function ProductDetailScreen() {
   ];
 
   return (
-    <SafeAreaView style={s.screen}>
+    <SafeAreaView style={styles.screen}>
       {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Text style={s.backIcon}>←</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={s.productId}>{product.product_id}</Text>
-          <Text style={s.customerName} numberOfLines={1}>{product.customer_name}</Text>
+          <Text style={styles.productId}>{product.product_id}</Text>
+          <Text style={styles.customerName} numberOfLines={1}>{product.customer_name}</Text>
         </View>
-        <View style={s.headerRight}>
+        <View style={styles.headerRight}>
           {canChangeStatus() && (
             <TouchableOpacity onPress={() => setShowStatus(true)}>
               <StatusChip status={product.status} size="sm" />
@@ -1649,26 +1692,26 @@ export default function ProductDetailScreen() {
             <StatusChip status={product.status} size="sm" />
           )}
           {canDeleteProduct() && (
-            <TouchableOpacity style={s.deleteBtn} onPress={handleDelete}>
-              <Text style={s.deleteBtnText}>🗑</Text>
+            <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+              <Text style={styles.deleteBtnText}>🗑</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       {/* Tabs */}
-      <View style={s.tabs}>
+      <View style={styles.tabs}>
         {TABS.map((tab) => (
           <TouchableOpacity
             key={tab.id}
-            style={[s.tab, activeTab === tab.id && s.tabActive]}
+            style={[styles.tab, activeTab === tab.id && styles.tabActive]}
             onPress={() => setActiveTab(tab.id)}
           >
-            <View style={s.tabInner}>
-              <Text style={[s.tabText, activeTab === tab.id && s.tabTextActive]}>
+            <View style={styles.tabInner}>
+              <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
                 {tab.label}
               </Text>
-              {tab.badge && <View style={s.tabBadge} />}
+              {tab.badge && <View style={styles.tabBadge} />}
             </View>
           </TouchableOpacity>
         ))}
@@ -1715,35 +1758,37 @@ export default function ProductDetailScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0D14' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  backBtn: { padding: 4 },
-  backIcon: { fontSize: 22, color: '#94A3B8' },
-  productId: { fontSize: 12, fontWeight: '700', color: '#818CF8', fontFamily: 'monospace' },
-  customerName: { fontSize: 16, fontWeight: '700', color: '#F1F5F9' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  deleteBtn: {
-    width: 34, height: 34, borderRadius: 10,
-    backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center',
-  },
-  deleteBtnText: { fontSize: 16 },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1E2535' },
-  tab: {
-    flex: 1, paddingVertical: 13, alignItems: 'center',
-    borderBottomWidth: 2, borderBottomColor: 'transparent',
-  },
-  tabActive: { borderBottomColor: '#6366F1' },
-  tabText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
-  tabTextActive: { color: '#818CF8' },
-  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  tabBadge: {
-    width: 7, height: 7, borderRadius: 99,
-    backgroundColor: '#EF4444',
-  },
-});
+function makeScreenStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    backBtn: { padding: 4 },
+    backIcon: { fontSize: 22, color: c.textSec },
+    productId: { fontSize: 12, fontWeight: '700', color: c.brandLight, fontFamily: 'monospace' },
+    customerName: { fontSize: 16, fontWeight: '700', color: c.text },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    deleteBtn: {
+      width: 34, height: 34, borderRadius: 10,
+      backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center',
+    },
+    deleteBtnText: { fontSize: 16 },
+    tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.surface2 },
+    tab: {
+      flex: 1, paddingVertical: 13, alignItems: 'center',
+      borderBottomWidth: 2, borderBottomColor: 'transparent',
+    },
+    tabActive: { borderBottomColor: c.brand },
+    tabText: { fontSize: 13, fontWeight: '600', color: c.textMuted },
+    tabTextActive: { color: c.brandLight },
+    tabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    tabBadge: {
+      width: 7, height: 7, borderRadius: 99,
+      backgroundColor: '#EF4444',
+    },
+  });
+}

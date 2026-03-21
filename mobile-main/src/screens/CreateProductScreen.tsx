@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet,
   ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform,
@@ -7,6 +7,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
 import { productsApi, usersApi } from '../api/services';
 import { User } from '../types';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -17,6 +19,10 @@ function formatDateTime(iso: string): string {
 
 export default function CreateProductScreen() {
   const navigation = useNavigation();
+
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const s = useMemo(() => makeStyles(c), [c]);
 
   const [productId, setProductId]       = useState('');
   const [customerName, setCustomerName] = useState('');
@@ -105,7 +111,7 @@ export default function CreateProductScreen() {
               value={productId}
               onChangeText={setProductId}
               placeholder="e.g. PRD-001"
-              placeholderTextColor="#475569"
+              placeholderTextColor={c.textDim}
               autoCapitalize="characters"
             />
           </View>
@@ -118,7 +124,7 @@ export default function CreateProductScreen() {
               value={customerName}
               onChangeText={setCustomerName}
               placeholder="Customer name"
-              placeholderTextColor="#475569"
+              placeholderTextColor={c.textDim}
               autoCapitalize="words"
             />
           </View>
@@ -131,7 +137,7 @@ export default function CreateProductScreen() {
               value={customerPhone}
               onChangeText={setCustomerPhone}
               placeholder="+1 234 567 8900"
-              placeholderTextColor="#475569"
+              placeholderTextColor={c.textDim}
               keyboardType="phone-pad"
             />
           </View>
@@ -144,7 +150,7 @@ export default function CreateProductScreen() {
               value={description}
               onChangeText={setDescription}
               placeholder="Product description..."
-              placeholderTextColor="#475569"
+              placeholderTextColor={c.textDim}
               multiline
               textAlignVertical="top"
             />
@@ -171,15 +177,15 @@ export default function CreateProductScreen() {
                     setDeliveryAt(v ? new Date(v) : null);
                   }}
                   style={{
-                    backgroundColor: '#1C2130',
-                    border: '1px solid #2D3748',
+                    backgroundColor: c.surface,
+                    border: `1px solid ${c.border2}`,
                     borderRadius: 12,
-                    color: deliveryAt ? '#F1F5F9' : '#475569',
+                    color: deliveryAt ? c.text : c.textDim,
                     padding: '13px 16px',
                     fontSize: 15,
                     width: '100%',
                     boxSizing: 'border-box',
-                    colorScheme: 'dark',
+                    colorScheme: isDark ? 'dark' : 'light',
                     outline: 'none',
                   }}
                 />
@@ -298,76 +304,78 @@ export default function CreateProductScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0D14' },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  backBtn:       { padding: 4 },
-  backIcon:      { fontSize: 22, color: '#94A3B8' },
-  title:         { flex: 1, fontSize: 17, fontWeight: '700', color: '#F1F5F9' },
-  createBtn:     { backgroundColor: '#6366F1', paddingHorizontal: 18, paddingVertical: 8, borderRadius: 10 },
-  createBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    backBtn:       { padding: 4 },
+    backIcon:      { fontSize: 22, color: c.textSec },
+    title:         { flex: 1, fontSize: 17, fontWeight: '700', color: c.text },
+    createBtn:     { backgroundColor: c.brand, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 10 },
+    createBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
-  body:    { flex: 1 },
-  content: { padding: 20, gap: 20, paddingBottom: 60 },
+    body:    { flex: 1 },
+    content: { padding: 20, gap: 20, paddingBottom: 60 },
 
-  errorBox: {
-    backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 10,
-    borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', padding: 12,
-  },
-  errorText: { color: '#FCA5A5', fontSize: 13 },
+    errorBox: {
+      backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 10,
+      borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', padding: 12,
+    },
+    errorText: { color: '#FCA5A5', fontSize: 13 },
 
-  field:    { gap: 8 },
-  label:    { fontSize: 12, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 },
-  required: { color: '#EF4444' },
-  subLabel: { fontSize: 12, color: '#475569', marginTop: 4 },
+    field:    { gap: 8 },
+    label:    { fontSize: 12, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+    required: { color: '#EF4444' },
+    subLabel: { fontSize: 12, color: c.textDim, marginTop: 4 },
 
-  input: {
-    backgroundColor: '#1C2130', borderRadius: 12, borderWidth: 1,
-    borderColor: '#2D3748', color: '#F1F5F9',
-    paddingHorizontal: 16, paddingVertical: 13, fontSize: 15,
-  },
-  textarea: { minHeight: 90 },
+    input: {
+      backgroundColor: c.surface, borderRadius: 12, borderWidth: 1,
+      borderColor: c.border2, color: c.text,
+      paddingHorizontal: 16, paddingVertical: 13, fontSize: 15,
+    },
+    textarea: { minHeight: 90 },
 
-  // Date picker button
-  dateBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#1C2130', borderRadius: 12, borderWidth: 1,
-    borderColor: '#2D3748', paddingHorizontal: 16, paddingVertical: 13,
-  },
-  dateBtnText:        { fontSize: 15, color: '#F1F5F9' },
-  dateBtnPlaceholder: { fontSize: 15, color: '#475569' },
-  dateBtnIcon:        { fontSize: 16 },
-  clearDate:   { alignSelf: 'flex-end', marginTop: 4 },
-  clearDateText: { fontSize: 12, color: '#64748B' },
+    // Date picker button
+    dateBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      backgroundColor: c.surface, borderRadius: 12, borderWidth: 1,
+      borderColor: c.border2, paddingHorizontal: 16, paddingVertical: 13,
+    },
+    dateBtnText:        { fontSize: 15, color: c.text },
+    dateBtnPlaceholder: { fontSize: 15, color: c.textDim },
+    dateBtnIcon:        { fontSize: 16 },
+    clearDate:   { alignSelf: 'flex-end', marginTop: 4 },
+    clearDateText: { fontSize: 12, color: c.textMuted },
 
-  doneBtn: {
-    alignSelf: 'flex-end', marginTop: 8,
-    backgroundColor: '#6366F1', paddingHorizontal: 20, paddingVertical: 8, borderRadius: 10,
-  },
-  doneBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+    doneBtn: {
+      alignSelf: 'flex-end', marginTop: 8,
+      backgroundColor: c.brand, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 10,
+    },
+    doneBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
-  // Assignees
-  selectedChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  selectedChip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: 'rgba(99,102,241,0.15)', borderRadius: 99,
-    borderWidth: 1, borderColor: '#6366F1',
-    paddingHorizontal: 12, paddingVertical: 7,
-  },
-  selectedChipText:   { fontSize: 13, color: '#A5B4FC', fontWeight: '600' },
-  selectedChipRemove: { fontSize: 12, color: '#818CF8' },
+    // Assignees
+    selectedChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    selectedChip: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      backgroundColor: 'rgba(99,102,241,0.15)', borderRadius: 99,
+      borderWidth: 1, borderColor: c.brand,
+      paddingHorizontal: 12, paddingVertical: 7,
+    },
+    selectedChipText:   { fontSize: 13, color: '#A5B4FC', fontWeight: '600' },
+    selectedChipRemove: { fontSize: 12, color: c.brandLight },
 
-  availableChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  availableChip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99,
-    borderWidth: 1, borderColor: '#2D3748', backgroundColor: '#1C2130',
-  },
-  availableChipText: { fontSize: 13, color: '#64748B' },
+    availableChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    availableChip: {
+      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99,
+      borderWidth: 1, borderColor: c.border2, backgroundColor: c.surface,
+    },
+    availableChipText: { fontSize: 13, color: c.textMuted },
 
-  noUsers: { fontSize: 13, color: '#475569', fontStyle: 'italic' },
-});
+    noUsers: { fontSize: 13, color: c.textDim, fontStyle: 'italic' },
+  });
+}

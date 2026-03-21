@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   ActivityIndicator, SafeAreaView,
@@ -7,6 +7,8 @@ import { useNavigation } from '@react-navigation/native';
 import { activityApi } from '../api/services';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { ActivityLog } from '../types';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 function formatRelative(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -40,6 +42,10 @@ function avatarColor(name: string): string {
 type ListItem = { type: 'header'; date: string } | { type: 'log'; log: ActivityLog };
 
 export default function ActivityScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const s = useMemo(() => makeStyles(c), [c]);
+
   const navigation = useNavigation();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +92,7 @@ export default function ActivityScreen() {
 
       {loading ? (
         <View style={s.center}>
-          <ActivityIndicator color="#6366F1" />
+          <ActivityIndicator color={c.brand} />
         </View>
       ) : grouped.length === 0 ? (
         <View style={s.center}>
@@ -144,58 +150,60 @@ export default function ActivityScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0D14' },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  backBtn: { padding: 4 },
-  backIcon: { fontSize: 22, color: '#94A3B8' },
-  title: { flex: 1, fontSize: 17, fontWeight: '700', color: '#F1F5F9' },
-  countBadge: {
-    backgroundColor: '#1E2535', borderRadius: 99,
-    paddingHorizontal: 8, paddingVertical: 3,
-  },
-  countText: { fontSize: 12, color: '#64748B', fontWeight: '600' },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    backBtn: { padding: 4 },
+    backIcon: { fontSize: 22, color: c.textSec },
+    title: { flex: 1, fontSize: 17, fontWeight: '700', color: c.text },
+    countBadge: {
+      backgroundColor: c.surface2, borderRadius: 99,
+      paddingHorizontal: 8, paddingVertical: 3,
+    },
+    countText: { fontSize: 12, color: c.textMuted, fontWeight: '600' },
 
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emptyText: { fontSize: 14, color: '#64748B' },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
+    emptyText: { fontSize: 14, color: c.textMuted },
 
-  dateHeader: {
-    paddingHorizontal: 16, paddingVertical: 8,
-    backgroundColor: '#0F1117',
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  dateLabel: {
-    fontSize: 11, fontWeight: '700', color: '#64748B',
-    textTransform: 'uppercase', letterSpacing: 0.6,
-  },
+    dateHeader: {
+      paddingHorizontal: 16, paddingVertical: 8,
+      backgroundColor: c.headerBg,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    dateLabel: {
+      fontSize: 11, fontWeight: '700', color: c.textMuted,
+      textTransform: 'uppercase', letterSpacing: 0.6,
+    },
 
-  row: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  avatar: {
-    width: 28, height: 28, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center', marginTop: 2,
-  },
-  avatarText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+    row: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    avatar: {
+      width: 28, height: 28, borderRadius: 14,
+      alignItems: 'center', justifyContent: 'center', marginTop: 2,
+    },
+    avatarText: { fontSize: 11, fontWeight: '700', color: '#fff' },
 
-  content: { flex: 1 },
-  topLine: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  name: { fontSize: 12, fontWeight: '700', color: '#E2E8F0' },
-  badge: {
-    flexDirection: 'row', alignItems: 'center', gap: 3,
-    borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
-  },
-  badgeEmoji: { fontSize: 10 },
-  badgeLabel: { fontSize: 10, fontWeight: '600' },
-  entity: { fontSize: 10, color: '#64748B', textTransform: 'capitalize' },
-  details: { fontSize: 12, color: '#64748B', marginTop: 3 },
+    content: { flex: 1 },
+    topLine: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+    name: { fontSize: 12, fontWeight: '700', color: c.text },
+    badge: {
+      flexDirection: 'row', alignItems: 'center', gap: 3,
+      borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+    },
+    badgeEmoji: { fontSize: 10 },
+    badgeLabel: { fontSize: 10, fontWeight: '600' },
+    entity: { fontSize: 10, color: c.textMuted, textTransform: 'capitalize' },
+    details: { fontSize: 12, color: c.textMuted, marginTop: 3 },
 
-  time: { fontSize: 10, color: '#475569', marginTop: 2 },
-});
+    time: { fontSize: 10, color: c.textDim, marginTop: 2 },
+  });
+}

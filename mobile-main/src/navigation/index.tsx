@@ -4,11 +4,15 @@ import {
   NavigationContainer,
   useNavigation,
   createNavigationContainerRef,
+  DarkTheme,
+  DefaultTheme,
 } from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '../store/authStore';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors } from '../theme';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { useNotificationStore } from '../store/notificationStore';
 import { usePushToken } from '../hooks/usePushToken';
@@ -48,22 +52,16 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 // ── Header right: bell + activity icons ──────────────────────────────────────
 function HeaderIcons() {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const navigation  = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
-
   return (
     <View style={h.row}>
-      {/* Team Chat */}
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('TeamChat')}>
         <Text style={h.icon}>💬</Text>
       </TouchableOpacity>
-
-      {/* Activity */}
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('Activity')}>
         <Text style={h.icon}>⚡</Text>
       </TouchableOpacity>
-
-      {/* Notifications bell */}
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('Notifications')}>
         <Text style={h.icon}>🔔</Text>
         {unreadCount > 0 && (
@@ -94,8 +92,9 @@ const h = StyleSheet.create({
 function MainTabs() {
   const { badges: allBadges } = useProductBadges();
   const { count: myOrdersBadgeCount, productIds: myOrdersProductIds } = useMyOrdersBadges();
+  const isDark = useThemeStore((s) => s.isDark);
+  const c      = isDark ? darkColors : lightColors;
 
-  // Products tab: only products with badges NOT assigned to the current user
   const unreadProductCount = Object.keys(allBadges)
     .filter((id) => !myOrdersProductIds.has(Number(id))).length;
 
@@ -103,17 +102,17 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: '#0F1117' },
-        headerTintColor: '#F1F5F9',
-        headerTitleStyle: { fontWeight: '700' },
+        headerStyle: { backgroundColor: c.headerBg },
+        headerTintColor: c.text,
+        headerTitleStyle: { fontWeight: '700', color: c.text },
         headerRight: () => <HeaderIcons />,
         tabBarStyle: {
-          backgroundColor: '#0F1117',
-          borderTopColor: '#1E2535',
+          backgroundColor: c.tabBarBg,
+          borderTopColor: c.border,
           borderTopWidth: 1,
         },
-        tabBarActiveTintColor: '#6366F1',
-        tabBarInactiveTintColor: '#64748B',
+        tabBarActiveTintColor: c.brand,
+        tabBarInactiveTintColor: c.textMuted,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
@@ -152,22 +151,17 @@ function MainTabs() {
 }
 
 // ── Push notification tap handler (native only) ───────────────────────────────
-// useLastNotificationResponse is not available on web — keep it in its own
-// component so it never runs outside a native environment.
 function PushTapHandler({ token }: { token: string }) {
   const lastNotifResponse = Notifications.useLastNotificationResponse();
   const handledResponseId = useRef<string | null>(null);
 
   useEffect(() => {
     if (!lastNotifResponse) return;
-
     const responseId = lastNotifResponse.notification.request.identifier;
     if (handledResponseId.current === responseId) return;
     handledResponseId.current = responseId;
-
     const data = lastNotifResponse.notification.request.content.data as Record<string, any>;
     if (!navigationRef.isReady()) return;
-
     if (data?.entityType === 'product' && data?.entityId) {
       navigationRef.navigate('ProductDetail', { productId: Number(data.entityId) });
     } else if (data?.entityType === 'chat') {
@@ -180,27 +174,26 @@ function PushTapHandler({ token }: { token: string }) {
 
 // ── App navigator ─────────────────────────────────────────────────────────────
 function AppNavigator() {
-  const token = useAuthStore((s) => s.token);
+  const token   = useAuthStore((s) => s.token);
+  const isDark  = useThemeStore((s) => s.isDark);
+  const c       = isDark ? darkColors : lightColors;
   const { refreshUnreadCount } = useNotificationStore();
 
   useWsEvents();
   usePushToken();
 
-  // Fetch accurate unread count from API on login
   useEffect(() => {
     if (!token) return;
     refreshUnreadCount();
   }, [token]);
 
-
   return (
     <>
-      {/* Mount the push tap handler only on native — expo-notifications APIs crash on web */}
       {Platform.OS !== 'web' && token ? <PushTapHandler token={token} /> : null}
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#0A0D14' },
+          contentStyle: { backgroundColor: c.bg },
           animation: 'slide_from_right',
         }}
       >
@@ -208,12 +201,12 @@ function AppNavigator() {
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
           <>
-            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen name="MainTabs"      component={MainTabs} />
             <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-            <Stack.Screen name="CreateProduct"  component={CreateProductScreen} options={{ presentation: 'modal' }} />
-            <Stack.Screen name="Notifications"  component={NotificationsScreen} />
-            <Stack.Screen name="Activity"       component={ActivityScreen} />
-            <Stack.Screen name="TeamChat"       component={TeamChatScreen} />
+            <Stack.Screen name="CreateProduct" component={CreateProductScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Activity"      component={ActivityScreen} />
+            <Stack.Screen name="TeamChat"      component={TeamChatScreen} />
           </>
         )}
       </Stack.Navigator>
@@ -222,8 +215,15 @@ function AppNavigator() {
 }
 
 export default function Navigation() {
+  const isDark = useThemeStore((s) => s.isDark);
+
+  // Use React Navigation's built-in theme so modals/overlays also respect theme
+  const navTheme = isDark
+    ? { ...DarkTheme,    colors: { ...DarkTheme.colors,    background: darkColors.bg,  card: darkColors.headerBg,  text: darkColors.text,  border: darkColors.border } }
+    : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: lightColors.bg, card: lightColors.headerBg, text: lightColors.text, border: lightColors.border } };
+
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <AppNavigator />
     </NavigationContainer>
   );

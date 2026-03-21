@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
   StyleSheet, Modal, SafeAreaView, Platform,
@@ -7,6 +7,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { ProductFilters } from '../store/boardStore';
 import { STATUS_LABELS, STATUS_ORDER } from '../types';
 import { User } from '../types';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 interface Props {
   visible: boolean;
@@ -51,10 +53,11 @@ function fmt(iso: string): string {
 
 // Inline date picker row — shows current value + opens native picker
 function DateField({
-  label, value, onChange, minimumDate,
-}: { label: string; value: string; onChange: (iso: string) => void; minimumDate?: Date }) {
+  label, value, onChange, minimumDate, c,
+}: { label: string; value: string; onChange: (iso: string) => void; minimumDate?: Date; c: ThemeColors }) {
   const [show, setShow] = useState(false);
   const date = value ? new Date(value) : new Date();
+  const df = useMemo(() => makeDateFieldStyles(c), [c]);
 
   return (
     <View style={df.wrap}>
@@ -88,23 +91,29 @@ function DateField({
   );
 }
 
-const df = StyleSheet.create({
-  wrap: { flex: 1, minWidth: 140 },
-  label: { fontSize: 11, fontWeight: '600', color: '#64748B', marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
-  btn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#1C2130', borderRadius: 10, borderWidth: 1,
-    borderColor: '#2D3748', paddingHorizontal: 12, paddingVertical: 10,
-  },
-  valText: { fontSize: 13, color: '#F1F5F9' },
-  placeholder: { fontSize: 13, color: '#475569' },
-  icon: { fontSize: 14 },
-  clear: { fontSize: 13, color: '#64748B', paddingLeft: 4 },
-});
+function makeDateFieldStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    wrap: { flex: 1, minWidth: 140 },
+    label: { fontSize: 11, fontWeight: '600', color: c.textMuted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
+    btn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      backgroundColor: c.surface, borderRadius: 10, borderWidth: 1,
+      borderColor: c.border2, paddingHorizontal: 12, paddingVertical: 10,
+    },
+    valText: { fontSize: 13, color: c.text },
+    placeholder: { fontSize: 13, color: c.textDim },
+    icon: { fontSize: 14 },
+    clear: { fontSize: 13, color: c.textMuted, paddingLeft: 4 },
+  });
+}
 
 // ─── Main FilterPanel ─────────────────────────────────────────────────────────
 
 export default function FilterPanel({ visible, filters, users, hideAssignedTo, onApply, onClose }: Props) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const s = useMemo(() => makeStyles(c), [c]);
+
   const [local, setLocal]                 = useState<ProductFilters>(filters);
   const [deliveryPreset, setDeliveryPreset] = useState<DeliveryPreset>('');
 
@@ -170,7 +179,7 @@ export default function FilterPanel({ visible, filters, users, hideAssignedTo, o
               value={local.search}
               onChangeText={(v) => set({ search: v })}
               placeholder="Search by ID, customer, phone…"
-              placeholderTextColor="#475569"
+              placeholderTextColor={c.textDim}
             />
           </View>
 
@@ -253,6 +262,7 @@ export default function FilterPanel({ visible, filters, users, hideAssignedTo, o
                 label="From"
                 value={local.date_from}
                 onChange={(v) => set({ date_from: v })}
+                c={c}
               />
               <View style={s.dateSep} />
               <DateField
@@ -260,6 +270,7 @@ export default function FilterPanel({ visible, filters, users, hideAssignedTo, o
                 value={local.date_to}
                 minimumDate={local.date_from ? new Date(local.date_from) : undefined}
                 onChange={(v) => set({ date_to: v })}
+                c={c}
               />
             </View>
           </View>
@@ -294,6 +305,7 @@ export default function FilterPanel({ visible, filters, users, hideAssignedTo, o
                   label="Delivery From"
                   value={local.delivery_from}
                   onChange={(v) => set({ delivery_from: v })}
+                  c={c}
                 />
                 <View style={s.dateSep} />
                 <DateField
@@ -308,6 +320,7 @@ export default function FilterPanel({ visible, filters, users, hideAssignedTo, o
                     d.setHours(0, 0, 0, 0);
                     set({ delivery_to: d.toISOString() });
                   }}
+                  c={c}
                 />
               </View>
             )}
@@ -340,60 +353,62 @@ export default function FilterPanel({ visible, filters, users, hideAssignedTo, o
   );
 }
 
-const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F1117' },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: c.headerBg },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  title:    { fontSize: 18, fontWeight: '700', color: '#F1F5F9' },
-  closeBtn: { fontSize: 18, color: '#94A3B8', padding: 4 },
+    header: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 20, paddingVertical: 16,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    title:    { fontSize: 18, fontWeight: '700', color: c.text },
+    closeBtn: { fontSize: 18, color: c.textSec, padding: 4 },
 
-  body:        { flex: 1 },
-  bodyContent: { paddingBottom: 20 },
+    body:        { flex: 1 },
+    bodyContent: { paddingBottom: 20 },
 
-  section: { paddingHorizontal: 20, paddingVertical: 16 },
-  divider: { height: 1, backgroundColor: '#1E2535', marginHorizontal: 20 },
+    section: { paddingHorizontal: 20, paddingVertical: 16 },
+    divider: { height: 1, backgroundColor: c.surface2, marginHorizontal: 20 },
 
-  sectionLabel: {
-    fontSize: 11, fontWeight: '700', color: '#64748B',
-    textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10,
-  },
+    sectionLabel: {
+      fontSize: 11, fontWeight: '700', color: c.textMuted,
+      textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 10,
+    },
 
-  input: {
-    backgroundColor: '#1C2130', borderRadius: 10, borderWidth: 1,
-    borderColor: '#2D3748', color: '#F1F5F9',
-    paddingHorizontal: 14, paddingVertical: 11, fontSize: 14,
-  },
+    input: {
+      backgroundColor: c.surface, borderRadius: 10, borderWidth: 1,
+      borderColor: c.border2, color: c.text,
+      paddingHorizontal: 14, paddingVertical: 11, fontSize: 14,
+    },
 
-  chipRow: { flexDirection: 'row', gap: 8 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99,
-    borderWidth: 1, borderColor: '#2D3748', backgroundColor: '#1C2130',
-  },
-  chipActive:     { borderColor: '#6366F1', backgroundColor: 'rgba(99,102,241,0.15)' },
-  chipText:       { fontSize: 13, color: '#94A3B8' },
-  chipTextActive: { color: '#A5B4FC', fontWeight: '600' },
+    chipRow: { flexDirection: 'row', gap: 8 },
+    chip: {
+      paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99,
+      borderWidth: 1, borderColor: c.border2, backgroundColor: c.surface,
+    },
+    chipActive:     { borderColor: c.brand, backgroundColor: 'rgba(99,102,241,0.15)' },
+    chipText:       { fontSize: 13, color: c.textSec },
+    chipTextActive: { color: '#A5B4FC', fontWeight: '600' },
 
-  dateRow: { flexDirection: 'row', gap: 10 },
-  dateSep: { width: 10, alignSelf: 'center', alignItems: 'center' },
+    dateRow: { flexDirection: 'row', gap: 10 },
+    dateSep: { width: 10, alignSelf: 'center', alignItems: 'center' },
 
-  presetSummary: { fontSize: 12, color: '#64748B', marginTop: 8 },
+    presetSummary: { fontSize: 12, color: c.textMuted, marginTop: 8 },
 
-  actions: {
-    flexDirection: 'row', gap: 12, padding: 20,
-    borderTopWidth: 1, borderTopColor: '#1E2535',
-  },
-  resetBtn: {
-    flex: 1, paddingVertical: 13, borderRadius: 12,
-    borderWidth: 1, borderColor: '#2D3748', alignItems: 'center',
-  },
-  resetText: { color: '#94A3B8', fontSize: 15, fontWeight: '600' },
-  applyBtn: {
-    flex: 2, paddingVertical: 13, borderRadius: 12,
-    backgroundColor: '#6366F1', alignItems: 'center',
-  },
-  applyText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-});
+    actions: {
+      flexDirection: 'row', gap: 12, padding: 20,
+      borderTopWidth: 1, borderTopColor: c.surface2,
+    },
+    resetBtn: {
+      flex: 1, paddingVertical: 13, borderRadius: 12,
+      borderWidth: 1, borderColor: c.border2, alignItems: 'center',
+    },
+    resetText: { color: c.textSec, fontSize: 15, fontWeight: '600' },
+    applyBtn: {
+      flex: 2, paddingVertical: 13, borderRadius: 12,
+      backgroundColor: c.brand, alignItems: 'center',
+    },
+    applyText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  });
+}

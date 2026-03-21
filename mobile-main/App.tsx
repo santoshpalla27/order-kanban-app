@@ -2,25 +2,33 @@ import 'react-native-gesture-handler';
 import React, { useEffect } from 'react';
 import { StatusBar, View, ActivityIndicator } from 'react-native';
 import { useAuthStore } from './src/store/authStore';
+import { useThemeStore } from './src/store/themeStore';
 import Navigation from './src/navigation';
 
 export default function App() {
-  const { hydrated, hydrate } = useAuthStore();
+  const { hydrated: authHydrated, hydrate: hydrateAuth } = useAuthStore();
+  const { hydrated: themeHydrated, hydrate: hydrateTheme, isDark } = useThemeStore();
 
-  useEffect(() => { hydrate(); }, []);
+  useEffect(() => {
+    hydrateAuth();
+    hydrateTheme();
+  }, []);
+
+  const hydrated = authHydrated && themeHydrated;
+  const bg = isDark ? '#0A0D14' : '#F1F5F9';
 
   if (!hydrated) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0A0D14', alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="#6366F1" size="large" />
-        <StatusBar barStyle="light-content" backgroundColor="#0A0D14" />
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
       </View>
     );
   }
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#0A0D14" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
       <Navigation />
     </>
   );

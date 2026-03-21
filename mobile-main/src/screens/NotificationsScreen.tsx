@@ -10,6 +10,8 @@ import { useNotificationStore } from '../store/notificationStore';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { Notification } from '../types';
 import { RootStackParamList } from '../navigation';
+import { useThemeStore } from '../store/themeStore';
+import { darkColors, lightColors, ThemeColors } from '../theme';
 
 type StatusFilter = 'all' | 'unread' | 'read';
 
@@ -44,6 +46,10 @@ function humanizeType(type: string): string {
 }
 
 export default function NotificationsScreen() {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const s = useMemo(() => makeStyles(c), [c]);
+
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { setUnreadCount } = useNotificationStore();
 
@@ -159,7 +165,7 @@ export default function NotificationsScreen() {
         <TextInput
           style={s.searchInput}
           placeholder="Search notifications…"
-          placeholderTextColor="#4B5563"
+          placeholderTextColor={c.textMuted}
           value={search}
           onChangeText={setSearch}
           returnKeyType="search"
@@ -241,7 +247,7 @@ export default function NotificationsScreen() {
       {/* ── List ── */}
       {loading ? (
         <View style={s.center}>
-          <ActivityIndicator color="#6366F1" />
+          <ActivityIndicator color={c.brand} />
         </View>
       ) : (
         <FlatList
@@ -312,138 +318,140 @@ export default function NotificationsScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0A0D14' },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
 
-  // Header
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  backBtn:  { padding: 4 },
-  backIcon: { fontSize: 22, color: '#94A3B8' },
-  title:    { flex: 1, fontSize: 16, fontWeight: '700', color: '#F1F5F9' },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  iconBtn:     { padding: 6 },
-  iconBtnText: { fontSize: 20, color: '#94A3B8', fontWeight: '600' },
-  markAllBtn: {
-    paddingHorizontal: 10, paddingVertical: 6,
-    borderRadius: 8, backgroundColor: '#6366F1',
-  },
-  markAllText: { fontSize: 11, color: '#fff', fontWeight: '600' },
+    // Header
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingHorizontal: 16, paddingVertical: 12,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    backBtn:  { padding: 4 },
+    backIcon: { fontSize: 22, color: c.textSec },
+    title:    { flex: 1, fontSize: 16, fontWeight: '700', color: c.text },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    iconBtn:     { padding: 6 },
+    iconBtnText: { fontSize: 20, color: c.textSec, fontWeight: '600' },
+    markAllBtn: {
+      paddingHorizontal: 10, paddingVertical: 6,
+      borderRadius: 8, backgroundColor: c.brand,
+    },
+    markAllText: { fontSize: 11, color: '#fff', fontWeight: '600' },
 
-  // Search
-  searchRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 10,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  searchInput: {
-    flex: 1,
-    height: 38,
-    backgroundColor: '#141824',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#1E2535',
-    paddingHorizontal: 12,
-    fontSize: 14,
-    color: '#E2E8F0',
-  },
-  clearBtn:  { paddingHorizontal: 8, paddingVertical: 6 },
-  clearText: { fontSize: 13, color: '#EF4444' },
+    // Search
+    searchRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingHorizontal: 16, paddingVertical: 10,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    searchInput: {
+      flex: 1,
+      height: 38,
+      backgroundColor: c.inputBg,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: c.surface2,
+      paddingHorizontal: 12,
+      fontSize: 14,
+      color: c.text,
+    },
+    clearBtn:  { paddingHorizontal: 8, paddingVertical: 6 },
+    clearText: { fontSize: 13, color: '#EF4444' },
 
-  // Status filter tabs
-  tabRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16, paddingVertical: 10, gap: 8,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  tab: {
-    flex: 1, alignItems: 'center',
-    paddingVertical: 7,
-    borderRadius: 8,
-    backgroundColor: '#141824',
-    borderWidth: 1, borderColor: '#1E2535',
-  },
-  tabActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
-  tabText:   { fontSize: 13, color: '#64748B', fontWeight: '600' },
-  tabTextActive: { color: '#fff' },
+    // Status filter tabs
+    tabRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 16, paddingVertical: 10, gap: 8,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    tab: {
+      flex: 1, alignItems: 'center',
+      paddingVertical: 7,
+      borderRadius: 8,
+      backgroundColor: c.inputBg,
+      borderWidth: 1, borderColor: c.surface2,
+    },
+    tabActive: { backgroundColor: c.brand, borderColor: c.brand },
+    tabText:   { fontSize: 13, color: c.textMuted, fontWeight: '600' },
+    tabTextActive: { color: '#fff' },
 
-  // Type dropdown
-  dropdownRow: {
-    paddingHorizontal: 16, paddingVertical: 8,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  dropdownBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    height: 38,
-    backgroundColor: '#141824',
-    borderRadius: 10,
-    borderWidth: 1, borderColor: '#1E2535',
-    paddingHorizontal: 12,
-  },
-  dropdownLabel:   { fontSize: 14, color: '#E2E8F0', flex: 1 },
-  dropdownChevron: { fontSize: 14, color: '#64748B', marginLeft: 6 },
+    // Type dropdown
+    dropdownRow: {
+      paddingHorizontal: 16, paddingVertical: 8,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    dropdownBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      height: 38,
+      backgroundColor: c.inputBg,
+      borderRadius: 10,
+      borderWidth: 1, borderColor: c.surface2,
+      paddingHorizontal: 12,
+    },
+    dropdownLabel:   { fontSize: 14, color: c.text, flex: 1 },
+    dropdownChevron: { fontSize: 14, color: c.textMuted, marginLeft: 6 },
 
-  // Dropdown modal
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center', paddingHorizontal: 32,
-  },
-  dropdownMenu: {
-    backgroundColor: '#141824',
-    borderRadius: 12,
-    borderWidth: 1, borderColor: '#1E2535',
-    overflow: 'hidden',
-  },
-  dropdownOption: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 13,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  dropdownOptionActive:     { backgroundColor: 'rgba(99,102,241,0.12)' },
-  dropdownOptionText:       { fontSize: 14, color: '#94A3B8' },
-  dropdownOptionTextActive: { color: '#6366F1', fontWeight: '600' },
-  dropdownCheck:            { fontSize: 14, color: '#6366F1', fontWeight: '700' },
+    // Dropdown modal
+    modalOverlay: {
+      flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+      justifyContent: 'center', paddingHorizontal: 32,
+    },
+    dropdownMenu: {
+      backgroundColor: c.inputBg,
+      borderRadius: 12,
+      borderWidth: 1, borderColor: c.surface2,
+      overflow: 'hidden',
+    },
+    dropdownOption: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 16, paddingVertical: 13,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    dropdownOptionActive:     { backgroundColor: 'rgba(99,102,241,0.12)' },
+    dropdownOptionText:       { fontSize: 14, color: c.textSec },
+    dropdownOptionTextActive: { color: c.brand, fontWeight: '600' },
+    dropdownCheck:            { fontSize: 14, color: c.brand, fontWeight: '700' },
 
-  // Count row
-  countRow: { paddingHorizontal: 16, paddingVertical: 6 },
-  countText: { fontSize: 11, color: '#4B5563' },
+    // Count row
+    countRow: { paddingHorizontal: 16, paddingVertical: 6 },
+    countText: { fontSize: 11, color: c.textMuted },
 
-  // Center / empty
-  center:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  emptyWrap: { alignItems: 'center', paddingTop: 80, gap: 8 },
-  emptyText: { fontSize: 14, color: '#64748B' },
-  emptyClrBtn: {
-    marginTop: 4, paddingHorizontal: 14, paddingVertical: 7,
-    borderRadius: 8, borderWidth: 1, borderColor: '#EF4444',
-  },
-  emptyClrText: { fontSize: 13, color: '#EF4444' },
+    // Center / empty
+    center:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
+    emptyWrap: { alignItems: 'center', paddingTop: 80, gap: 8 },
+    emptyText: { fontSize: 14, color: c.textMuted },
+    emptyClrBtn: {
+      marginTop: 4, paddingHorizontal: 14, paddingVertical: 7,
+      borderRadius: 8, borderWidth: 1, borderColor: '#EF4444',
+    },
+    emptyClrText: { fontSize: 13, color: '#EF4444' },
 
-  // Notification items
-  item: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    paddingHorizontal: 16, paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#1E2535',
-  },
-  itemUnread:  { backgroundColor: 'rgba(99,102,241,0.05)' },
-  dotWrap:     { width: 10, marginTop: 6, alignItems: 'center' },
-  dot:         { width: 8, height: 8, borderRadius: 99, backgroundColor: '#6366F1' },
-  content:     { flex: 1 },
-  message:     { fontSize: 14, color: '#E2E8F0', lineHeight: 20 },
-  messageRead: { color: '#64748B' },
+    // Notification items
+    item: {
+      flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+      paddingHorizontal: 16, paddingVertical: 14,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+    },
+    itemUnread:  { backgroundColor: 'rgba(99,102,241,0.05)' },
+    dotWrap:     { width: 10, marginTop: 6, alignItems: 'center' },
+    dot:         { width: 8, height: 8, borderRadius: 99, backgroundColor: c.brand },
+    content:     { flex: 1 },
+    message:     { fontSize: 14, color: c.text, lineHeight: 20 },
+    messageRead: { color: c.textMuted },
 
-  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 5 },
-  typeBadge: {
-    paddingHorizontal: 7, paddingVertical: 2,
-    borderRadius: 6, backgroundColor: '#1E2535',
-  },
-  typeBadgeText: { fontSize: 10, color: '#94A3B8', fontWeight: '500' },
-  time:          { fontSize: 11, color: '#64748B' },
-  timeFull:      { fontSize: 10, color: '#374151' },
+    metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 5 },
+    typeBadge: {
+      paddingHorizontal: 7, paddingVertical: 2,
+      borderRadius: 6, backgroundColor: c.surface2,
+    },
+    typeBadgeText: { fontSize: 10, color: c.textSec, fontWeight: '500' },
+    time:          { fontSize: 11, color: c.textMuted },
+    timeFull:      { fontSize: 10, color: c.textDim },
 
-  link:    { fontSize: 11, color: '#818CF8', marginTop: 4 },
-  eyeBtn:  { padding: 6, marginTop: 1 },
-  eyeIcon: { fontSize: 16 },
-});
+    link:    { fontSize: 11, color: c.brandLight, marginTop: 4 },
+    eyeBtn:  { padding: 6, marginTop: 1 },
+    eyeIcon: { fontSize: 16 },
+  });
+}
