@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { productsApi } from '../api/services';
 import { usersApi } from '../api/services';
 import { useAuthStore } from '../store/authStore';
@@ -41,6 +42,7 @@ export default function ListScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { canCreateProduct, canDeleteProduct } = useAuthStore();
 
+  const insets = useSafeAreaInsets();
   const isDark = useThemeStore((s) => s.isDark);
   const c = isDark ? darkColors : lightColors;
   const styles = useMemo(() => makeStyles(c), [c]);
@@ -307,7 +309,7 @@ export default function ListScreen() {
       {/* FAB — create product */}
       {canCreateProduct() && (
         <TouchableOpacity
-          style={styles.fab}
+          style={[styles.fab, { bottom: insets.bottom + 20 }]}
           onPress={() => navigation.navigate('CreateProduct')}
         >
           <Text style={styles.fabText}>＋</Text>

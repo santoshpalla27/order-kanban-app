@@ -7,6 +7,8 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { notificationsApi } from '../api/services';
 import { useNotificationStore } from '../store/notificationStore';
+import { useBadgeStore } from '../store/badgeStore';
+import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { Notification } from '../types';
 import { RootStackParamList } from '../navigation';
@@ -52,6 +54,13 @@ export default function NotificationsScreen() {
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { setUnreadCount } = useNotificationStore();
+  const userId = useAuthStore((s) => s.user?.id);
+  const { refreshAll, refreshMyOrders } = useBadgeStore();
+
+  const refreshBadges = useCallback(() => {
+    refreshAll();
+    if (userId) refreshMyOrders(userId);
+  }, [refreshAll, refreshMyOrders, userId]);
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -82,6 +91,7 @@ export default function NotificationsScreen() {
       setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
       const countRes = await notificationsApi.getUnreadCount();
       setUnreadCount(countRes.data?.count ?? 0);
+      refreshBadges();
     } catch {}
   };
 
@@ -90,6 +100,7 @@ export default function NotificationsScreen() {
       await notificationsApi.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       setUnreadCount(0);
+      refreshBadges();
     } catch {}
   };
 

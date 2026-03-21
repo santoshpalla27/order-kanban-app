@@ -11,13 +11,18 @@ export type { BadgeCategory };
 // Uses global store — refreshing from any component updates ALL consumers
 
 export function useProductBadges() {
-  const { allBadges, refreshAll } = useBadgeStore();
+  const { allBadges, refreshAll, refreshMyOrders } = useBadgeStore();
+  const userId = useAuthStore((s) => s.user?.id);
 
-  // Fetch on mount (only triggers API if not already loading)
-  useEffect(() => { refreshAll(); }, []);
+  // Always refresh both all-badges and my-orders-badges together
+  const refresh = useCallback(() => {
+    refreshAll();
+    if (userId) refreshMyOrders(userId);
+  }, [refreshAll, refreshMyOrders, userId]);
 
-  // Re-fetch on WS events that may change badge state
-  const onBadge = useCallback(() => { refreshAll(); }, [refreshAll]);
+  useEffect(() => { refresh(); }, []);
+
+  const onBadge = useCallback(() => { refresh(); }, [refresh]);
   useWsEvents({ onNotification: onBadge, onBadgesChanged: onBadge });
 
   const hasAny = useCallback(
@@ -30,7 +35,7 @@ export function useProductBadges() {
     [allBadges],
   );
 
-  return { badges: allBadges, hasAny, has, refreshBadges: refreshAll };
+  return { badges: allBadges, hasAny, has, refreshBadges: refresh };
 }
 
 // ── My Orders badge hook (assigned-to-user products only) ─────────────────────
