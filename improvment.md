@@ -48,3 +48,36 @@ cd android
 APK will be at:
 
 android/app/build/outputs/apk/release/app-release.apk
+
+=============
+
+Step 1 — Create new Firebase project
+Go to console.firebase.google.com
+Click "Add project"
+Name: kanban-push → Continue
+Disable Google Analytics → Create project
+Step 2 — Add Android app
+Click Android icon (Add app)
+Package name: com.gifthighway
+Nickname: KanbanFlow → Register app
+Download google-services.json → save it
+Click Next → Next → Continue to console
+Step 3 — Download Service Account Key
+Click gear icon → Project Settings
+Service Accounts tab
+Click "Generate new private key" → Generate key
+Save the downloaded JSON file
+Step 4 — Replace files locally
+
+cp ~/Downloads/google-services.json /Users/vamsy/Desktop/mobile-app/order-kanban-app/google-services.json
+cp ~/Downloads/google-services.json /Users/vamsy/Desktop/mobile-app/order-kanban-app/mobile-main/google-services.json
+Step 5 — Upload to Expo via CLI
+
+cd /Users/vamsy/Desktop/mobile-app/order-kanban-app/mobile-main
+eas credentials --platform android
+production
+Google Service Account
+Manage your Google Service Account Key for Push Notifications (FCM V1)
+Set up a Google Service Account Key for Push Notifications (FCM V1)
+Path: ~/Downloads/kanban-push-firebase-adminsdk-xxxxx.json
+Step 6 — Push & rebuild
