@@ -20,6 +20,7 @@ import ProductDetailScreen  from '../screens/ProductDetailScreen';
 import CreateProductScreen  from '../screens/CreateProductScreen';
 import NotificationsScreen  from '../screens/NotificationsScreen';
 import ActivityScreen       from '../screens/ActivityScreen';
+import TeamChatScreen       from '../screens/TeamChatScreen';
 import { useProductBadges, useMyOrdersBadges } from '../hooks/useProductBadges';
 
 export type RootStackParamList = {
@@ -29,6 +30,7 @@ export type RootStackParamList = {
   CreateProduct: undefined;
   Notifications: undefined;
   Activity:      undefined;
+  TeamChat:      undefined;
 };
 
 export type TabParamList = {
@@ -49,6 +51,11 @@ function HeaderIcons() {
 
   return (
     <View style={h.row}>
+      {/* Team Chat */}
+      <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('TeamChat')}>
+        <Text style={h.icon}>💬</Text>
+      </TouchableOpacity>
+
       {/* Activity */}
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('Activity')}>
         <Text style={h.icon}>⚡</Text>
@@ -147,8 +154,12 @@ function PushTapHandler({ token }: { token: string }) {
     handledResponseId.current = responseId;
 
     const data = lastNotifResponse.notification.request.content.data as Record<string, any>;
-    if (data?.entityType === 'product' && data?.entityId && navigationRef.isReady()) {
+    if (!navigationRef.isReady()) return;
+
+    if (data?.entityType === 'product' && data?.entityId) {
       navigationRef.navigate('ProductDetail', { productId: Number(data.entityId) });
+    } else if (data?.entityType === 'chat') {
+      navigationRef.navigate('TeamChat');
     }
   }, [lastNotifResponse]);
 
@@ -190,6 +201,7 @@ function AppNavigator() {
             <Stack.Screen name="CreateProduct"  component={CreateProductScreen} options={{ presentation: 'modal' }} />
             <Stack.Screen name="Notifications"  component={NotificationsScreen} />
             <Stack.Screen name="Activity"       component={ActivityScreen} />
+            <Stack.Screen name="TeamChat"       component={TeamChatScreen} />
           </>
         )}
       </Stack.Navigator>

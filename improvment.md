@@ -47,7 +47,9 @@ cd android
 ./gradlew assembleRelease --max-workers=2
 APK will be at:
 
-android/app/build/outputs/apk/release/app-release.apk
+cd app/build/outputs/apk/release/
+
+python3 -m http.server 8000 --bind 0.0.0.0
 
 =============
 

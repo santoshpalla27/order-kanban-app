@@ -200,23 +200,77 @@ async function startListener() {
     try {
       const event = JSON.parse(msg.payload);
 
-      // ── 1. User-targeted notifications (comments, mentions, assignments) ──
+      // ── 1. User-targeted notifications (comments, mentions, attachments, chat) ──
       if (event.event_type === 'user' && event.user_id) {
         const wsMsg = JSON.parse(event.ws_msg);
         if (wsMsg.type !== 'notification') return;
 
-        const p     = wsMsg.payload || {};
-        const title = p.sender_name ? `📦 ${p.sender_name}` : '📦 KanbanFlow';
-        const body  = p.message || 'You have a new notification';
+        const p       = wsMsg.payload || {};
+        const type    = p.notif_type  || '';
+        const entity  = p.entity_type || '';
+        const sender  = p.sender_name || '';
+        const content = (p.content    || '').trim();
+        const message = (p.message    || '').trim();
+
+        // Truncate to fit push notification body limits (~100 chars)
+        const trunc = (s, n = 100) => s.length > n ? s.slice(0, n - 1) + '…' : s;
+
+        // Extract the order display-ID embedded in backend-formatted messages:
+        //   "admin commented on ABC123"      → "ABC123"
+        //   "admin mentioned you in ABC123"  → "ABC123"
+        const orderRef = (msg) => {
+          const m = msg.match(/ on (\S+)$/) || msg.match(/ in (\S+)$/) || msg.match(/^Order (\S+)/);
+          return m ? m[1] : null;
+        };
+
+        let title, body;
+
+        switch (type) {
+          case 'comment_added': {
+            // backend message: "admin commented on ABC123"
+            const ref = orderRef(message);
+            title = ref ? `💬 Comment on ${ref}` : '💬 New Comment';
+            body  = sender && content ? trunc(`${sender}: ${content}`) : trunc(message);
+            break;
+          }
+
+          case 'mention': {
+            if (entity === 'chat') {
+              // Chat mention — show the actual message
+              title = '💬 Team Chat';
+              body  = sender && content ? trunc(`${sender}: ${content}`) : trunc(message);
+            } else {
+              // Product mention: "admin mentioned you in ABC123"
+              const ref = orderRef(message);
+              title = ref ? `💬 Mentioned in ${ref}` : '💬 You were mentioned';
+              body  = sender && content ? trunc(`${sender}: ${content}`) : trunc(message);
+            }
+            break;
+          }
+
+          case 'attachment_uploaded': {
+            // backend message: "admin uploaded 'filename.pdf'" — already perfect
+            title = '📎 New Attachment';
+            body  = trunc(message || (sender ? `${sender} uploaded an attachment` : 'New attachment'));
+            break;
+          }
+
+          case 'chat_message': {
+            title = '💬 Team Chat';
+            body  = sender && content ? trunc(`${sender}: ${content}`) : trunc(message);
+            break;
+          }
+
+          default: {
+            title = sender ? `📦 ${sender}` : '📦 KanbanFlow';
+            body  = trunc(message || 'You have a new notification');
+          }
+        }
 
         await sendPushToUser(event.user_id, {
           title,
           body,
-          data: {
-            entityType: p.entity_type || '',
-            entityId:   p.entity_id   || 0,
-            type:       p.notif_type  || 'notification',
-          },
+          data: { entityType: entity, entityId: p.entity_id || 0, type },
         });
         return;
       }
@@ -226,30 +280,42 @@ async function startListener() {
         const wsMsg = JSON.parse(event.ws_msg);
         if (wsMsg.type !== 'activity_updated') return;
 
-        const p = wsMsg.payload || {};
+        const p     = wsMsg.payload || {};
+        const msg   = (p.message    || '').trim();
+        const actor = p.actor_name  || 'Someone';
 
-        // Skip comment and attachment activities — those are handled above via
-        // targeted "notification" events so mobile users don't get duplicate pushes.
+        // Skip comment/attachment activities — those go via targeted notification events.
         if (p.entity === 'comment' || p.entity === 'attachment') return;
 
-        const actorName = p.actor_name || 'KanbanFlow';
-
-        // Human-readable title based on entity type / action
-        let title = `⚡ ${actorName}`;
-        if (p.entity === 'product') {
-          title = `📦 ${actorName}`;
+        // Derive a descriptive title from the pre-formatted activity message.
+        // Backend formats:
+        //   "Order ABC moved from Yet to Start to Working"  → 🔄 Status Update
+        //   "Order ABC created for customer X"              → 📦 New Order
+        //   "Order ABC details updated (customer: X)"       → 📝 Order Updated
+        //   "Order ABC moved to trash"                      → 🗑️ Order Deleted
+        //   "Order ABC restored from trash"                 → ♻️ Order Restored
+        let title;
+        if (/moved from .+ to /i.test(msg)) {
+          title = '🔄 Status Update';
+        } else if (/created for customer/i.test(msg) || / created$/i.test(msg)) {
+          title = '📦 New Order';
+        } else if (/details updated/i.test(msg) || / updated/i.test(msg)) {
+          title = '📝 Order Updated';
+        } else if (/moved to trash/i.test(msg)) {
+          title = '🗑️ Order Deleted';
+        } else if (/restored from trash/i.test(msg)) {
+          title = '♻️ Order Restored';
+        } else {
+          title = `📦 ${actor}`;
         }
 
-        const body = p.message || 'Order activity updated';
+        // Body: "Actor: full activity message" so recipient knows who did it
+        const body = msg ? `${actor}: ${msg}` : 'Order activity updated';
 
         await sendPushToAllExcept(event.exclude_id || 0, {
           title,
           body,
-          data: {
-            entityType: 'product',
-            entityId:   p.entity_id || 0,
-            type:       'activity',
-          },
+          data: { entityType: 'product', entityId: p.entity_id || 0, type: 'activity' },
         });
         return;
       }

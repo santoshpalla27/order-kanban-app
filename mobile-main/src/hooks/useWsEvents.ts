@@ -11,6 +11,7 @@ export interface WsCallbacks {
   onBadgesChanged?: () => void;
   onForceLogout?: () => void;
   onActivityChanged?: () => void;
+  onChatMessage?: (msg: any) => void;
 }
 
 export function useWsEvents(callbacks?: WsCallbacks) {
@@ -78,6 +79,9 @@ export function useWsEvents(callbacks?: WsCallbacks) {
             entityId: data.payload?.entity_id || 0,
             senderName: data.payload?.sender_name || '',
           });
+          break;
+        case 'chat_message':
+          cb?.onChatMessage?.(data.payload);
           break;
       }
     };
