@@ -1,0 +1,361 @@
+import React, { useState } from 'react';
+import {
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  TextInput, Alert, ActivityIndicator, Image, Modal, SafeAreaView,
+} from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuthStore } from '../store/authStore';
+import { profileApi, authApi } from '../api/services';
+
+const ROLE_META: Record<string, { label: string; color: string; bg: string }> = {
+  admin:     { label: 'Admin',     color: '#F87171', bg: 'rgba(239,68,68,0.15)' },
+  manager:   { label: 'Manager',   color: '#FBBF24', bg: 'rgba(251,191,36,0.15)' },
+  organiser: { label: 'Organiser', color: '#A78BFA', bg: 'rgba(167,139,250,0.15)' },
+  employee:  { label: 'Employee',  color: '#60A5FA', bg: 'rgba(96,165,250,0.15)' },
+  view_only: { label: 'View Only', color: '#94A3B8', bg: 'rgba(148,163,184,0.15)' },
+};
+
+const AVATAR_BG = [
+  '#6366F1', '#8B5CF6', '#EC4899', '#F97316',
+  '#10B981', '#06B6D4', '#EF4444', '#FBBF24',
+];
+
+function getAvatarBg(name: string) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return AVATAR_BG[Math.abs(h) % AVATAR_BG.length];
+}
+
+function formatSince(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+export default function ProfileScreen() {
+  const { user, updateUser, logout } = useAuthStore();
+
+  const [editingName, setEditingName]     = useState(false);
+  const [nameInput, setNameInput]         = useState(user?.name ?? '');
+  const [savingName, setSavingName]       = useState(false);
+  const [uploadingAvatar, setUploading]   = useState(false);
+  const [uploadProgress, setProgress]     = useState(0);
+  const [showLogout, setShowLogout]       = useState(false);
+
+  const roleName = user?.role?.name ?? 'employee';
+  const meta     = ROLE_META[roleName] ?? ROLE_META.employee;
+  const avatarBg = getAvatarBg(user?.name ?? '');
+  const initials = (user?.name ?? '?').slice(0, 2).toUpperCase();
+
+  // ── Save name ──────────────────────────────────────────────────────────────
+  const saveName = async () => {
+    if (!nameInput.trim()) { Alert.alert('Error', 'Name cannot be empty'); return; }
+    if (nameInput.trim() === user?.name) { setEditingName(false); return; }
+    setSavingName(true);
+    try {
+      const res = await profileApi.update({ name: nameInput.trim() });
+      updateUser(res.data);
+      setEditingName(false);
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.error || 'Failed to update name');
+      setNameInput(user?.name ?? '');
+    }
+    setSavingName(false);
+  };
+
+  // ── Pick & upload avatar ───────────────────────────────────────────────────
+  const pickAvatar = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo library access to change your picture.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    const asset    = result.assets[0];
+    const filename = asset.uri.split('/').pop() || 'avatar.jpg';
+    const mime     = asset.mimeType || 'image/jpeg';
+
+    setUploading(true);
+    setProgress(0);
+    try {
+      const presignRes = await profileApi.getAvatarUploadUrl(filename);
+      const { upload_url, s3_key, content_type } = presignRes.data;
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', upload_url);
+        xhr.setRequestHeader('Content-Type', content_type || mime);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('Upload failed')));
+        xhr.onerror = () => reject(new Error('Network error'));
+        fetch(asset.uri).then((r) => r.blob()).then((blob) => xhr.send(blob)).catch(reject);
+      });
+
+      const updated = await profileApi.update({ avatar_key: s3_key });
+      updateUser(updated.data);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to upload photo');
+    }
+    setUploading(false);
+    setProgress(0);
+  };
+
+  // ── Logout ─────────────────────────────────────────────────────────────────
+  const doLogout = async () => {
+    setShowLogout(false);
+    try { await authApi.logout(); } catch {}
+    await logout();
+  };
+
+  return (
+    <SafeAreaView style={s.safe}>
+      <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
+
+        {/* ── Avatar + name header ─────────────────────────────────── */}
+        <View style={s.header}>
+          {/* Avatar */}
+          <TouchableOpacity style={s.avatarWrap} onPress={pickAvatar} disabled={uploadingAvatar}>
+            {user?.avatar_url
+              ? <Image source={{ uri: user.avatar_url }} style={s.avatar} />
+              : (
+                <View style={[s.avatar, s.avatarFallback, { backgroundColor: avatarBg }]}>
+                  <Text style={s.initials}>{initials}</Text>
+                </View>
+              )}
+
+            {/* Camera overlay */}
+            <View style={s.cameraOverlay}>
+              {uploadingAvatar
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={{ fontSize: 15 }}>📷</Text>}
+            </View>
+
+            {/* Progress badge */}
+            {uploadingAvatar && uploadProgress > 0 && (
+              <View style={s.progressBadge}>
+                <Text style={s.progressText}>{uploadProgress}%</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Name */}
+          <Text style={s.displayName}>{user?.name ?? 'Unknown'}</Text>
+          <View style={[s.rolePill, { backgroundColor: meta.bg }]}>
+            <Text style={[s.rolePillText, { color: meta.color }]}>{meta.label}</Text>
+          </View>
+        </View>
+
+        {/* ── Info card ────────────────────────────────────────────── */}
+        <View style={s.card}>
+
+          {/* Full Name row */}
+          <View style={s.row}>
+            <View style={s.rowLeft}>
+              <Text style={s.rowIcon}>👤</Text>
+              <View>
+                <Text style={s.rowLabel}>Full Name</Text>
+                {editingName ? (
+                  <View style={s.nameEditRow}>
+                    <TextInput
+                      style={s.nameInput}
+                      value={nameInput}
+                      onChangeText={setNameInput}
+                      autoFocus
+                      returnKeyType="done"
+                      onSubmitEditing={saveName}
+                      selectTextOnFocus
+                    />
+                  </View>
+                ) : (
+                  <Text style={s.rowValue}>{user?.name ?? '—'}</Text>
+                )}
+              </View>
+            </View>
+            {editingName ? (
+              <View style={s.editActions}>
+                <TouchableOpacity style={s.saveBtn} onPress={saveName} disabled={savingName}>
+                  {savingName
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.saveBtnTxt}>Save</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => { setEditingName(false); setNameInput(user?.name ?? ''); }}>
+                  <Text style={s.cancelTxt}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={s.editChip}
+                onPress={() => { setEditingName(true); setNameInput(user?.name ?? ''); }}
+              >
+                <Text style={s.editChipTxt}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={s.divider} />
+
+          {/* Email row */}
+          <View style={s.row}>
+            <View style={s.rowLeft}>
+              <Text style={s.rowIcon}>✉️</Text>
+              <View>
+                <Text style={s.rowLabel}>Email</Text>
+                <Text style={s.rowValue}>{user?.email ?? '—'}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={s.divider} />
+
+          {/* Role row */}
+          <View style={s.row}>
+            <View style={s.rowLeft}>
+              <Text style={s.rowIcon}>🎖️</Text>
+              <View>
+                <Text style={s.rowLabel}>Role</Text>
+                <Text style={[s.rowValue, { color: meta.color }]}>{meta.label}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Logout ──────────────────────────────────────────────── */}
+        <TouchableOpacity style={s.logoutBtn} onPress={() => setShowLogout(true)}>
+          <Text style={s.logoutIcon}>🚪</Text>
+          <Text style={s.logoutTxt}>Sign Out</Text>
+        </TouchableOpacity>
+
+      </ScrollView>
+
+      {/* ── Logout confirm ───────────────────────────────────────────── */}
+      <Modal visible={showLogout} transparent animationType="fade" onRequestClose={() => setShowLogout(false)}>
+        <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setShowLogout(false)}>
+          <View style={s.logoutModal}>
+            <Text style={{ fontSize: 44, marginBottom: 12 }}>🚪</Text>
+            <Text style={s.logoutTitle}>Sign Out?</Text>
+            <Text style={s.logoutSub}>You'll need to log in again to access the app.</Text>
+            <TouchableOpacity style={s.logoutConfirm} onPress={doLogout}>
+              <Text style={s.logoutConfirmTxt}>Yes, Sign Out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.logoutCancel} onPress={() => setShowLogout(false)}>
+              <Text style={s.logoutCancelTxt}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const s = StyleSheet.create({
+  safe:    { flex: 1, backgroundColor: '#0A0D14' },
+  content: { paddingHorizontal: 20, paddingTop: 32, paddingBottom: 48, gap: 14 },
+
+  // ── Header
+  header: { alignItems: 'center', marginBottom: 8, gap: 12 },
+
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: '#6366F1' },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  initials: { fontSize: 38, fontWeight: '800', color: '#fff', letterSpacing: 1 },
+
+  cameraOverlay: {
+    position: 'absolute', bottom: 2, right: 2,
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: '#6366F1', borderWidth: 2, borderColor: '#0A0D14',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  progressBadge: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 55, backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  progressText: { fontSize: 14, fontWeight: '800', color: '#fff' },
+
+  displayName: { fontSize: 24, fontWeight: '800', color: '#F1F5F9', letterSpacing: -0.4 },
+
+  rolePill: { paddingHorizontal: 14, paddingVertical: 5, borderRadius: 99 },
+  rolePillText: { fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+
+  // ── Card
+  card: {
+    backgroundColor: '#131720', borderRadius: 20,
+    borderWidth: 1, borderColor: '#1E2535',
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25, shadowRadius: 10, elevation: 5,
+  },
+  divider: { height: 1, backgroundColor: '#1A2030', marginHorizontal: 16 },
+
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 18, paddingVertical: 16,
+  },
+  rowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
+  rowIcon:  { fontSize: 20, width: 28, textAlign: 'center' },
+  rowLabel: { fontSize: 11, color: '#475569', fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 3 },
+  rowValue: { fontSize: 15, color: '#E2E8F0', fontWeight: '600' },
+
+  // Name edit
+  nameEditRow: { marginTop: 2 },
+  nameInput: {
+    backgroundColor: '#0E1118', borderRadius: 8, borderWidth: 1,
+    borderColor: '#6366F1', color: '#F1F5F9', paddingHorizontal: 10,
+    paddingVertical: 6, fontSize: 15, fontWeight: '600', minWidth: 140,
+  },
+  editActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  saveBtn: {
+    backgroundColor: '#6366F1', paddingHorizontal: 14, paddingVertical: 7,
+    borderRadius: 9, minWidth: 52, alignItems: 'center',
+  },
+  saveBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  cancelTxt:  { color: '#64748B', fontWeight: '700', fontSize: 17, paddingHorizontal: 4 },
+
+  editChip: {
+    backgroundColor: 'rgba(99,102,241,0.12)', paddingHorizontal: 12,
+    paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)',
+  },
+  editChipTxt: { fontSize: 12, fontWeight: '700', color: '#818CF8' },
+
+  // ── Logout button
+  logoutBtn: {
+    backgroundColor: 'rgba(239,68,68,0.07)', borderRadius: 16, borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.18)', flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: 15, gap: 10,
+  },
+  logoutIcon: { fontSize: 20 },
+  logoutTxt:  { fontSize: 15, fontWeight: '700', color: '#EF4444' },
+
+  // ── Logout modal
+  overlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.72)',
+    alignItems: 'center', justifyContent: 'center', padding: 28,
+  },
+  logoutModal: {
+    backgroundColor: '#131720', borderRadius: 26, borderWidth: 1,
+    borderColor: '#1E2535', padding: 30, width: '100%', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4, shadowRadius: 24, elevation: 14,
+  },
+  logoutTitle: { fontSize: 22, fontWeight: '800', color: '#F1F5F9', marginBottom: 8 },
+  logoutSub:   { fontSize: 14, color: '#64748B', textAlign: 'center', marginBottom: 28, lineHeight: 20 },
+  logoutConfirm: {
+    backgroundColor: '#EF4444', width: '100%', paddingVertical: 15,
+    borderRadius: 14, alignItems: 'center', marginBottom: 10,
+  },
+  logoutConfirmTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  logoutCancel: {
+    backgroundColor: '#1A2030', width: '100%', paddingVertical: 15,
+    borderRadius: 14, alignItems: 'center',
+  },
+  logoutCancelTxt: { fontSize: 15, fontWeight: '600', color: '#64748B' },
+});

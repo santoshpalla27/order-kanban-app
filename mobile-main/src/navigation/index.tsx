@@ -21,6 +21,7 @@ import CreateProductScreen  from '../screens/CreateProductScreen';
 import NotificationsScreen  from '../screens/NotificationsScreen';
 import ActivityScreen       from '../screens/ActivityScreen';
 import TeamChatScreen       from '../screens/TeamChatScreen';
+import ProfileScreen        from '../screens/ProfileScreen';
 import { useProductBadges, useMyOrdersBadges } from '../hooks/useProductBadges';
 
 export type RootStackParamList = {
@@ -36,6 +37,7 @@ export type RootStackParamList = {
 export type TabParamList = {
   List:     undefined;
   MyOrders: undefined;
+  Profile:  undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -133,6 +135,16 @@ function MainTabs() {
           tabBarLabel: 'My Orders',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>📋</Text>,
           tabBarBadge: myOrdersBadgeCount > 0 ? myOrdersBadgeCount : undefined,
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{
+          title: 'Profile',
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>👤</Text>,
+          headerShown: true,
         }}
       />
     </Tab.Navigator>
