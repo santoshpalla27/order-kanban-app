@@ -5,6 +5,24 @@ import { Platform } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { PUSH_SERVICE_URL } from '../utils/config';
 
+// ─── Foreground notification handler ─────────────────────────────────────────
+// When the app is in the foreground, WS toasts already inform the user.
+// Suppress the system alert so there's no duplicate UI. Sound is still played
+// so the user knows something arrived even with the app open.
+// NOTE: this handler is ONLY called for foreground delivery; background and
+// killed-state notifications are always shown by the OS regardless.
+// Guard: expo-notifications APIs are not available on web.
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: false, // WS toast handles foreground visibility
+      shouldPlaySound: true,
+      shouldSetBadge:  false,
+    }),
+  });
+}
+
+// ─── Token registration helpers ───────────────────────────────────────────────
 async function registerDeviceToken(userId: number, token: string) {
   try {
     await fetch(`${PUSH_SERVICE_URL}/push/register`, {
@@ -55,10 +73,10 @@ async function getExpoPushToken(): Promise<string | null> {
   }
 
   const tokenData = await Notifications.getExpoPushTokenAsync();
-  console.log('[PushToken]', tokenData.data); // copy this from Metro logs
   return tokenData.data;
 }
 
+// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function usePushToken() {
   const user  = useAuthStore((s) => s.user);
   const token = useAuthStore((s) => s.token);

@@ -102,6 +102,18 @@ async function getTokensForUser(userId) {
   return rows.map(r => r.token).filter(t => Expo.isExpoPushToken(t));
 }
 
+// Returns all user IDs that have registered push tokens, excluding excludeId.
+async function getPushUserIdsExcept(excludeId) {
+  const client = newClient();
+  await client.connect();
+  const { rows } = await client.query(
+    `SELECT DISTINCT user_id FROM device_push_tokens WHERE user_id != $1`,
+    [excludeId || 0]
+  );
+  await client.end();
+  return rows.map(r => r.user_id);
+}
+
 async function deleteInvalidTokens(tokens) {
   if (!tokens.length) return;
   const client = newClient();
@@ -113,18 +125,17 @@ async function deleteInvalidTokens(tokens) {
   await client.end();
 }
 
-// ─── Send push to a user ──────────────────────────────────────────────────────
+// ─── Send push to a single user ───────────────────────────────────────────────
 async function sendPushToUser(userId, { title, body, data }) {
   const tokens = await getTokensForUser(userId);
   if (!tokens.length) return;
 
   const messages = tokens.map(token => ({
-    to:    token,
-    sound: 'default',
+    to:       token,
+    sound:    'default',
     title,
     body,
-    data:  data || {},
-    // Android: show heads-up notification even in foreground
+    data:     data || {},
     priority: 'high',
     channelId: 'default',
   }));
@@ -139,7 +150,6 @@ async function sendPushToUser(userId, { title, body, data }) {
         const t = tickets[i];
         if (t.status === 'error') {
           console.warn('Push ticket error:', t.message);
-          // DeviceNotRegistered = stale token, remove it
           if (t.details?.error === 'DeviceNotRegistered') {
             invalidTokens.push(messages[i].to);
           }
@@ -153,6 +163,17 @@ async function sendPushToUser(userId, { title, body, data }) {
   if (invalidTokens.length) await deleteInvalidTokens(invalidTokens);
 }
 
+// ─── Send push to all users with tokens, except one ──────────────────────────
+async function sendPushToAllExcept(excludeId, opts) {
+  try {
+    const userIds = await getPushUserIdsExcept(excludeId);
+    if (!userIds.length) return;
+    await Promise.all(userIds.map(uid => sendPushToUser(uid, opts)));
+  } catch (err) {
+    console.error('sendPushToAllExcept error:', err.message);
+  }
+}
+
 // ─── PostgreSQL LISTEN/NOTIFY ─────────────────────────────────────────────────
 async function startListener() {
   const client = newClient();
@@ -160,7 +181,6 @@ async function startListener() {
   client.on('error', (err) => {
     console.error('PG listener connection error:', err.message);
     client.end().catch(() => {});
-    // Reconnect after 5s
     setTimeout(startListener, 5000);
   });
 
@@ -180,27 +200,60 @@ async function startListener() {
     try {
       const event = JSON.parse(msg.payload);
 
-      // We only handle user-targeted events (EmitToUser calls)
-      if (event.event_type !== 'user' || !event.user_id) return;
+      // ── 1. User-targeted notifications (comments, mentions, assignments) ──
+      if (event.event_type === 'user' && event.user_id) {
+        const wsMsg = JSON.parse(event.ws_msg);
+        if (wsMsg.type !== 'notification') return;
 
-      const wsMsg = JSON.parse(event.ws_msg);
+        const p     = wsMsg.payload || {};
+        const title = p.sender_name ? `📦 ${p.sender_name}` : '📦 KanbanFlow';
+        const body  = p.message || 'You have a new notification';
 
-      // Only send push for "notification" type WS messages
-      if (wsMsg.type !== 'notification') return;
+        await sendPushToUser(event.user_id, {
+          title,
+          body,
+          data: {
+            entityType: p.entity_type || '',
+            entityId:   p.entity_id   || 0,
+            type:       p.notif_type  || 'notification',
+          },
+        });
+        return;
+      }
 
-      const p = wsMsg.payload || {};
-      const title = p.sender_name ? `📦 ${p.sender_name}` : '📦 KanbanFlow';
-      const body  = p.message || 'You have a new notification';
+      // ── 2. Broadcast-except: activity events (status changes, order movements, etc.) ──
+      if (event.event_type === 'broadcast_except') {
+        const wsMsg = JSON.parse(event.ws_msg);
+        if (wsMsg.type !== 'activity_updated') return;
 
-      await sendPushToUser(event.user_id, {
-        title,
-        body,
-        data: {
-          entityType: p.entity_type || '',
-          entityId:   p.entity_id   || 0,
-          type:       p.notif_type  || 'notification',
-        },
-      });
+        const p = wsMsg.payload || {};
+
+        // Skip comment and attachment activities — those are handled above via
+        // targeted "notification" events so mobile users don't get duplicate pushes.
+        if (p.entity === 'comment' || p.entity === 'attachment') return;
+
+        const actorName = p.actor_name || 'KanbanFlow';
+
+        // Human-readable title based on entity type / action
+        let title = `⚡ ${actorName}`;
+        if (p.entity === 'product') {
+          title = `📦 ${actorName}`;
+        }
+
+        const body = p.message || 'Order activity updated';
+
+        await sendPushToAllExcept(event.exclude_id || 0, {
+          title,
+          body,
+          data: {
+            entityType: 'product',
+            entityId:   p.entity_id || 0,
+            type:       'activity',
+          },
+        });
+        return;
+      }
+
     } catch (err) {
       console.error('Notification handler error:', err.message);
     }

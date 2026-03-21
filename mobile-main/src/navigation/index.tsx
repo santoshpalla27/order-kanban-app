@@ -1,8 +1,13 @@
-import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { NavigationContainer, useNavigation } from '@react-navigation/native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import {
+  NavigationContainer,
+  useNavigation,
+  createNavigationContainerRef,
+} from '@react-navigation/native';
 import { createNativeStackNavigator, NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import * as Notifications from 'expo-notifications';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { useNotificationStore } from '../store/notificationStore';
@@ -33,6 +38,9 @@ export type TabParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab   = createBottomTabNavigator<TabParamList>();
+
+// Navigation ref — allows navigating from outside React tree (e.g. push tap handler)
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 // ── Header right: bell + activity icons ──────────────────────────────────────
 function HeaderIcons() {
@@ -75,7 +83,6 @@ const h = StyleSheet.create({
 
 // ── Bottom tab navigator ───────────────────────────────────────────────────────
 function MainTabs() {
-  // Trigger WS subscriptions and initial fetches via hooks
   const { badges: allBadges } = useProductBadges();
   const { count: myOrdersBadgeCount, productIds: myOrdersProductIds } = useMyOrdersBadges();
 
@@ -125,6 +132,29 @@ function MainTabs() {
   );
 }
 
+// ── Push notification tap handler (native only) ───────────────────────────────
+// useLastNotificationResponse is not available on web — keep it in its own
+// component so it never runs outside a native environment.
+function PushTapHandler({ token }: { token: string }) {
+  const lastNotifResponse = Notifications.useLastNotificationResponse();
+  const handledResponseId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!lastNotifResponse) return;
+
+    const responseId = lastNotifResponse.notification.request.identifier;
+    if (handledResponseId.current === responseId) return;
+    handledResponseId.current = responseId;
+
+    const data = lastNotifResponse.notification.request.content.data as Record<string, any>;
+    if (data?.entityType === 'product' && data?.entityId && navigationRef.isReady()) {
+      navigationRef.navigate('ProductDetail', { productId: Number(data.entityId) });
+    }
+  }, [lastNotifResponse]);
+
+  return null;
+}
+
 // ── App navigator ─────────────────────────────────────────────────────────────
 function AppNavigator() {
   const token = useAuthStore((s) => s.token);
@@ -139,32 +169,37 @@ function AppNavigator() {
     refreshUnreadCount();
   }, [token]);
 
+
   return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: '#0A0D14' },
-        animation: 'slide_from_right',
-      }}
-    >
-      {!token ? (
-        <Stack.Screen name="Login" component={LoginScreen} />
-      ) : (
-        <>
-          <Stack.Screen name="MainTabs" component={MainTabs} />
-          <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
-          <Stack.Screen name="CreateProduct"  component={CreateProductScreen} options={{ presentation: 'modal' }} />
-          <Stack.Screen name="Notifications"  component={NotificationsScreen} />
-          <Stack.Screen name="Activity"       component={ActivityScreen} />
-        </>
-      )}
-    </Stack.Navigator>
+    <>
+      {/* Mount the push tap handler only on native — expo-notifications APIs crash on web */}
+      {Platform.OS !== 'web' && token ? <PushTapHandler token={token} /> : null}
+      <Stack.Navigator
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: '#0A0D14' },
+          animation: 'slide_from_right',
+        }}
+      >
+        {!token ? (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        ) : (
+          <>
+            <Stack.Screen name="MainTabs" component={MainTabs} />
+            <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+            <Stack.Screen name="CreateProduct"  component={CreateProductScreen} options={{ presentation: 'modal' }} />
+            <Stack.Screen name="Notifications"  component={NotificationsScreen} />
+            <Stack.Screen name="Activity"       component={ActivityScreen} />
+          </>
+        )}
+      </Stack.Navigator>
+    </>
   );
 }
 
 export default function Navigation() {
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <AppNavigator />
     </NavigationContainer>
   );
