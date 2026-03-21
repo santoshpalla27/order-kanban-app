@@ -12,6 +12,8 @@ import {
 } from '../api/services';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
+import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES } from '../hooks/useProductBadges';
+import { useNotificationStore } from '../store/notificationStore';
 import {
   Product, Attachment, Comment, User,
   STATUS_LABELS, STATUS_ORDER, STATUS_COLORS, ProductStatus,
@@ -1382,13 +1384,18 @@ export default function ProductDetailScreen() {
 
   useWsEvents({ onProductsChanged: loadProduct, onAttachmentsChanged: loadAttachments });
 
-  // Clear per-product notification badges when user views Comments or Attachments tab
+  const { has, refreshBadges } = useProductBadges();
+  const { refreshUnreadCount } = useNotificationStore();
+
+  // Mark notifications as read and refresh badge state when user opens a tab
   useEffect(() => {
-    if (activeTab === 'comments') {
-      notificationsApi.markReadByEntityAndTypes('product', productId, ['comment_added', 'mention'])
+    if (activeTab === 'comments' && has(productId, 'comments')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES)
+        .then(() => { refreshBadges(); refreshUnreadCount(); })
         .catch(() => {});
-    } else if (activeTab === 'attachments') {
-      notificationsApi.markReadByEntityAndTypes('product', productId, ['attachment_uploaded'])
+    } else if (activeTab === 'attachments' && has(productId, 'attachments')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES)
+        .then(() => { refreshBadges(); refreshUnreadCount(); })
         .catch(() => {});
     }
   }, [activeTab, productId]);
@@ -1435,10 +1442,10 @@ export default function ProductDetailScreen() {
 
   if (!product) return null;
 
-  const TABS: Array<{ id: TabId; label: string }> = [
-    { id: 'details',     label: 'Details' },
-    { id: 'attachments', label: 'Attachments' },
-    { id: 'comments',    label: 'Comments' },
+  const TABS: Array<{ id: TabId; label: string; badge: boolean }> = [
+    { id: 'details',     label: 'Details',     badge: false },
+    { id: 'attachments', label: 'Attachments', badge: has(productId, 'attachments') },
+    { id: 'comments',    label: 'Comments',    badge: has(productId, 'comments') },
   ];
 
   return (
@@ -1477,9 +1484,12 @@ export default function ProductDetailScreen() {
             style={[s.tab, activeTab === tab.id && s.tabActive]}
             onPress={() => setActiveTab(tab.id)}
           >
-            <Text style={[s.tabText, activeTab === tab.id && s.tabTextActive]}>
-              {tab.label}
-            </Text>
+            <View style={s.tabInner}>
+              <Text style={[s.tabText, activeTab === tab.id && s.tabTextActive]}>
+                {tab.label}
+              </Text>
+              {tab.badge && <View style={s.tabBadge} />}
+            </View>
           </TouchableOpacity>
         ))}
       </View>
@@ -1551,4 +1561,9 @@ const s = StyleSheet.create({
   tabActive: { borderBottomColor: '#6366F1' },
   tabText: { fontSize: 13, fontWeight: '600', color: '#64748B' },
   tabTextActive: { color: '#818CF8' },
+  tabInner: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  tabBadge: {
+    width: 7, height: 7, borderRadius: 99,
+    backgroundColor: '#EF4444',
+  },
 });

@@ -1,30 +1,54 @@
-import { useState, useCallback } from 'react';
-import { notificationsApi } from '../api/services';
+import { useEffect, useCallback } from 'react';
 import { useWsEvents } from './useWsEvents';
+import { useAuthStore } from '../store/authStore';
+import { useBadgeStore, BadgeCategory, COMMENT_TYPES, ATTACHMENT_TYPES } from '../store/badgeStore';
 
-// summary: map of productId → array of unread notification types
-type BadgeSummary = Record<number, string[]>;
+// Re-export constants so screens can import from one place
+export { COMMENT_TYPES, ATTACHMENT_TYPES };
+export type { BadgeCategory };
+
+// ── All products badge hook ───────────────────────────────────────────────────
+// Uses global store — refreshing from any component updates ALL consumers
 
 export function useProductBadges() {
-  const [summary, setSummary] = useState<BadgeSummary>({});
+  const { allBadges, refreshAll } = useBadgeStore();
 
-  const refresh = useCallback(() => {
-    notificationsApi.getUnreadSummary()
-      .then((res) => setSummary(res.data ?? {}))
-      .catch(() => {});
-  }, []);
+  // Fetch on mount (only triggers API if not already loading)
+  useEffect(() => { refreshAll(); }, []);
 
-  // Refresh on any new notification (product badges may have changed)
-  useWsEvents({ onNotification: refresh });
+  // Re-fetch on WS events that may change badge state
+  const onBadge = useCallback(() => { refreshAll(); }, [refreshAll]);
+  useWsEvents({ onNotification: onBadge, onBadgesChanged: onBadge });
 
-  // hasAny returns true if the product has at least one unread notification type
   const hasAny = useCallback(
-    (productId: number) => {
-      const types = summary[productId];
-      return !!(types && types.length > 0);
-    },
-    [summary],
+    (productId: number) => !!allBadges[productId]?.size,
+    [allBadges],
   );
 
-  return { summary, hasAny, refreshBadges: refresh };
+  const has = useCallback(
+    (productId: number, cat: BadgeCategory) => !!allBadges[productId]?.has(cat),
+    [allBadges],
+  );
+
+  return { badges: allBadges, hasAny, has, refreshBadges: refreshAll };
+}
+
+// ── My Orders badge hook (assigned-to-user products only) ─────────────────────
+
+export function useMyOrdersBadges() {
+  const user = useAuthStore((s) => s.user);
+  const userId = user?.id;
+  const { myOrdersBadges, refreshMyOrders } = useBadgeStore();
+
+  const refresh = useCallback(() => {
+    if (userId) refreshMyOrders(userId);
+  }, [userId, refreshMyOrders]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const onBadge = useCallback(() => { refresh(); }, [refresh]);
+  useWsEvents({ onNotification: onBadge, onBadgesChanged: onBadge });
+
+  const productIds = new Set(Object.keys(myOrdersBadges).map(Number));
+  return { count: productIds.size, productIds };
 }

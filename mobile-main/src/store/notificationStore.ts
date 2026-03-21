@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { Toast } from '../types';
+import { notificationsApi } from '../api/services';
 
 interface NotificationStore {
   unreadCount: number;
   toasts: Toast[];
 
   setUnreadCount: (n: number) => void;
-  incrementUnread: () => void;
+  refreshUnreadCount: () => Promise<void>;
 
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
@@ -17,7 +18,12 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   toasts: [],
 
   setUnreadCount: (n) => set({ unreadCount: n }),
-  incrementUnread: () => set((s) => ({ unreadCount: s.unreadCount + 1 })),
+  refreshUnreadCount: async () => {
+    try {
+      const res = await notificationsApi.getUnreadCount();
+      set({ unreadCount: res.data?.count ?? 0 });
+    } catch {}
+  },
 
   addToast: (toast) => {
     const existing = get().toasts;

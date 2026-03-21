@@ -37,7 +37,7 @@ const TAB_COLORS: Record<string, string> = {
 
 export default function MyOrdersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { user, canCreateProduct } = useAuthStore();
+  const { user } = useAuthStore();
   const userId = String(user?.id ?? '');
 
   // assigned_to is always locked to the current user
@@ -144,8 +144,7 @@ export default function MyOrdersScreen() {
 
   useWsEvents({ onProductsChanged: () => handleRefresh() });
 
-  const { hasAny, refreshBadges } = useProductBadges();
-  useEffect(() => { refreshBadges(); }, [refreshBadges]);
+  const { hasAny } = useProductBadges();
 
   const handleStatusChange = async (product: Product, newStatus: string) => {
     setProducts((prev) =>
@@ -283,16 +282,6 @@ export default function MyOrdersScreen() {
         />
       )}
 
-      {/* FAB — create product */}
-      {canCreateProduct() && (
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => navigation.navigate('CreateProduct')}
-        >
-          <Text style={styles.fabText}>＋</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Filter panel — hides "Assigned To" since it's locked */}
       <FilterPanel
         visible={showFilters}
@@ -367,17 +356,4 @@ const styles = StyleSheet.create({
   loadMoreBtn: { paddingVertical: 14, alignItems: 'center' },
   loadMoreText: { color: '#6366F1', fontWeight: '600', fontSize: 14 },
   allLoaded: { textAlign: 'center', color: '#374151', fontSize: 12, paddingVertical: 12 },
-  fab: {
-    position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-  },
-  fabText: { color: '#fff', fontSize: 28, lineHeight: 30 },
 });

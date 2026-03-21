@@ -8,6 +8,7 @@ export interface WsCallbacks {
   onCommentsChanged?: () => void;
   onAttachmentsChanged?: () => void;
   onNotification?: () => void;
+  onBadgesChanged?: () => void;
   onForceLogout?: () => void;
   onActivityChanged?: () => void;
 }
@@ -16,7 +17,7 @@ export function useWsEvents(callbacks?: WsCallbacks) {
   const token         = useAuthStore((s) => s.token);
   const currentUserId = useAuthStore((s) => s.user?.id);
   const logout        = useAuthStore((s) => s.logout);
-  const { addToast, incrementUnread } = useNotificationStore();
+  const { addToast, refreshUnreadCount } = useNotificationStore();
 
   const cbRef = useRef<WsCallbacks | undefined>(callbacks);
   cbRef.current = callbacks;
@@ -43,11 +44,15 @@ export function useWsEvents(callbacks?: WsCallbacks) {
         case 'comment_added':
           cb?.onCommentsChanged?.();
           cb?.onProductsChanged?.();
-          incrementUnread();
+          cb?.onBadgesChanged?.();
+          // Re-fetch real count — comment_added may or may not generate
+          // a notification for the current user, so don't blindly increment
+          refreshUnreadCount();
           break;
         case 'attachment_uploaded':
           cb?.onAttachmentsChanged?.();
           cb?.onProductsChanged?.();
+          cb?.onBadgesChanged?.();
           break;
         case 'activity_updated':
           cb?.onActivityChanged?.();
@@ -63,7 +68,8 @@ export function useWsEvents(callbacks?: WsCallbacks) {
           break;
         case 'notification':
           cb?.onNotification?.();
-          incrementUnread();
+          // Re-fetch real count from API (accurate, no guessing)
+          refreshUnreadCount();
           addToast({
             message: data.payload?.message || 'New notification',
             content: data.payload?.content || '',
@@ -77,5 +83,5 @@ export function useWsEvents(callbacks?: WsCallbacks) {
     };
     wsManager.addHandler(handler);
     return () => { wsManager.removeHandler(handler); };
-  }, [currentUserId, logout, addToast, incrementUnread]);
+  }, [currentUserId, logout, addToast, refreshUnreadCount]);
 }

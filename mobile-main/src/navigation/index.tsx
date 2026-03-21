@@ -6,7 +6,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { useNotificationStore } from '../store/notificationStore';
-import { notificationsApi } from '../api/services';
 import { usePushToken } from '../hooks/usePushToken';
 
 import LoginScreen          from '../screens/LoginScreen';
@@ -16,6 +15,7 @@ import ProductDetailScreen  from '../screens/ProductDetailScreen';
 import CreateProductScreen  from '../screens/CreateProductScreen';
 import NotificationsScreen  from '../screens/NotificationsScreen';
 import ActivityScreen       from '../screens/ActivityScreen';
+import { useProductBadges, useMyOrdersBadges } from '../hooks/useProductBadges';
 
 export type RootStackParamList = {
   Login:         undefined;
@@ -75,6 +75,14 @@ const h = StyleSheet.create({
 
 // ── Bottom tab navigator ───────────────────────────────────────────────────────
 function MainTabs() {
+  // Trigger WS subscriptions and initial fetches via hooks
+  const { badges: allBadges } = useProductBadges();
+  const { count: myOrdersBadgeCount, productIds: myOrdersProductIds } = useMyOrdersBadges();
+
+  // Products tab: only products with badges NOT assigned to the current user
+  const unreadProductCount = Object.keys(allBadges)
+    .filter((id) => !myOrdersProductIds.has(Number(id))).length;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -100,6 +108,7 @@ function MainTabs() {
           title: 'Products',
           tabBarLabel: 'Products',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>📦</Text>,
+          tabBarBadge: unreadProductCount > 0 ? unreadProductCount : undefined,
         }}
       />
       <Tab.Screen
@@ -109,6 +118,7 @@ function MainTabs() {
           title: 'My Orders',
           tabBarLabel: 'My Orders',
           tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>📋</Text>,
+          tabBarBadge: myOrdersBadgeCount > 0 ? myOrdersBadgeCount : undefined,
         }}
       />
     </Tab.Navigator>
@@ -118,16 +128,15 @@ function MainTabs() {
 // ── App navigator ─────────────────────────────────────────────────────────────
 function AppNavigator() {
   const token = useAuthStore((s) => s.token);
-  const { setUnreadCount } = useNotificationStore();
+  const { refreshUnreadCount } = useNotificationStore();
 
   useWsEvents();
   usePushToken();
 
+  // Fetch accurate unread count from API on login
   useEffect(() => {
     if (!token) return;
-    notificationsApi.getUnreadCount()
-      .then((res) => setUnreadCount(res.data?.count ?? 0))
-      .catch(() => {});
+    refreshUnreadCount();
   }, [token]);
 
   return (
