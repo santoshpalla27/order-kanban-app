@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   ActivityIndicator, Alert, Modal, FlatList,
-  KeyboardAvoidingView, Linking, Image, useWindowDimensions,
+  KeyboardAvoidingView, Linking, Image, useWindowDimensions, Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
@@ -907,7 +907,9 @@ function CommentsTab({
   const [attLightbox, setAttLightbox] = useState<{ url: string; name: string; id?: number } | null>(null);
 
   // @mention state
-  const inputRef = useRef<TextInput>(null);
+  const inputRef     = useRef<TextInput>(null);
+  const listRef      = useRef<FlatList<Comment>>(null);
+  const keyboardOpen = useRef(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState(0);
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -999,6 +1001,17 @@ function CommentsTab({
   useEffect(() => { load(); }, [load]);
   useWsEvents({ onCommentsChanged: load });
 
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      keyboardOpen.current = true;
+      listRef.current?.scrollToEnd({ animated: true });
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardOpen.current = false;
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
+
   const handleSend = async () => {
     if (!message.trim()) return;
     setSending(true);
@@ -1048,10 +1061,16 @@ function CommentsTab({
   return (
     <View style={{ flex: 1 }}>
       <FlatList
+        ref={listRef}
         data={comments}
         keyExtractor={(c) => String(c.id)}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
+        onLayout={() => {
+          if (keyboardOpen.current) {
+            listRef.current?.scrollToEnd({ animated: false });
+          }
+        }}
         ListEmptyComponent={
           <View style={styles.center}>
             <Text style={{ fontSize: 32 }}>💬</Text>

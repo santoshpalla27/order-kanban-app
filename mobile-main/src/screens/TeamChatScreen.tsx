@@ -179,9 +179,10 @@ export default function TeamChatScreen() {
   const [orderLoading,  setOrderLoading]  = useState(false);
   const orderTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const listRef   = useRef<FlatList<Processed>>(null);
-  const inputRef  = useRef<TextInput>(null);
-  const didScroll = useRef(false);
+  const listRef      = useRef<FlatList<Processed>>(null);
+  const inputRef     = useRef<TextInput>(null);
+  const didScroll    = useRef(false);
+  const keyboardOpen = useRef(false);
 
   // ── Load users for @mention ────────────────────────────────────────────────
   useEffect(() => {
@@ -239,10 +240,14 @@ export default function TeamChatScreen() {
 
   // Scroll to bottom when keyboard opens so latest message stays visible
   useEffect(() => {
-    const sub = Keyboard.addListener('keyboardDidShow', () => {
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    const showSub = Keyboard.addListener('keyboardDidShow', () => {
+      keyboardOpen.current = true;
+      listRef.current?.scrollToEnd({ animated: true });
     });
-    return () => sub.remove();
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardOpen.current = false;
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
   }, []);
 
   // ── Load older ─────────────────────────────────────────────────────────────
@@ -497,6 +502,11 @@ export default function TeamChatScreen() {
             contentContainerStyle={processed.length === 0 ? st.emptyContainer : st.listContent}
             maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             onScrollToIndexFailed={() => {}}
+            onLayout={() => {
+              if (keyboardOpen.current) {
+                listRef.current?.scrollToEnd({ animated: false });
+              }
+            }}
             ListHeaderComponent={
               hasMore ? (
                 <TouchableOpacity

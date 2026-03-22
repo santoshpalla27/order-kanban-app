@@ -62,8 +62,8 @@ export default function CreateProductModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="w-full max-w-md glass rounded-2xl animate-scale-in" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-5 border-b border-surface-700/50">
+      <div className="w-full max-w-md glass rounded-2xl animate-scale-in flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-surface-700/50 flex-shrink-0">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Package className="w-5 h-5 text-brand-400" />
             New Product
@@ -73,7 +73,7 @@ export default function CreateProductModal({ onClose }: Props) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
               {error}
