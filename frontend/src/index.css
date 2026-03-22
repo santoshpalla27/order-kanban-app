@@ -87,19 +87,19 @@ body {
 /* Status badge colors — dark */
 [data-theme="dark"] .status-yet_to_start,
 :root .status-yet_to_start {
-  @apply bg-gray-600/30 text-gray-300 border border-gray-600/50;
+  @apply bg-gray-500/20 text-gray-300 border border-gray-500/30 shadow-[0_0_10px_rgba(107,114,128,0.15)];
 }
 [data-theme="dark"] .status-working,
 :root .status-working {
-  @apply bg-blue-600/30 text-blue-300 border border-blue-600/50;
+  @apply bg-blue-500/20 text-blue-300 border border-blue-500/30 shadow-[0_0_10px_rgba(59,130,246,0.15)];
 }
 [data-theme="dark"] .status-review,
 :root .status-review {
-  @apply bg-amber-600/30 text-amber-300 border border-amber-600/50;
+  @apply bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-[0_0_10px_rgba(245,158,11,0.15)];
 }
 [data-theme="dark"] .status-done,
 :root .status-done {
-  @apply bg-emerald-600/30 text-emerald-300 border border-emerald-600/50;
+  @apply bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)];
 }
 
 /* Status badge colors — light */
@@ -181,9 +181,9 @@ body {
 
 /* Button base */
 .btn {
-  @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200
+  @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-out active:scale-95
     focus:outline-none focus:ring-2 focus:ring-offset-2
-    disabled:opacity-50 disabled:cursor-not-allowed;
+    disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
 }
 
 /* Buttons — dark */

@@ -133,8 +133,8 @@ export default function ActivityPage() {
 
   const inputCls = `px-3 py-2 rounded-lg text-sm border outline-none transition-colors ${
     isDark
-      ? 'bg-surface-800 border-surface-700 text-surface-200 placeholder-surface-500 focus:border-brand-500'
-      : 'bg-white border-surface-300 text-surface-800 placeholder-surface-400 focus:border-brand-500'
+      ? 'bg-surface-800 border-surface-700 text-white placeholder-surface-500 focus:border-brand-500'
+      : 'bg-white border-surface-300 text-black placeholder-surface-400 focus:border-brand-500'
   }`;
 
   const selectCls = `${inputCls} cursor-pointer`;
@@ -144,7 +144,7 @@ export default function ActivityPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400 flex items-center gap-2">
             <Activity className="w-6 h-6 text-brand-400" />
             Activity Log
           </h1>
@@ -166,8 +166,8 @@ export default function ActivityPage() {
       </div>
 
       {/* Filter bar */}
-      <div className={`rounded-xl border p-4 space-y-3 ${
-        isDark ? 'bg-surface-900 border-surface-700/50' : 'bg-white border-surface-200'
+      <div className={`rounded-xl border p-4 space-y-3 relative overflow-hidden shadow-sm ${
+        isDark ? 'bg-surface-900/60 backdrop-blur-md border-surface-700/50 before:absolute before:inset-0 before:border-t before:border-white/5 before:pointer-events-none' : 'bg-white/80 backdrop-blur-md border-surface-200'
       }`}>
         <div className="flex items-center gap-2 mb-1">
           <Filter className="w-4 h-4 text-brand-400" />
@@ -191,7 +191,7 @@ export default function ActivityPage() {
               placeholder="Search details..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className={`${inputCls} pl-9 w-full`}
+              className={`${inputCls} !pl-9 w-full`}
             />
           </div>
 
@@ -259,8 +259,8 @@ export default function ActivityPage() {
       </div>
 
       {/* Log list */}
-      <div className={`rounded-xl border overflow-hidden ${
-        isDark ? 'bg-surface-900 border-surface-700/50' : 'bg-white border-surface-200'
+      <div className={`rounded-xl border overflow-hidden shadow-sm relative ${
+        isDark ? 'bg-surface-900/60 backdrop-blur-md border-surface-700/50 before:absolute before:inset-0 before:border-t before:border-white/5 before:pointer-events-none' : 'bg-white/80 backdrop-blur-md border-surface-200'
       }`}>
         {isLoading ? (
           <div className="flex justify-center py-16">
@@ -288,8 +288,8 @@ export default function ActivityPage() {
               return (
                 <div
                   key={log.id}
-                  className={`flex items-start gap-4 px-5 py-4 transition-colors ${
-                    isDark ? 'hover:bg-surface-800/50' : 'hover:bg-surface-50'
+                  className={`flex items-start gap-4 px-5 py-4 transition-all duration-300 ${
+                    isDark ? 'hover:bg-surface-800/40' : 'hover:bg-surface-50'
                   }`}
                 >
                   {/* Avatar */}

@@ -156,7 +156,7 @@ export default function KanbanBoard() {
   return (
     <div className="space-y-6 h-full flex flex-col">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Kanban Board</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400">Kanban Board</h1>
         {canCreateProduct() && (
           <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" /> New Product
@@ -244,7 +244,7 @@ function KanbanColumn({
   return (
     <div
       ref={setDropRef}
-      className={`${colors.bg} border ${isOver ? 'border-brand-500/50' : colors.border} rounded-2xl flex flex-col min-h-[200px] transition-colors duration-150`}
+      className={`${colors.bg} border ${isOver ? 'border-brand-500/50' : colors.border} rounded-[24px] flex flex-col min-h-[200px] transition-colors duration-150`}
     >
       {/* Header */}
       <div className="p-4 border-b border-surface-700/30 flex-shrink-0">
@@ -281,7 +281,7 @@ function KanbanColumn({
                   left: 0,
                   width: '100%',
                   transform: `translateY(${vItem.start}px)`,
-                  paddingBottom: '8px',
+                  paddingBottom: '12px',
                 }}
               >
                 <KanbanCard
@@ -295,7 +295,7 @@ function KanbanColumn({
           </div>
         ) : (
           /* Flat list — used when item count ≤ threshold or while dragging from this column */
-          <div className="space-y-2">
+          <div className="space-y-3">
             {items.map((product) => (
               <KanbanCard
                 key={product.id}
@@ -347,7 +347,7 @@ function KanbanCard({
     <div
       ref={setNodeRef}
       style={{ opacity: isDragging ? 0.3 : 1 }}
-      className="bg-surface-800/80 border border-surface-700/50 rounded-xl p-4 cursor-pointer card-hover group"
+      className="bg-surface-800/60 backdrop-blur-md border border-surface-700/50 rounded-2xl p-5 cursor-pointer card-hover group shadow-sm relative overflow-hidden before:absolute before:inset-0 before:border-t before:border-white/5 before:rounded-2xl before:pointer-events-none"
       onClick={onClick}
     >
       <div className="flex items-start gap-2">
@@ -393,7 +393,7 @@ function KanbanCard({
 
 function KanbanCardOverlay({ product }: { product: Product }) {
   return (
-    <div className="bg-surface-800 border border-brand-500/50 rounded-xl p-3 shadow-2xl shadow-brand-500/10 rotate-2">
+    <div className="bg-surface-800/90 backdrop-blur-xl border-2 border-brand-500/70 rounded-2xl p-4 shadow-2xl shadow-brand-500/30 rotate-3 scale-105">
       <div className="flex items-center gap-2 mb-2">
         <Package className="w-3.5 h-3.5 text-brand-400" />
         <span className="text-xs font-mono text-brand-400">{product.product_id}</span>

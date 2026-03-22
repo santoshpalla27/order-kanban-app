@@ -105,7 +105,7 @@ export default function ListView() {
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 53,
+    estimateSize: () => 61,
     overscan: 10,
   });
 
@@ -176,7 +176,7 @@ export default function ListView() {
 
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
-        <h1 className="text-2xl font-bold">Products</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400">Products</h1>
         {canCreateProduct() && (
           <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" /> New Product
@@ -216,14 +216,14 @@ export default function ListView() {
       <div className="flex-1 min-h-0 glass rounded-2xl border border-surface-700/30 flex flex-col overflow-hidden">
 
         {/* Sticky column header */}
-        <div className="flex-shrink-0 bg-surface-900/90 backdrop-blur-sm border-b border-surface-700/50 grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_160px_60px]">
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Product ID</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Customer</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden md:block">Phone</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:block">Assignee</div>
-          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">View</div>
-          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</div>
-          <div />
+        <div className="flex-shrink-0 bg-surface-900/80 backdrop-blur-lg border-b border-surface-700/50 grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_100px_180px_80px]">
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4">Product ID</div>
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4">Customer</div>
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4 hidden md:block">Phone</div>
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4 hidden lg:block">Assignee</div>
+          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4">View</div>
+          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4">Status</div>
+          <div className="pl-4 pr-8 py-4"/>
         </div>
 
         {/* Body */}
@@ -256,29 +256,29 @@ export default function ListView() {
                       width: '100%',
                       transform: `translateY(${vr.start}px)`,
                     }}
-                    className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_160px_60px] border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors"
+                    className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_100px_180px_80px] border-b border-surface-700/20 hover:bg-surface-700/30 transition-colors"
                   >
-                    <div className="px-4 py-3 flex items-center gap-2 min-w-0">
+                    <div className="px-4 py-4 flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
                       {hasAny(product.id) && (
                         <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New comment" />
                       )}
                     </div>
-                    <div className="px-4 py-3 flex items-center text-sm truncate min-w-0">{product.customer_name}</div>
-                    <div className="px-4 py-3 items-center text-sm text-surface-400 hidden md:flex truncate min-w-0">
+                    <div className="px-4 py-4 flex items-center text-sm truncate min-w-0">{product.customer_name}</div>
+                    <div className="px-4 py-4 items-center text-sm text-surface-400 hidden md:flex truncate min-w-0">
                       {product.customer_phone || '—'}
                     </div>
-                    <div className="px-4 py-3 items-center text-sm text-surface-400 hidden lg:flex truncate min-w-0">
+                    <div className="px-4 py-4 items-center text-sm text-surface-400 hidden lg:flex truncate min-w-0">
                       {product.assignees && product.assignees.length > 0
                         ? product.assignees.map(a => a.name).join(', ')
                         : '—'}
                     </div>
-                    <div className="px-4 py-3 flex items-center justify-center">
+                    <div className="px-4 py-4 flex items-center justify-center">
                       <button onClick={() => { setSelectedProduct(product.id); }} className="btn-ghost p-1.5 rounded-lg" title="View details">
                         <Eye className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="px-4 py-3 flex items-center justify-center">
+                    <div className="px-4 py-4 flex items-center justify-center">
                       <select
                         value={product.status}
                         onChange={(e) => statusMutation.mutate({ id: product.id, status: e.target.value })}
@@ -289,7 +289,7 @@ export default function ListView() {
                         ))}
                       </select>
                     </div>
-                    <div className="px-2 py-3 flex items-center justify-center">
+                    <div className="pl-4 pr-8 py-4 flex items-center justify-center">
                       {canDeleteProduct() && (
                         <button onClick={() => setDeleteConfirmId(product.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete">
                           <Trash2 className="w-4 h-4" />

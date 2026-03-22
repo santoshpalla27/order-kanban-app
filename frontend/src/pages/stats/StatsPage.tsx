@@ -101,7 +101,7 @@ function StatCard({
   isDark: boolean;
 }) {
   return (
-    <div className={`rounded-2xl p-5 border ${isDark ? 'bg-surface-900 border-surface-700/50' : 'bg-white border-surface-200'}`}>
+    <div className={`rounded-2xl p-5 border relative overflow-hidden card-hover group shadow-sm transition-all duration-300 ${isDark ? 'bg-surface-900/60 backdrop-blur-md border-surface-700/50 before:absolute before:inset-0 before:border-t before:border-white/5 before:rounded-2xl before:pointer-events-none' : 'bg-white/80 backdrop-blur-md border-surface-200'}`}>
       <div className="flex items-start justify-between">
         <div>
           <p className={`text-xs font-medium uppercase tracking-wide ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>{label}</p>
@@ -130,7 +130,7 @@ function PeriodCard({
   isDark: boolean;
 }) {
   return (
-    <div className={`rounded-2xl p-5 border ${isDark ? 'bg-surface-900 border-surface-700/50' : 'bg-white border-surface-200'}`}>
+    <div className={`rounded-2xl p-5 border relative overflow-hidden card-hover group shadow-sm transition-all duration-300 ${isDark ? 'bg-surface-900/60 backdrop-blur-md border-surface-700/50 before:absolute before:inset-0 before:border-t before:border-white/5 before:rounded-2xl before:pointer-events-none' : 'bg-white/80 backdrop-blur-md border-surface-200'}`}>
       <div className="flex items-center gap-2 mb-4">
         <div className={`w-8 h-8 rounded-lg ${color} flex items-center justify-center flex-shrink-0`}>
           <Icon className="w-4 h-4 text-white" />
@@ -152,7 +152,7 @@ function PeriodCard({
 function ProgressBar({ value, max, colorClass }: { value: number; max: number; colorClass: string }) {
   const pct = max > 0 ? (value / max) * 100 : 0;
   return (
-    <div className="h-1.5 w-full bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
+    <div className="h-2 w-full bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
       <div
         className={`h-full rounded-full ${colorClass} transition-all duration-500`}
         style={{ width: `${pct}%` }}
@@ -198,8 +198,8 @@ export default function StatsPage() {
     <div className="max-w-7xl mx-auto space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <BarChart3 className="w-6 h-6 text-brand-500" />
+        <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400 flex items-center gap-3">
+          <BarChart3 className="w-8 h-8 text-brand-500" />
           Statistics
         </h1>
         <p className={`text-sm mt-1 ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>
@@ -218,7 +218,7 @@ export default function StatsPage() {
       {/* Status breakdown + Period cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Status breakdown */}
-        <div className={`rounded-2xl p-5 border lg:col-span-1 ${isDark ? 'bg-surface-900 border-surface-700/50' : 'bg-white border-surface-200'}`}>
+        <div className={`rounded-2xl p-5 border relative overflow-hidden shadow-sm transition-all duration-300 lg:col-span-1 ${isDark ? 'bg-surface-900/60 backdrop-blur-md border-surface-700/50 before:absolute before:inset-0 before:border-t before:border-white/5 before:rounded-2xl before:pointer-events-none' : 'bg-white/80 backdrop-blur-md border-surface-200'}`}>
           <div className="flex items-center gap-2 mb-4">
             <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center">
               <Package className="w-4 h-4 text-white" />
@@ -260,7 +260,7 @@ export default function StatsPage() {
 
       {/* User performance table */}
       {user_stats.length > 0 && (
-        <div className={`rounded-2xl border ${isDark ? 'bg-surface-900 border-surface-700/50' : 'bg-white border-surface-200'}`}>
+        <div className={`rounded-2xl border overflow-hidden shadow-sm ${isDark ? 'bg-surface-900/60 backdrop-blur-md border-surface-700/50' : 'bg-white/80 backdrop-blur-md border-surface-200'}`}>
           <div className="px-6 py-4 border-b flex items-center gap-2" style={{ borderColor: isDark ? 'rgba(255,255,255,0.07)' : '#e2e8f0' }}>
             <Users className="w-4 h-4 text-brand-500" />
             <h2 className="text-sm font-semibold">Team Performance</h2>
@@ -268,7 +268,7 @@ export default function StatsPage() {
           </div>
 
           {/* Table header */}
-          <div className={`hidden sm:grid grid-cols-[minmax(160px,1fr)_80px_80px_80px_80px_80px_120px] gap-4 px-6 py-2 text-[11px] font-medium uppercase tracking-wide ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>
+          <div className={`hidden sm:grid grid-cols-[minmax(160px,1fr)_80px_80px_80px_80px_80px_120px] gap-4 px-6 py-4 text-[11px] font-medium uppercase tracking-wide ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>
             <span>Member</span>
             <span className="text-center">Assigned</span>
             <span className="text-center text-surface-400">Not Started</span>
@@ -282,7 +282,7 @@ export default function StatsPage() {
             {user_stats.map((u) => (
               <div
                 key={u.user_id}
-                className={`px-6 py-3 grid grid-cols-1 sm:grid-cols-[minmax(160px,1fr)_80px_80px_80px_80px_80px_120px] gap-4 items-center transition-colors ${isDark ? 'hover:bg-surface-800/50' : 'hover:bg-surface-50'}`}
+                className={`px-6 py-4 grid grid-cols-1 sm:grid-cols-[minmax(160px,1fr)_80px_80px_80px_80px_80px_120px] gap-4 items-center transition-colors ${isDark ? 'hover:bg-surface-800/40' : 'hover:bg-surface-50'}`}
               >
                 {/* Name */}
                 <div className="flex items-center gap-3">

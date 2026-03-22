@@ -168,19 +168,19 @@ export default function ChatPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)]">
 
       {/* Header */}
-      <div className="glass rounded-xl px-4 py-2.5 mb-3 flex items-center justify-center gap-2.5 border border-surface-700/40 relative">
+      <div className="glass backdrop-blur-xl rounded-xl px-4 py-3 mb-3 flex items-center justify-center gap-3 border border-surface-700/40 relative shadow-sm">
         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow shadow-brand-500/20">
           <Hash className="w-4 h-4 text-white" />
         </div>
         <div className="text-center">
-          <h2 className="text-base font-semibold tracking-tight text-surface-100">Team Chat</h2>
+          <h2 className="text-xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400">Team Chat</h2>
         </div>
       </div>
 
       {/* Messages */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto rounded-2xl px-4 py-3 mb-3 bg-surface-900/50 border border-surface-700/30"
+        className="flex-1 overflow-y-auto rounded-2xl px-4 py-3 mb-3 bg-surface-900/50 backdrop-blur-sm border border-surface-700/30 shadow-inner"
       >
         {isLoading ? (
           <div className="flex justify-center py-16">
@@ -260,10 +260,10 @@ export default function ChatPage() {
 
                     {/* Bubble */}
                     <div
-                      className={`relative px-3.5 py-2 shadow-sm ${
+                      className={`relative px-3.5 py-2 ${
                         isOwn
-                          ? 'bg-brand-600 text-white rounded-2xl' + (isFirst ? ' rounded-tr-sm' : '')
-                          : 'bg-surface-800 text-surface-200 border border-surface-700/50 rounded-2xl' + (isFirst ? ' rounded-tl-sm' : '')
+                          ? 'bg-gradient-to-br from-brand-500 to-indigo-600 text-white rounded-2xl shadow-md shadow-brand-500/20' + (isFirst ? ' rounded-tr-sm' : '')
+                          : 'bg-surface-800/80 backdrop-blur-md text-surface-200 border border-surface-700/50 rounded-2xl shadow-sm' + (isFirst ? ' rounded-tl-sm' : '')
                       }`}
                     >
                       <p className={`text-sm whitespace-pre-wrap ${isOwn ? 'text-white/95' : 'text-surface-200'}`}>
@@ -285,14 +285,14 @@ export default function ChatPage() {
       {/* Input bar */}
       <form
         onSubmit={handleSubmit}
-        className="flex items-center gap-2 glass rounded-2xl px-3 py-2 border border-surface-700/40"
+        className="flex items-center gap-2 glass backdrop-blur-lg rounded-2xl px-3 py-2 border border-surface-700/40"
       >
         {/* Emoji picker */}
         <div className="relative flex-shrink-0">
           <button
             type="button"
             onClick={() => setShowEmoji(!showEmoji)}
-            className={`p-2 rounded-xl transition-colors ${showEmoji ? 'text-brand-400 bg-brand-500/10' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'}`}
+            className={`p-2 rounded-xl transition-all duration-300 ${showEmoji ? 'text-brand-400 bg-brand-500/10' : 'text-surface-400 hover:text-surface-200 hover:bg-surface-700/50'}`}
           >
             <Smile className="w-5 h-5" />
           </button>
@@ -326,7 +326,7 @@ export default function ChatPage() {
         <button
           type="submit"
           disabled={!message.trim() || sendMutation.isPending}
-          className="w-9 h-9 rounded-full bg-brand-600 hover:bg-brand-500 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all flex-shrink-0 shadow-md shadow-brand-900/30"
+          className="w-9 h-9 rounded-full bg-gradient-to-r from-brand-500 to-indigo-500 hover:shadow-lg hover:shadow-brand-500/30 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all flex-shrink-0"
         >
           <Send className="w-4 h-4 text-white" />
         </button>

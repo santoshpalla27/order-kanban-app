@@ -81,7 +81,7 @@ export default function ActivityPanel({ onClose }: { onClose: () => void }) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-700/40">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-brand-400" />
-          <span className="text-sm font-semibold">Activity</span>
+          <span className="text-sm font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400">Activity</span>
           {logs.length > 0 && (
             <span className="text-[10px] bg-surface-700/60 text-surface-400 px-2 py-0.5 rounded-full">
               {logs.length}

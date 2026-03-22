@@ -128,7 +128,7 @@ export default function Layout() {
       <aside
         className={`${
           sidebarOpen ? 'w-64' : 'w-0 lg:w-20'
-        } ${isDark ? 'bg-surface-900 border-surface-700/50' : 'bg-white border-surface-200'} border-r transition-all duration-300 flex flex-col overflow-hidden flex-shrink-0`}
+        } ${isDark ? 'bg-surface-900/80 backdrop-blur-lg border-surface-700/50' : 'bg-white/80 backdrop-blur-lg border-surface-200'} border-r transition-all duration-300 flex flex-col overflow-hidden flex-shrink-0 z-20`}
       >
         {/* Logo */}
         <div className={`h-16 flex items-center px-5 border-b ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
@@ -155,7 +155,7 @@ export default function Layout() {
                 to={item.to}
                 end={item.to === '/'}
                 className={({ isActive }) =>
-                  `relative flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  `relative flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-medium transition-all duration-200 ${
                     isActive
                       ? isDark
                         ? 'bg-brand-600/20 text-brand-400'
@@ -202,7 +202,7 @@ export default function Layout() {
           <div className={`p-3 border-t ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
             <button
               onClick={() => { setProfileModalOpen(true); }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${isDark ? 'hover:bg-surface-800' : 'hover:bg-surface-100'}`}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-2xl transition-colors ${isDark ? 'hover:bg-surface-800' : 'hover:bg-surface-100'}`}
             >
               <UserAvatar user={user} size="md" />
               <div className="overflow-hidden text-left">
@@ -217,7 +217,7 @@ export default function Layout() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className={`h-16 backdrop-blur-md border-b flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30 ${
+        <header className={`h-16 backdrop-blur-xl border-b flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30 ${
           isDark ? 'bg-surface-900/80 border-surface-700/50' : 'bg-white/80 border-surface-200'
         }`}>
           <button
@@ -288,7 +288,7 @@ export default function Layout() {
               </button>
 
               {profileOpen && (
-                <div className={`absolute right-0 top-full mt-2 w-52 ${isDark ? 'bg-surface-800 border-surface-700/50' : 'bg-white border-surface-200'} border rounded-xl py-2 animate-scale-in z-50 shadow-xl`}>
+                <div className={`absolute right-0 top-full mt-2 w-52 ${isDark ? 'bg-surface-800/90 backdrop-blur-xl border-surface-700/50' : 'bg-white/95 backdrop-blur-xl border-surface-200'} border rounded-xl py-2 animate-scale-in z-50 shadow-2xl`}>
                   {/* User info */}
                   <div className={`px-4 py-3 border-b ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
                     <div className="flex items-center gap-3">

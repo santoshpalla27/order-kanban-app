@@ -98,7 +98,7 @@ export default function MyOrdersPage() {
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 53,
+    estimateSize: () => 61,
     overscan: 10,
   });
 
@@ -161,7 +161,7 @@ export default function MyOrdersPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
-        <h1 className="text-2xl font-bold">My Orders</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400">My Orders</h1>
       </div>
 
       <SearchFilters filters={filters} onChange={setFilters} showDeliveryFilter />
@@ -195,13 +195,13 @@ export default function MyOrdersPage() {
       {/* Table */}
       <div className="flex-1 min-h-0 glass rounded-2xl border border-surface-700/30 flex flex-col overflow-hidden">
 
-        <div className="flex-shrink-0 bg-surface-900/90 backdrop-blur-sm border-b border-surface-700/50 grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_140px]">
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Product ID</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Customer</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden md:block">Delivery</div>
-          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3 hidden lg:block">Description</div>
-          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">View</div>
-          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-3">Status</div>
+        <div className="flex-shrink-0 bg-surface-900/80 backdrop-blur-lg border-b border-surface-700/50 grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_100px_minmax(180px,200px)]">
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4">Product ID</div>
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4">Customer</div>
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4 hidden md:block">Delivery</div>
+          <div className="text-left text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4 hidden lg:block">Description</div>
+          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider px-4 py-4">View</div>
+          <div className="text-center text-xs font-medium text-surface-400 uppercase tracking-wider pl-4 pr-10 py-4">Status</div>
         </div>
 
         {isLoading ? (
@@ -223,20 +223,20 @@ export default function MyOrdersPage() {
                     data-index={vi.index}
                     ref={virtualizer.measureElement}
                     style={{ position: 'absolute', top: 0, left: 0, width: '100%', transform: `translateY(${vi.start}px)` }}
-                    className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_80px_140px] border-b border-surface-700/30 hover:bg-surface-800/40 transition-colors group"
+                    className="grid grid-cols-[minmax(100px,1fr)_minmax(120px,1.5fr)_minmax(100px,1fr)_minmax(0,2fr)_100px_minmax(180px,200px)] border-b border-surface-700/30 hover:bg-surface-800/40 transition-colors group"
                   >
-                    <div className="px-4 py-3 flex items-center gap-2 min-w-0">
+                    <div className="px-4 py-4 flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
                       {hasAny(product.id) && (
                         <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New comment" />
                       )}
                     </div>
-                    <div className="px-4 py-3 text-sm text-surface-200 truncate">{product.customer_name}</div>
-                    <div className="px-4 py-3 text-sm text-surface-400 truncate hidden md:block">
+                    <div className="px-4 py-4 text-sm text-surface-200 truncate">{product.customer_name}</div>
+                    <div className="px-4 py-4 text-sm text-surface-400 truncate hidden md:block">
                       {product.delivery_at ? formatDate(product.delivery_at) : '—'}
                     </div>
-                    <div className="px-4 py-3 text-sm text-surface-400 truncate hidden lg:block">{product.description || '—'}</div>
-                    <div className="px-4 py-3 flex items-center justify-center">
+                    <div className="px-4 py-4 text-sm text-surface-400 truncate hidden lg:block">{product.description || '—'}</div>
+                    <div className="px-4 py-4 flex items-center justify-center">
                       <button
                         onClick={() => { setSelectedProduct(product.id); }}
                         className="p-1.5 rounded-lg text-surface-400 hover:text-brand-400 hover:bg-brand-500/10 transition-colors"
@@ -245,7 +245,7 @@ export default function MyOrdersPage() {
                         <Eye className="w-4 h-4" />
                       </button>
                     </div>
-                    <div className="px-4 py-3 flex items-center justify-center">
+                    <div className="pl-4 pr-10 py-4 flex items-center justify-center">
                       <select
                         value={product.status}
                         onChange={(e) => statusMutation.mutate({ id: product.id, status: e.target.value })}

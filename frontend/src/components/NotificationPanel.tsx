@@ -60,9 +60,9 @@ export default function NotificationPanel({ onClose }: Props) {
   };
 
   return (
-    <div className="absolute right-0 top-full mt-2 w-80 glass-opaque rounded-xl animate-scale-in z-50 max-h-[480px] flex flex-col">
+    <div className="absolute right-0 top-full mt-2 w-80 glass-opaque rounded-xl animate-scale-in z-50 shadow-2xl max-h-[480px] flex flex-col border border-surface-700/50">
       <div className="flex items-center justify-between p-4 border-b border-surface-700/50">
-        <h3 className="font-semibold flex items-center gap-2">
+        <h3 className="text-sm font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400 flex items-center gap-2">
           <Bell className="w-4 h-4" /> Notifications
         </h3>
         <div className="flex items-center gap-2">
@@ -99,7 +99,7 @@ export default function NotificationPanel({ onClose }: Props) {
               >
                 {/* Unread dot */}
                 <div className="flex-shrink-0 mt-1.5 w-2">
-                  {!n.is_read && <div className="w-2 h-2 rounded-full bg-brand-500" />}
+                  {!n.is_read && <div className="w-2.5 h-2.5 rounded-full bg-brand-500 shadow-[0_0_8px_theme(colors.brand.500)]" />}
                 </div>
 
                 {/* Message + hint + time */}
