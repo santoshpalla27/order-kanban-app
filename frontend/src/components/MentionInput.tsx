@@ -274,6 +274,7 @@ export function renderWithMentions(
   text: string,
   currentUserName?: string,
   onOrderClick?: (id: number) => void,
+  isOwnBubble?: boolean,
 ): React.ReactNode {
   const parts = text.split(/(@\[[^\]]+\]|@\{\d+:[^}]+\})/g);
   return parts.map((part, i) => {
@@ -282,6 +283,13 @@ export function renderWithMentions(
     if (userMatch) {
       const name = userMatch[1];
       const isSelf = currentUserName && name.toLowerCase() === currentUserName.toLowerCase();
+      if (isOwnBubble) {
+        return (
+          <span key={i} style={{ color: '#ffffff', fontWeight: 600 }}>
+            @{name}
+          </span>
+        );
+      }
       return (
         <span
           key={i}
@@ -298,6 +306,17 @@ export function renderWithMentions(
     if (orderMatch) {
       const id = Number(orderMatch[1]);
       const productId = orderMatch[2];
+      if (isOwnBubble) {
+        return (
+          <span
+            key={i}
+            onClick={() => onOrderClick?.(id)}
+            style={{ color: '#ffffff', fontWeight: 600, cursor: onOrderClick ? 'pointer' : undefined }}
+          >
+            @{productId}
+          </span>
+        );
+      }
       return (
         <span
           key={i}

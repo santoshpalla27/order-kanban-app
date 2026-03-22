@@ -1016,7 +1016,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
                         {/* Comment text */}
                         {parsed.text && (
                           <p className={`text-sm whitespace-pre-wrap ${isOwn ? 'text-white/95' : 'text-surface-200'}`}>
-                            {renderWithMentions(parsed.text, user?.name)}
+                            {renderWithMentions(parsed.text, user?.name, undefined, isOwn)}
                           </p>
                         )}
 

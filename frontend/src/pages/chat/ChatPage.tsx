@@ -267,7 +267,7 @@ export default function ChatPage() {
                       }`}
                     >
                       <p className={`text-sm whitespace-pre-wrap ${isOwn ? 'text-white/95' : 'text-surface-200'}`}>
-                        {renderWithMentions(msg.message, user?.name, (id) => navigate(`/?product=${id}`))}
+                        {renderWithMentions(msg.message, user?.name, (id) => navigate(`/?product=${id}`), isOwn)}
                         <span className={`float-right ml-3 mt-1.5 text-[9px] translate-y-0.5 ${isOwn ? 'text-white/60' : 'text-surface-500'}`}>
                           {formatTime(msg.created_at)}
                         </span>
