@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Alert, ActivityIndicator, Image, Modal, Switch,
+  TextInput, Alert, ActivityIndicator, Image, Modal, Switch, KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -122,6 +122,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={s.safe}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
 
         {/* ── Avatar + name header ─────────────────────────────────── */}
@@ -268,6 +269,7 @@ export default function ProfileScreen() {
           </View>
         </TouchableOpacity>
       </Modal>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
