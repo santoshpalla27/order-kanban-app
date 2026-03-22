@@ -183,6 +183,7 @@ export default function TeamChatScreen() {
   const inputRef     = useRef<TextInput>(null);
   const didScroll    = useRef(false);
   const keyboardOpen = useRef(false);
+  const userScrolled = useRef(false);
 
   // ── Load users for @mention ────────────────────────────────────────────────
   useEffect(() => {
@@ -230,19 +231,17 @@ export default function TeamChatScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Scroll to bottom on first load
-  useEffect(() => {
-    if (!loading && messages.length > 0 && !didScroll.current) {
-      didScroll.current = true;
-      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 120);
-    }
-  }, [loading, messages.length]);
+  // Scroll to bottom on first load — handled via onContentSizeChange on the FlatList
 
   // Scroll to bottom when keyboard opens so latest message stays visible
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => {
       keyboardOpen.current = true;
-      listRef.current?.scrollToEnd({ animated: true });
+      setTimeout(() => {
+        if (!userScrolled.current) {
+          listRef.current?.scrollToEnd({ animated: false });
+        }
+      }, 50);
     });
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
       keyboardOpen.current = false;
@@ -500,13 +499,18 @@ export default function TeamChatScreen() {
             data={processed}
             keyExtractor={(item) => String(item.msg.id)}
             contentContainerStyle={processed.length === 0 ? st.emptyContainer : st.listContent}
-            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
             onScrollToIndexFailed={() => {}}
-            onLayout={() => {
-              if (keyboardOpen.current) {
+            onContentSizeChange={() => {
+              if (!userScrolled.current) {
                 listRef.current?.scrollToEnd({ animated: false });
               }
             }}
+            onScroll={(e) => {
+              const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+              const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+              userScrolled.current = distanceFromBottom > 80;
+            }}
+            scrollEventThrottle={100}
             ListHeaderComponent={
               hasMore ? (
                 <TouchableOpacity

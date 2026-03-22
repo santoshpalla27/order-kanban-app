@@ -910,6 +910,8 @@ function CommentsTab({
   const inputRef     = useRef<TextInput>(null);
   const listRef      = useRef<FlatList<Comment>>(null);
   const keyboardOpen = useRef(false);
+  const didScroll    = useRef(false);
+  const userScrolled = useRef(false);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [mentionStart, setMentionStart] = useState(0);
   const [allUsers, setAllUsers] = useState<User[]>([]);
@@ -1004,7 +1006,11 @@ function CommentsTab({
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => {
       keyboardOpen.current = true;
-      listRef.current?.scrollToEnd({ animated: true });
+      setTimeout(() => {
+        if (!userScrolled.current) {
+          listRef.current?.scrollToEnd({ animated: false });
+        }
+      }, 50);
     });
     const hideSub = Keyboard.addListener('keyboardDidHide', () => {
       keyboardOpen.current = false;
@@ -1066,11 +1072,17 @@ function CommentsTab({
         keyExtractor={(c) => String(c.id)}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
-        onLayout={() => {
-          if (keyboardOpen.current) {
+        onContentSizeChange={() => {
+          if (!userScrolled.current) {
             listRef.current?.scrollToEnd({ animated: false });
           }
         }}
+        onScroll={(e) => {
+          const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+          const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
+          userScrolled.current = distanceFromBottom > 80;
+        }}
+        scrollEventThrottle={100}
         ListEmptyComponent={
           <View style={styles.center}>
             <Text style={{ fontSize: 32 }}>💬</Text>
