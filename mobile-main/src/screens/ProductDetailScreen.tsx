@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Alert, Modal, SafeAreaView, FlatList,
-  KeyboardAvoidingView, Platform, Linking, Image, useWindowDimensions,
+  ActivityIndicator, Alert, Modal, FlatList,
+  KeyboardAvoidingView, Linking, Image, useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -1045,11 +1046,7 @@ function CommentsTab({
   }
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
-      keyboardVerticalOffset={120}
-    >
+    <View style={{ flex: 1 }}>
       <FlatList
         data={comments}
         keyExtractor={(c) => String(c.id)}
@@ -1371,7 +1368,7 @@ function CommentsTab({
           }}
         />
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -1673,6 +1670,7 @@ export default function ProductDetailScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -1754,6 +1752,7 @@ export default function ProductDetailScreen() {
         onSelect={handleStatusChange}
         onClose={() => setShowStatus(false)}
       />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

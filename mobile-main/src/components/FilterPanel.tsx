@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Modal, SafeAreaView, Platform,
+  StyleSheet, Modal, Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ProductFilters } from '../store/boardStore';
 import { STATUS_LABELS, STATUS_ORDER } from '../types';
