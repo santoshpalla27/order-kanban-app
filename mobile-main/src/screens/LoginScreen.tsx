@@ -49,7 +49,7 @@ export default function LoginScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
 

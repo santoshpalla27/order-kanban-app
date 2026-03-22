@@ -4,7 +4,7 @@ import React, {
 import {
   View, Text, FlatList, TextInput, TouchableOpacity,
   StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView,
-  ActivityIndicator, ScrollView,
+  ActivityIndicator, ScrollView, Keyboard,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -235,6 +235,14 @@ export default function TeamChatScreen() {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 120);
     }
   }, [loading, messages.length]);
+
+  // Scroll to bottom when keyboard opens so latest message stays visible
+  useEffect(() => {
+    const sub = Keyboard.addListener('keyboardDidShow', () => {
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+    return () => sub.remove();
+  }, []);
 
   // ── Load older ─────────────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
@@ -472,7 +480,7 @@ export default function TeamChatScreen() {
 
       <KeyboardAvoidingView
         style={st.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior="padding"
       >
         {/* ── Messages ── */}
         {loading ? (

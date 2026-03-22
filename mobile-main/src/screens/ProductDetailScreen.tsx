@@ -431,7 +431,7 @@ function AttachmentCommentModal({
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         {/* Dim area above the sheet — tapping it closes the modal */}
         <TouchableOpacity style={styles.dimArea} activeOpacity={1} onPress={onClose} />
 
@@ -1047,7 +1047,7 @@ function CommentsTab({
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       keyboardVerticalOffset={120}
     >
       <FlatList
