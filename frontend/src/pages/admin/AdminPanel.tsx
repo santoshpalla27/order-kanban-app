@@ -4,7 +4,7 @@ import { usersApi } from '../../api/client';
 import { formatDate } from '../../utils/date';
 import { User } from '../../types';
 import { useAuthStore } from '../../store/authStore';
-import { Users, UserPlus, Trash2, Shield, X, AlertTriangle } from 'lucide-react';
+import { Users, UserPlus, Trash2, Shield, X, AlertTriangle, Check } from 'lucide-react';
 
 const ROLES = [
   { id: 1, name: 'admin', label: 'Admin', color: 'text-red-400 bg-red-500/10' },
@@ -57,6 +57,7 @@ function ConfirmDeleteModal({ userName, onConfirm, onCancel, isPending }: {
 
 export default function AdminPanel() {
   const [showCreate, setShowCreate] = useState(false);
+  const [showCapabilities, setShowCapabilities] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const queryClient = useQueryClient();
   const currentUser = useAuthStore((s) => s.user);
@@ -92,9 +93,14 @@ export default function AdminPanel() {
             <p className="text-sm text-surface-500">Manage users and roles</p>
           </div>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
-          <UserPlus className="w-4 h-4" /> Add User
-        </button>
+        <div className="flex gap-3">
+          <button onClick={() => setShowCapabilities(true)} className="btn-secondary flex items-center gap-2">
+            <Shield className="w-4 h-4" /> User Capabilities
+          </button>
+          <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
+            <UserPlus className="w-4 h-4" /> Add User
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -162,6 +168,7 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {showCapabilities && <UserCapabilitiesModal onClose={() => setShowCapabilities(false)} />}
       {showCreate && <CreateUserModal onClose={() => setShowCreate(false)} />}
 
       {deleteTarget && (
@@ -241,6 +248,79 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+export function UserCapabilitiesModal({ onClose }: { onClose: () => void }) {
+  const CAPABILITIES = [
+    { name: 'Manage Users & Roles (Add/Delete/Change Role)', roles: [1] },
+    { name: 'Delete Orders Permanently', roles: [1, 2] },
+    { name: 'View Admin Analytics Dashboard', roles: [1, 2] },
+    { name: 'Manage System Products & Configurations', roles: [1, 2, 3] },
+    { name: 'Create New Orders & Edit Order Details', roles: [1, 2, 3, 4] },
+    { name: 'Update Order Status (Move Kanban Cards)', roles: [1, 2, 3, 4] },
+    { name: 'Participate in Team Chat Channels', roles: [1, 2, 3, 4, 5] },
+    { name: 'View All Live Orders & Kanban Board', roles: [1, 2, 3, 4, 5] },
+  ];
+
+  /* 1 = admin, 2 = manager, 3 = organiser, 4 = employee, 5 = view_only */
+  const ROLES = [
+    { id: 1, name: 'admin', label: 'Admin', color: 'text-red-400 bg-red-500/10' },
+    { id: 2, name: 'manager', label: 'Manager', color: 'text-amber-400 bg-amber-500/10' },
+    { id: 3, name: 'organiser', label: 'Organiser', color: 'text-violet-400 bg-violet-500/10' },
+    { id: 4, name: 'employee', label: 'Employee', color: 'text-blue-400 bg-blue-500/10' },
+    { id: 5, name: 'view_only', label: 'View Only', color: 'text-surface-400 bg-surface-500/10' },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="w-full max-w-4xl glass rounded-2xl animate-scale-in flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-surface-700/50">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-brand-400"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path></svg>
+            User Capabilities
+          </h2>
+          <button onClick={onClose} className="btn-ghost p-2 rounded-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
+        
+        <div className="overflow-auto p-5">
+          <table className="w-full text-sm text-left border-collapse">
+            <thead className="bg-surface-800/50 text-surface-300">
+              <tr>
+                <th className="px-4 py-3 font-semibold rounded-tl-lg border-b border-surface-700/50 text-surface-100">Capability</th>
+                {ROLES.map(r => <th key={r.id} className="px-4 py-3 font-semibold text-center border-b border-surface-700/50">{r.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {CAPABILITIES.map((cap, i) => (
+                <tr key={i} className="border-b border-surface-700/30 hover:bg-surface-700/20 transition-colors">
+                  <td className="px-4 py-4 font-medium text-surface-200">{cap.name}</td>
+                  {ROLES.map(r => (
+                    <td key={r.id} className="px-4 py-4 text-center border-l border-surface-700/20">
+                      {cap.roles.includes(r.id) ? (
+                        <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                      ) : (
+                        <div className="w-6 h-6 flex items-center justify-center mx-auto text-surface-600 opacity-50">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </div>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        
+        <div className="p-5 border-t border-surface-700/50 flex justify-end">
+          <button onClick={onClose} className="btn-secondary">Close</button>
+        </div>
       </div>
     </div>
   );
