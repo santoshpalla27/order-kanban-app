@@ -72,6 +72,8 @@ export interface Notification {
   type: string;
   entity_type: string;
   entity_id: number;
+  content?: string;
+  sender_name?: string;
   is_read: boolean;
   created_at: string;
 }

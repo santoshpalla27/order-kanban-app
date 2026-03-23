@@ -5,8 +5,31 @@ import { formatDate, formatDateTime } from '../../utils/date';
 import { Notification } from '../../types';
 import { useThemeStore } from '../../store/themeStore';
 import {
-  Bell, Check, CheckCheck, Search, Filter, X, ChevronDown, RefreshCw,
+  Bell, CheckCheck, Search, Filter, X, ChevronDown, RefreshCw, Eye,
 } from 'lucide-react';
+
+const NOTIF_META: Record<string, { color: string; label: string }> = {
+  comment_added:       { color: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',       label: 'Comment'    },
+  mention:             { color: 'text-purple-400 bg-purple-400/10 border-purple-400/20', label: 'Mention'    },
+  attachment_uploaded: { color: 'text-orange-400 bg-orange-400/10 border-orange-400/20', label: 'Attachment' },
+  status_change:       { color: 'text-amber-400 bg-amber-400/10 border-amber-400/20',    label: 'Status'     },
+  chat_message:        { color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', label: 'Chat'   },
+};
+
+function getTypeMeta(type: string) {
+  return NOTIF_META[type] || { color: 'text-brand-400 bg-brand-400/10 border-brand-400/20', label: type.replace(/_/g, ' ') };
+}
+
+function getAvatarGradient(name: string) {
+  const colors = [
+    'from-pink-500 to-rose-500', 'from-orange-400 to-amber-500',
+    'from-emerald-500 to-teal-500', 'from-cyan-500 to-blue-500',
+    'from-violet-500 to-purple-500', 'from-fuchsia-500 to-pink-500',
+  ];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return colors[Math.abs(h) % colors.length];
+}
 
 function formatRelative(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -256,70 +279,79 @@ export default function NotificationsPage() {
         ) : (
           <>
             <div className="divide-y divide-surface-700/20">
-              {filtered.map(n => (
-                <div
-                  key={n.id}
-                  className={`flex items-start gap-4 px-5 py-4 transition-all duration-300 ${
-                    !n.is_read
-                      ? isDark ? 'bg-brand-600/5 hover:bg-brand-600/10' : 'bg-brand-50 hover:bg-brand-100/50'
-                      : isDark ? 'hover:bg-surface-800/50' : 'hover:bg-surface-50'
-                  }`}
-                >
-                  {/* Unread dot */}
-                  <div className="mt-1.5 flex-shrink-0">
-                    {!n.is_read ? (
-                      <div className="w-2.5 h-2.5 rounded-full bg-brand-500 shadow-[0_0_8px_theme(colors.brand.500)]" />
-                    ) : (
-                      <div className="w-2.5 h-2.5" />
-                    )}
-                  </div>
+              {filtered.map(n => {
+                const meta = getTypeMeta(n.type);
+                const senderName = n.sender_name || '';
+                const initial = senderName ? senderName.charAt(0).toUpperCase() : '?';
+                return (
+                  <div
+                    key={n.id}
+                    className={`flex items-start gap-4 px-5 py-4 transition-all duration-300 ${
+                      !n.is_read
+                        ? isDark ? 'bg-brand-600/5 hover:bg-brand-600/10' : 'bg-brand-50 hover:bg-brand-100/50'
+                        : isDark ? 'hover:bg-surface-800/50' : 'hover:bg-surface-50'
+                    }`}
+                  >
+                    {/* Avatar */}
+                    <div
+                      className={`w-9 h-9 rounded-full bg-gradient-to-br ${getAvatarGradient(senderName || n.type)} flex items-center justify-center text-sm font-bold text-white flex-shrink-0 mt-0.5`}
+                    >
+                      {initial}
+                    </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm leading-relaxed ${
-                      isDark
-                        ? n.is_read ? 'text-surface-400' : 'text-white'
-                        : n.is_read ? 'text-surface-500' : 'text-black font-medium'
-                    }`}>
-                      {n.message}
-                    </p>
-                    <div className="flex items-center gap-3 mt-1.5">
-                      {n.type && (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-md capitalize ${
-                          isDark ? 'bg-surface-800 text-surface-500' : 'bg-surface-100 text-surface-400'
-                        }`}>
-                          {n.type}
-                        </span>
-                      )}
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {senderName && (
+                          <span className={`text-sm font-semibold ${isDark ? 'text-surface-200' : 'text-surface-800'}`}>
+                            {senderName}
+                          </span>
+                        )}
+                        {n.type && (
+                          <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-md border ${meta.color}`}>
+                            {meta.label}
+                          </span>
+                        )}
+                        {!n.is_read && (
+                          <span className="w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_6px_theme(colors.brand.500)] flex-shrink-0" />
+                        )}
+                      </div>
+                      <p className={`text-sm mt-1 ${
+                        isDark
+                          ? n.is_read ? 'text-surface-400' : 'text-surface-200'
+                          : n.is_read ? 'text-surface-500' : 'text-surface-700'
+                      }`}>
+                        {n.message}
+                      </p>
+                    </div>
+
+                    {/* Right: time + eye */}
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                       <span
                         className={`text-xs ${isDark ? 'text-surface-500' : 'text-surface-400'}`}
                         title={formatFull(n.created_at)}
                       >
                         {formatRelative(n.created_at)}
                       </span>
-                      <span className={`text-xs ${isDark ? 'text-surface-600' : 'text-surface-300'}`}>
+                      <span className={`text-[10px] ${isDark ? 'text-surface-600' : 'text-surface-300'}`}>
                         {formatFull(n.created_at)}
                       </span>
+                      {!n.is_read && (
+                        <button
+                          onClick={() => markRead.mutate(n.id)}
+                          disabled={markRead.isPending}
+                          title="Mark as read"
+                          className={`p-1 rounded-md transition-colors disabled:opacity-50 ${
+                            isDark ? 'text-surface-500 hover:text-brand-400' : 'text-surface-400 hover:text-brand-600'
+                          }`}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
-
-                  {/* Mark read button */}
-                  {!n.is_read && (
-                    <button
-                      onClick={() => markRead.mutate(n.id)}
-                      disabled={markRead.isPending}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs border transition-colors flex-shrink-0 ${
-                        isDark
-                          ? 'border-surface-700 hover:border-brand-500 hover:text-brand-400 text-surface-400'
-                          : 'border-surface-300 hover:border-brand-400 hover:text-brand-600 text-surface-500'
-                      } disabled:opacity-50`}
-                      title="Mark as read"
-                    >
-                      <Check className="w-3 h-3" /> Mark read
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Load more */}
