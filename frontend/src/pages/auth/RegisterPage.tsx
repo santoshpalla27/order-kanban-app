@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../../api/client';
 import { useAuthStore } from '../../store/authStore';
-import { UserPlus, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -45,11 +45,25 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-surface-950 px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 mb-4">
-            <UserPlus className="w-8 h-8 text-white" />
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <svg viewBox="0 0 100 100" className="w-12 h-12 drop-shadow-sm" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="50" fill="#F0914A" />
+              <g stroke="#1e1b4b" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M 16 28 H 25 L 34 62 H 70 L 78 38 H 28" />
+                <circle cx="40" cy="75" r="5" fill="none" />
+                <circle cx="64" cy="75" r="5" fill="none" />
+                <path d="M 38 32 H 68 V 39 H 38 Z" fill="#F0914A" />
+                <path d="M 42 39 V 56 H 64 V 39" fill="#F0914A" />
+                <path d="M 53 32 V 56" />
+                <path d="M 53 32 C 45 18 36 24 44 32" fill="#F0914A" />
+                <path d="M 53 32 C 61 18 70 24 62 32" fill="#F0914A" />
+              </g>
+            </svg>
+            <span className="font-extrabold text-[32px] tracking-tighter leading-none text-white" style={{ fontFamily: "'Outfit', sans-serif" }}>
+              <span className="text-[#F0914A]">Gift</span> Highway
+            </span>
           </div>
-          <h1 className="text-3xl font-bold text-white">Create Account</h1>
-          <p className="text-surface-400 mt-2">Join your team workspace</p>
+          <p className="text-surface-400 text-sm">Create your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="glass rounded-2xl p-8 space-y-5">
