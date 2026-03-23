@@ -261,6 +261,11 @@ async function startListener() {
             break;
           }
 
+          case 'status_change': {
+            // Handled by broadcast_except (activity_updated) — skip to avoid duplicate push
+            return;
+          }
+
           default: {
             title = sender ? `📦 ${sender}` : '📦 KanbanFlow';
             body  = trunc(message || 'You have a new notification');
