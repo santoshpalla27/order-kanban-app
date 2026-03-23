@@ -30,11 +30,11 @@ function dayStart(offsetDays: number): Date {
 }
 
 function presetToRange(preset: DeliveryPreset): { from: string; to: string } {
-  if (preset === 'overdue')  return { from: '',                          to: dayStart(0).toISOString() };
-  if (preset === 'today')    return { from: dayStart(0).toISOString(),   to: dayStart(1).toISOString() };
-  if (preset === 'tomorrow') return { from: dayStart(1).toISOString(),   to: dayStart(2).toISOString() };
-  if (preset === '3days')    return { from: dayStart(0).toISOString(),   to: dayStart(4).toISOString() };
-  if (preset === '6days')    return { from: dayStart(0).toISOString(),   to: dayStart(7).toISOString() };
+  if (preset === 'overdue')  return { from: '', to: dayStart(0).toISOString() };  // before today
+  if (preset === 'today')    return { from: '', to: dayStart(1).toISOString() };  // overdue + today
+  if (preset === 'tomorrow') return { from: '', to: dayStart(2).toISOString() };  // overdue + today + tomorrow
+  if (preset === '3days')    return { from: '', to: dayStart(4).toISOString() };  // overdue + next 3 days
+  if (preset === '6days')    return { from: '', to: dayStart(7).toISOString() };  // overdue + next 6 days
   return { from: '', to: '' };
 }
 

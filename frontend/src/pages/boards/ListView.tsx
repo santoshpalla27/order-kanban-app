@@ -17,7 +17,7 @@ type TabKey = string; // ProductStatus | 'all'
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: '',             label: 'All'          },
   { key: 'yet_to_start', label: 'Yet to Start' },
-  { key: 'working',      label: 'In Progress'  },
+  { key: 'working',      label: 'Working'      },
   { key: 'review',       label: 'In Review'    },
   { key: 'done',         label: 'Done'         },
 ];

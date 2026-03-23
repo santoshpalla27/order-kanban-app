@@ -50,7 +50,7 @@ interface StatsData {
 
 const STATUS_LABELS: Record<string, string> = {
   yet_to_start: 'Yet to Start',
-  working: 'In Progress',
+  working: 'Working',
   review: 'In Review',
   done: 'Done',
 };
@@ -307,7 +307,7 @@ export default function StatsPage() {
             <span>Member</span>
             <span className="text-center">Assigned</span>
             <span className="text-center text-surface-400">Not Started</span>
-            <span className="text-center text-blue-500">In Progress</span>
+            <span className="text-center text-blue-500">Working</span>
             <span className="text-center text-amber-500">In Review</span>
             <span className="text-center text-emerald-500">Done</span>
             <span className="text-center">Completion</span>

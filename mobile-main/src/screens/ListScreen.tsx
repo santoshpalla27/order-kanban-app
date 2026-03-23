@@ -25,7 +25,7 @@ const PAGE_SIZE = 50;
 const TABS: Array<{ key: string; label: string }> = [
   { key: '',             label: 'All'          },
   { key: 'yet_to_start', label: 'Yet to Start' },
-  { key: 'working',      label: 'In Progress'  },
+  { key: 'working',      label: 'Working'      },
   { key: 'review',       label: 'In Review'    },
   { key: 'done',         label: 'Done'         },
 ];
