@@ -8,11 +8,13 @@ interface AuthState {
   refreshToken: string | null;
   user: User | null;
   hydrated: boolean;
+  logoutReason: string | null;
 
   setAuth: (token: string, refreshToken: string, user: User) => Promise<void>;
   setToken: (token: string, refreshToken: string) => Promise<void>;
   updateUser: (user: User) => void;
-  logout: () => Promise<void>;
+  logout: (reason?: string) => Promise<void>;
+  clearLogoutReason: () => void;
   hydrate: () => Promise<void>;
 
   // Role helpers
@@ -40,6 +42,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   refreshToken: null,
   user: null,
   hydrated: false,
+  logoutReason: null,
 
   hydrate: async () => {
     const [token, refreshToken, userJson] = await Promise.all([
@@ -60,7 +63,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       tokenManager.setTokens(token, refreshToken),
       AsyncStorage.setItem(USER_KEY, JSON.stringify(user)),
     ]);
-    set({ token, refreshToken, user });
+    set({ token, refreshToken, user, logoutReason: null });
   },
 
   setToken: async (token, refreshToken) => {
@@ -73,13 +76,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ user });
   },
 
-  logout: async () => {
+  logout: async (reason?: string) => {
     await Promise.all([
       tokenManager.clearTokens(),
       AsyncStorage.removeItem(USER_KEY),
     ]);
-    set({ token: null, refreshToken: null, user: null });
+    set({ token: null, refreshToken: null, user: null, logoutReason: reason ?? null });
   },
+
+  clearLogoutReason: () => set({ logoutReason: null }),
 
   // Roles
   isAdmin:     () => get().user?.role?.name === 'admin',

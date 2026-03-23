@@ -22,7 +22,7 @@ let refreshPromise: Promise<string> | null = null;
 async function doTokenRefresh(): Promise<string> {
   const { refreshToken, setToken, logout } = useAuthStore.getState();
   if (!refreshToken) {
-    logout();
+    logout('Your session has expired. Please sign in again.');
     window.location.href = '/login';
     throw new Error('No refresh token');
   }
@@ -32,7 +32,7 @@ async function doTokenRefresh(): Promise<string> {
     setToken(access_token, newRefresh);
     return access_token;
   } catch {
-    logout();
+    logout('Your session has expired. Please sign in again.');
     window.location.href = '/login';
     throw new Error('Token refresh failed');
   }

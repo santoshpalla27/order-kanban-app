@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, Alert, ScrollView,
+  KeyboardAvoidingView, ActivityIndicator, Alert, ScrollView,
 } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../api/services';
@@ -13,23 +13,33 @@ export default function LoginScreen() {
   const c = isDark ? darkColors : lightColors;
   const styles = useMemo(() => makeStyles(c), [c]);
 
-  const [mode, setMode]         = useState<'login' | 'register'>('login');
-  const [name, setName]         = useState('');
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading]   = useState(false);
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const [mode, setMode]                   = useState<'login' | 'register'>('login');
+  const [name, setName]                   = useState('');
+  const [email, setEmail]                 = useState('');
+  const [password, setPassword]           = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading]             = useState(false);
+  const setAuth          = useAuthStore((s) => s.setAuth);
+  const logoutReason     = useAuthStore((s) => s.logoutReason);
+  const clearLogoutReason = useAuthStore((s) => s.clearLogoutReason);
 
   const handleSubmit = async () => {
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Email and password are required');
       return;
     }
-    if (mode === 'register' && !name.trim()) {
-      Alert.alert('Error', 'Name is required');
-      return;
+    if (mode === 'register') {
+      if (!name.trim()) {
+        Alert.alert('Error', 'Name is required');
+        return;
+      }
+      if (password !== confirmPassword) {
+        Alert.alert('Error', 'Passwords do not match');
+        return;
+      }
     }
 
+    clearLogoutReason();
     setLoading(true);
     try {
       const res = mode === 'login'
@@ -39,7 +49,14 @@ export default function LoginScreen() {
       const { access_token, refresh_token, user } = res.data;
       await setAuth(access_token, refresh_token, user);
     } catch (err: any) {
-      const msg = err?.response?.data?.error || err?.response?.data?.message || 'Something went wrong';
+      let msg: string;
+      if (!err.response) {
+        msg = err.code === 'ECONNABORTED'
+          ? 'Request timed out. Please try again.'
+          : 'Unable to connect. Check your internet connection and try again.';
+      } else {
+        msg = err.response.data?.error || err.response.data?.message || 'Something went wrong. Please try again.';
+      }
       Alert.alert('Error', msg);
     } finally {
       setLoading(false);
@@ -67,6 +84,12 @@ export default function LoginScreen() {
           <Text style={styles.heading}>
             {mode === 'login' ? 'Sign in to your account' : 'Create an account'}
           </Text>
+
+          {logoutReason && (
+            <View style={styles.sessionBanner}>
+              <Text style={styles.sessionBannerText}>🔒 {logoutReason}</Text>
+            </View>
+          )}
 
           {mode === 'register' && (
             <View style={styles.field}>
@@ -108,6 +131,26 @@ export default function LoginScreen() {
             />
           </View>
 
+          {mode === 'register' && (
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Confirm Password</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  confirmPassword.length > 0 && password !== confirmPassword && styles.inputError,
+                ]}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                placeholder="••••••••"
+                placeholderTextColor={c.textMuted}
+                secureTextEntry
+              />
+              {confirmPassword.length > 0 && password !== confirmPassword && (
+                <Text style={styles.fieldError}>Passwords do not match</Text>
+              )}
+            </View>
+          )}
+
           <TouchableOpacity
             style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
             onPress={handleSubmit}
@@ -121,7 +164,7 @@ export default function LoginScreen() {
 
           <TouchableOpacity
             style={styles.switchMode}
-            onPress={() => setMode(mode === 'login' ? 'register' : 'login')}
+            onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setConfirmPassword(''); clearLogoutReason(); }}
           >
             <Text style={styles.switchText}>
               {mode === 'login'
@@ -184,5 +227,16 @@ function makeStyles(c: ThemeColors) {
     submitText: { color: '#fff', fontSize: 16, fontWeight: '700' },
     switchMode: { alignItems: 'center', paddingVertical: 4 },
     switchText: { fontSize: 13, color: c.brandLight },
+    sessionBanner: {
+      backgroundColor: '#F59E0B22',
+      borderWidth: 1,
+      borderColor: '#F59E0B66',
+      borderRadius: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+    },
+    sessionBannerText: { fontSize: 13, color: '#F59E0B', fontWeight: '500' },
+    inputError: { borderColor: '#EF4444' },
+    fieldError: { fontSize: 12, color: '#EF4444', marginTop: 2 },
   });
 }

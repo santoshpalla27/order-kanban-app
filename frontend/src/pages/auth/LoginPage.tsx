@@ -11,18 +11,27 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const setAuth = useAuthStore((s) => s.setAuth);
+  const setAuth           = useAuthStore((s) => s.setAuth);
+  const logoutReason      = useAuthStore((s) => s.logoutReason);
+  const clearLogoutReason = useAuthStore((s) => s.clearLogoutReason);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    clearLogoutReason();
     setLoading(true);
     try {
       const res = await authApi.login(email, password);
       setAuth(res.data.access_token ?? res.data.token, res.data.refresh_token, res.data.user);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed');
+      if (!err.response) {
+        setError(err.code === 'ECONNABORTED'
+          ? 'Request timed out. Please try again.'
+          : 'Unable to connect. Check your internet connection and try again.');
+      } else {
+        setError(err.response.data?.error || err.response.data?.message || 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -40,6 +49,13 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="glass rounded-2xl p-8 space-y-5">
+          {logoutReason && (
+            <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 px-4 py-3 rounded-lg text-sm animate-fade-in flex items-center gap-2">
+              <span>🔒</span>
+              <span>{logoutReason}</span>
+            </div>
+          )}
+
           {error && (
             <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm animate-fade-in">
               {error}

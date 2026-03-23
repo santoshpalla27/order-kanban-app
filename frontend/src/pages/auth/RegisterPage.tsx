@@ -8,7 +8,9 @@ export default function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -16,6 +18,10 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
@@ -23,7 +29,13 @@ export default function RegisterPage() {
       setAuth(res.data.access_token ?? res.data.token, res.data.refresh_token, res.data.user);
       navigate('/');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed');
+      if (!err.response) {
+        setError(err.code === 'ECONNABORTED'
+          ? 'Request timed out. Please try again.'
+          : 'Unable to connect. Check your internet connection and try again.');
+      } else {
+        setError(err.response.data?.error || err.response.data?.message || 'Registration failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -91,6 +103,30 @@ export default function RegisterPage() {
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-surface-300 mb-1.5">Confirm Password</label>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                className={`w-full !pr-10 ${confirmPassword && password !== confirmPassword ? 'border-red-500/60 focus:border-red-500' : ''}`}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 hover:text-surface-200"
+              >
+                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {confirmPassword && password !== confirmPassword && (
+              <p className="text-red-400 text-xs mt-1">Passwords do not match</p>
+            )}
           </div>
 
           <button type="submit" disabled={loading} className="btn-primary w-full py-2.5">

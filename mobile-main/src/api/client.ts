@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { API_BASE_URL } from '../utils/config';
 import { tokenManager } from '../utils/tokenManager';
+import { useAuthStore } from '../store/authStore';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -46,7 +47,7 @@ api.interceptors.response.use(
         original.headers.Authorization = `Bearer ${newToken}`;
         return api(original);
       } catch {
-        await tokenManager.clearTokens();
+        await useAuthStore.getState().logout('Your session has expired. Please sign in again.');
         return Promise.reject(error);
       }
     }

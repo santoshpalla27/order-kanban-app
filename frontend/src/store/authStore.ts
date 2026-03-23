@@ -6,10 +6,12 @@ interface AuthState {
   token: string | null;
   refreshToken: string | null;
   user: User | null;
+  logoutReason: string | null;
   setAuth: (token: string, refreshToken: string, user: User) => void;
   setToken: (token: string, refreshToken: string) => void;
   updateUser: (user: User) => void;
-  logout: () => void;
+  logout: (reason?: string) => void;
+  clearLogoutReason: () => void;
   isAdmin: () => boolean;
   isManager: () => boolean;
   isOrganiser: () => boolean;
@@ -31,10 +33,12 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       user: null,
-      setAuth: (token, refreshToken, user) => set({ token, refreshToken, user }),
+      logoutReason: null,
+      setAuth: (token, refreshToken, user) => set({ token, refreshToken, user, logoutReason: null }),
       setToken: (token, refreshToken) => set({ token, refreshToken }),
       updateUser: (user) => set({ user }),
-      logout: () => set({ token: null, refreshToken: null, user: null }),
+      logout: (reason?: string) => set({ token: null, refreshToken: null, user: null, logoutReason: reason ?? null }),
+      clearLogoutReason: () => set({ logoutReason: null }),
       isAdmin: () => get().user?.role?.name === 'admin',
       isManager: () => get().user?.role?.name === 'manager',
       isOrganiser: () => get().user?.role?.name === 'organiser',
