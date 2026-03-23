@@ -1077,6 +1077,11 @@ function CommentsTab({
             listRef.current?.scrollToEnd({ animated: false });
           }
         }}
+        onLayout={() => {
+          if (keyboardOpen.current && !userScrolled.current) {
+            listRef.current?.scrollToEnd({ animated: false });
+          }
+        }}
         onScroll={(e) => {
           const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
           const distanceFromBottom = contentSize.height - layoutMeasurement.height - contentOffset.y;
