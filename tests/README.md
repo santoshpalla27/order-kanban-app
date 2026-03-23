@@ -327,3 +327,57 @@ ADMIN_EMAIL=admin@prod.com ADMIN_PASSWORD=secret ./auth-security.sh https://myap
 # Run a heavy load test WITHOUT API and Security tests to save time
 
 ./run-all.sh --load load --peak-vus 100 --api false --security false
+
+---
+
+e2e
+
+cd tests/e2e
+npm install
+npx playwright install chromium
+
+cd tests/e2e
+E2E_BASE_URL=https://app.santoshdevops.cloud \
+E2E_API_URL=https://app.santoshdevops.cloud/api \
+ADMIN_EMAIL=admin@gmail.com \
+ADMIN_PASSWORD=admin123 \
+npx playwright test
+
+npx playwright test specs/chat.spec.ts
+npx playwright test specs/stats.spec.ts
+npx playwright test specs/myorders.spec.ts
+npx playwright test specs/register.spec.ts
+npx playwright test specs/activity.spec.ts
+npx playwright test specs/trash.spec.ts
+npx playwright test specs/navigation.spec.ts
+npx playwright test specs/profile.spec.ts
+npx playwright test specs/notificationspage.spec.ts
+
+npx playwright test --reporter=html
+npx playwright show-report
+
+# Run ALL 21 spec files
+
+cd tests/e2e
+E2E_BASE_URL=https://app.santoshdevops.cloud \
+E2E_API_URL=https://app.santoshdevops.cloud/api \
+ADMIN_EMAIL=admin@gmail.com \
+ADMIN_PASSWORD=admin123 \
+npx playwright test
+
+# Or run ONLY the 13 new spec files
+
+npx playwright test \
+ specs/chat.spec.ts \
+ specs/stats.spec.ts \
+ specs/myorders.spec.ts \
+ specs/register.spec.ts \
+ specs/activity.spec.ts \
+ specs/trash.spec.ts \
+ specs/navigation.spec.ts \
+ specs/profile.spec.ts \
+ specs/notificationspage.spec.ts \
+ specs/productdetail.spec.ts \
+ specs/createproduct.spec.ts \
+ specs/kanbanboard.spec.ts \
+ specs/attachments.spec.ts
