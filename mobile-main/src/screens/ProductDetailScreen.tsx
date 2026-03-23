@@ -1011,6 +1011,14 @@ function CommentsTab({
   useEffect(() => { load(); }, [load]);
   useWsEvents({ onCommentsChanged: load });
 
+  // Scroll to bottom on first load
+  useEffect(() => {
+    if (!loading && comments.length > 0 && !didScroll.current) {
+      didScroll.current = true;
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 150);
+    }
+  }, [loading, comments.length]);
+
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', () => {
       keyboardOpen.current = true;
@@ -1080,11 +1088,6 @@ function CommentsTab({
         keyExtractor={(c) => String(c.id)}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
-        onContentSizeChange={() => {
-          if (!userScrolled.current) {
-            listRef.current?.scrollToEnd({ animated: false });
-          }
-        }}
         onLayout={() => {
           if (keyboardOpen.current && !userScrolled.current) {
             listRef.current?.scrollToEnd({ animated: false });

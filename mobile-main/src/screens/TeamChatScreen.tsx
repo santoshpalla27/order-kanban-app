@@ -22,7 +22,8 @@ import { darkColors, lightColors, ThemeColors } from '../theme';
 interface ChatMessage {
   id: number;
   user_id: number;
-  user_name: string;
+  user_name?: string;
+  user?: { id: number; name: string };
   message: string;
   created_at: string;
 }
@@ -238,7 +239,13 @@ export default function TeamChatScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Scroll to bottom on first load — handled via onContentSizeChange on the FlatList
+  // Scroll to bottom on first load
+  useEffect(() => {
+    if (!loading && messages.length > 0 && !didScroll.current) {
+      didScroll.current = true;
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 150);
+    }
+  }, [loading, messages.length]);
 
   // Scroll to bottom when keyboard opens so latest message stays visible
   useEffect(() => {
@@ -406,7 +413,7 @@ export default function TeamChatScreen() {
   // ── Render message ─────────────────────────────────────────────────────────
   const renderItem = useCallback(({ item }: { item: Processed }) => {
     const { msg, isOwn, isFirst, isLast, showDate, dateLabel } = item;
-    const name  = msg.user_name || 'Unknown';
+    const name  = msg.user_name || msg.user?.name || 'Unknown';
     const color = getAvatarColor(name);
 
     return (
@@ -507,11 +514,6 @@ export default function TeamChatScreen() {
             keyExtractor={(item) => String(item.msg.id)}
             contentContainerStyle={processed.length === 0 ? st.emptyContainer : st.listContent}
             onScrollToIndexFailed={() => {}}
-            onContentSizeChange={() => {
-              if (!userScrolled.current) {
-                listRef.current?.scrollToEnd({ animated: false });
-              }
-            }}
             onLayout={() => {
               if (keyboardOpen.current && !userScrolled.current) {
                 listRef.current?.scrollToEnd({ animated: false });
