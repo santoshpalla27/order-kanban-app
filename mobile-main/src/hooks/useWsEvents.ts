@@ -73,7 +73,9 @@ export function useWsEvents(callbacks?: WsCallbacks) {
           const entityType = data.payload?.entity_type || '';
           // Suppress chat notification toasts when the user is already on the chat screen
           const isChatNotif = entityType === 'chat';
-          if (!isChatNotif || !useNotificationStore.getState().chatScreenActive) {
+          const isStatusChange = (data.payload?.notif_type || '') === 'status_change';
+          // Suppress toast for status_change — bell badge already increments via refreshUnreadCount
+          if (!isStatusChange && (!isChatNotif || !useNotificationStore.getState().chatScreenActive)) {
             addToast({
               message: data.payload?.message || 'New notification',
               content: data.payload?.content || '',

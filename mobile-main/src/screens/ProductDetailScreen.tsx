@@ -13,7 +13,7 @@ import {
 } from '../api/services';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
-import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES } from '../hooks/useProductBadges';
+import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES } from '../hooks/useProductBadges';
 import { useNotificationStore } from '../store/notificationStore';
 import {
   Product, Attachment, Comment, User,
@@ -1674,6 +1674,14 @@ export default function ProductDetailScreen() {
       notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES)
         .then(() => { refreshBadges(); refreshUnreadCount(); })
         .catch(() => {});
+    } else if (activeTab === 'details' && has(productId, 'status_change')) {
+      // Delay so user can see the badge before it clears
+      const t = setTimeout(() => {
+        notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES)
+          .then(() => { refreshBadges(); refreshUnreadCount(); })
+          .catch(() => {});
+      }, 2000);
+      return () => clearTimeout(t);
     }
   }, [activeTab, productId]);
 
@@ -1720,7 +1728,7 @@ export default function ProductDetailScreen() {
   if (!product) return null;
 
   const TABS: Array<{ id: TabId; label: string; badge: boolean }> = [
-    { id: 'details',     label: 'Details',     badge: false },
+    { id: 'details',     label: 'Details',     badge: has(productId, 'status_change') },
     { id: 'attachments', label: 'Attachments', badge: has(productId, 'attachments') },
     { id: 'comments',    label: 'Comments',    badge: has(productId, 'comments') },
   ];
@@ -1739,12 +1747,18 @@ export default function ProductDetailScreen() {
         </View>
         <View style={styles.headerRight}>
           {canChangeStatus() && (
-            <TouchableOpacity onPress={() => setShowStatus(true)}>
-              <StatusChip status={product.status} size="sm" />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {has(productId, 'status_change') && <View style={styles.tabBadge} />}
+              <TouchableOpacity onPress={() => setShowStatus(true)}>
+                <StatusChip status={product.status} size="sm" />
+              </TouchableOpacity>
+            </View>
           )}
           {!canChangeStatus() && (
-            <StatusChip status={product.status} size="sm" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {has(productId, 'status_change') && <View style={styles.tabBadge} />}
+              <StatusChip status={product.status} size="sm" />
+            </View>
           )}
           {canDeleteProduct() && (
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>

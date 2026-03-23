@@ -3,7 +3,8 @@ import { notificationsApi } from '../api/client';
 
 export const COMMENT_TYPES = ['comment_added', 'mention'];
 export const ATTACHMENT_TYPES = ['attachment_uploaded'];
-export type BadgeCategory = 'comments' | 'attachments';
+export const STATUS_CHANGE_TYPES = ['status_change'];
+export type BadgeCategory = 'comments' | 'attachments' | 'status_change';
 
 function buildBadges(raw: Record<string, string[]>) {
   const badges: Record<number, Set<BadgeCategory>> = {};
@@ -11,6 +12,7 @@ function buildBadges(raw: Record<string, string[]>) {
     const cats = new Set<BadgeCategory>();
     if (types.some(t => COMMENT_TYPES.includes(t))) cats.add('comments');
     if (types.some(t => ATTACHMENT_TYPES.includes(t))) cats.add('attachments');
+    if (types.some(t => STATUS_CHANGE_TYPES.includes(t))) cats.add('status_change');
     if (cats.size) badges[Number(entityId)] = cats;
   }
   return badges;

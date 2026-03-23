@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi } from '../api/client';
-import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES } from '../hooks/useProductBadges';
+import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES } from '../hooks/useProductBadges';
 import { formatDate, formatDateTime, formatTime } from '../utils/date';
 import { useAuthStore } from '../store/authStore';
 import { Product, Attachment, Comment, STATUS_LABELS, STATUS_ORDER } from '../types';
@@ -319,6 +319,16 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
         queryClient.invalidateQueries({ queryKey: ['unread-count'] });
         queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
       });
+    } else if (activeTab === 'details' && has(productId, 'status_change')) {
+      // Delay so user can see the badge before it clears
+      const t = setTimeout(() => {
+        notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['notifications'] });
+          queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+          queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+        });
+      }, 2000);
+      return () => clearTimeout(t);
     }
   }, [activeTab, productId, commentsData]);
 
@@ -328,7 +338,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
   });
 
   const tabs = [
-    { id: 'details' as const, label: 'Details', icon: Package, badge: false },
+    { id: 'details' as const, label: 'Details', icon: Package, badge: has(productId, 'status_change') },
     { id: 'attachments' as const, label: `Attachments (${attachments.length})`, icon: Paperclip, badge: has(productId, 'attachments') },
     { id: 'comments' as const, label: `Comments (${comments.length})`, icon: MessageSquare, badge: has(productId, 'comments') },
   ];
@@ -341,16 +351,21 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
             <h2 className="text-lg font-semibold">{product?.product_id || 'Loading...'}</h2>
             <div className="flex items-center gap-4 mr-1">
               {product && (
-                <select
-                  value={product.status}
-                  onChange={(e) => statusMutation.mutate(e.target.value)}
-                  disabled={statusMutation.isPending}
-                  className={`text-xs px-2.5 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer disabled:opacity-60`}
-                >
-                  {STATUS_ORDER.map((s) => (
-                    <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                  ))}
-                </select>
+                <div className="relative flex items-center">
+                  {has(productId, 'status_change') && (
+                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse mr-1.5 flex-shrink-0" />
+                  )}
+                  <select
+                    value={product.status}
+                    onChange={(e) => statusMutation.mutate(e.target.value)}
+                    disabled={statusMutation.isPending}
+                    className={`text-xs px-2.5 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer disabled:opacity-60`}
+                  >
+                    {STATUS_ORDER.map((s) => (
+                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
+                    ))}
+                  </select>
+                </div>
               )}
               <button onClick={onClose} className="btn-ghost p-2 rounded-lg"><X className="w-5 h-5" /></button>
             </div>

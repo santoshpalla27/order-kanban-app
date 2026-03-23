@@ -92,12 +92,15 @@ export function useWebSocket() {
           case 'notification': {
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
             queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+            queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
             const entityType = (data.payload?.entity_type as string) || '';
             const isChatNotif = entityType === 'chat';
             // Suppress toast and sound when user is already on the chat page
             if (isChatNotif && window.location.pathname.includes('/chat')) break;
-            const msg = data.payload?.message || 'New notification';
             const ntype = data.payload?.notif_type || 'notification';
+            // Suppress toast for status_change — bell badge already increments above
+            if (ntype === 'status_change') break;
+            const msg = data.payload?.message || 'New notification';
             const entityId = (data.payload?.entity_id as number) || 0;
             const content = (data.payload?.content as string) || '';
             const senderName = (data.payload?.sender_name as string) || '';

@@ -1,10 +1,10 @@
 import { useEffect, useCallback } from 'react';
 import { useWsEvents } from './useWsEvents';
 import { useAuthStore } from '../store/authStore';
-import { useBadgeStore, BadgeCategory, COMMENT_TYPES, ATTACHMENT_TYPES } from '../store/badgeStore';
+import { useBadgeStore, BadgeCategory, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES } from '../store/badgeStore';
 
 // Re-export constants so screens can import from one place
-export { COMMENT_TYPES, ATTACHMENT_TYPES };
+export { COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES };
 export type { BadgeCategory };
 
 // ── All products badge hook ───────────────────────────────────────────────────

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -187,7 +188,8 @@ func (h *AuthHandler) generateTokenPair(user *models.User) (string, string, erro
 	return accessToken, refreshToken, nil
 }
 
-// NotifyStatusChange broadcasts a product_update WS event so all clients refresh their board.
+// NotifyStatusChange broadcasts a product_update WS event so all clients refresh their board,
+// and creates a persistent notification for all other users so it appears in the bell panel.
 func NotifyStatusChange(userID uint, userName string, product *models.Product, oldStatus, newStatus string) {
 	wsMsg, _ := json.Marshal(WSMessage{
 		Type: "product_update",
@@ -200,4 +202,7 @@ func NotifyStatusChange(userID uint, userName string, product *models.Product, o
 		},
 	})
 	database.EmitBroadcast(wsMsg)
+
+	message := fmt.Sprintf("%s moved order %s to %s", userName, product.ProductID, formatStatus(newStatus))
+	services.CreateNotificationForAllExcept(userID, nil, message, "status_change", "product", product.ID, "", userName)
 }
