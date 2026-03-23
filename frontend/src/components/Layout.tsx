@@ -113,7 +113,7 @@ export default function Layout() {
   };
 
   const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Kanban Board' },
+    { to: '/', icon: LayoutDashboard, label: 'Orders' },
     { to: '/list', icon: List, label: 'List View' },
     { to: '/my-orders', icon: ClipboardList, label: 'My Orders' },
     { to: '/chat', icon: MessageSquare, label: 'Team Chat' },

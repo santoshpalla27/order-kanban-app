@@ -9,8 +9,8 @@ interface ThemeState {
 }
 
 export const useThemeStore = create<ThemeState>((set) => {
-  // Read saved theme or default to dark
-  const saved = (localStorage.getItem('kanban-theme') as Theme) || 'dark';
+  // Read saved theme or default to light
+  const saved = (localStorage.getItem('kanban-theme') as Theme) || 'light';
   // Apply immediately on load
   document.documentElement.setAttribute('data-theme', saved);
 

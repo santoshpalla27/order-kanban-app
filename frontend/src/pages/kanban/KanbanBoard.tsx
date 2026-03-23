@@ -156,7 +156,7 @@ export default function KanbanBoard() {
   return (
     <div className="space-y-6 h-full flex flex-col">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400">Kanban Board</h1>
+        <h1 className="text-3xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-brand-400 to-indigo-400">Orders</h1>
         {canCreateProduct() && (
           <button onClick={() => setShowCreate(true)} className="btn-primary flex items-center gap-2">
             <Plus className="w-4 h-4" /> New Product
