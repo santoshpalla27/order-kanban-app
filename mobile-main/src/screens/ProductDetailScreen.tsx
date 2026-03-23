@@ -287,6 +287,7 @@ function fileEmoji(type: string) {
 interface FileUploadState {
   name: string; size: number; progress: number;
   status: 'pending' | 'uploading' | 'done' | 'error';
+  errorMsg?: string;
 }
 
 function UploadProgressModal({
@@ -329,6 +330,11 @@ function UploadProgressModal({
                      `${f.progress}%`}
                   </Text>
                 </View>
+                {f.status === 'error' && f.errorMsg ? (
+                  <Text style={{ fontSize: 11, color: '#ef4444', marginTop: 3, marginLeft: 2 }} numberOfLines={2}>
+                    {f.errorMsg}
+                  </Text>
+                ) : null}
                 <View style={styles.track}>
                   <View style={[styles.fill, { width: `${f.progress}%` as any },
                     f.status === 'done'  ? styles.fillDone :
@@ -558,8 +564,10 @@ function AttachmentsTab({
             (pct) => setUploadFiles((prev) => prev.map((s, idx) => idx === i ? { ...s, progress: pct } : s)),
           );
           setUploadFiles((prev) => prev.map((s, idx) => idx === i ? { ...s, progress: 100, status: 'done' } : s));
-        } catch {
-          setUploadFiles((prev) => prev.map((s, idx) => idx === i ? { ...s, status: 'error' } : s));
+        } catch (uploadErr: any) {
+          const msg = uploadErr?.message || uploadErr?.response?.data?.error || 'Unknown error';
+          console.error(`[Upload] Failed for "${f.name}":`, uploadErr);
+          setUploadFiles((prev) => prev.map((s, idx) => idx === i ? { ...s, status: 'error', errorMsg: msg } : s));
         }
       }
       onAttachmentsChanged();
