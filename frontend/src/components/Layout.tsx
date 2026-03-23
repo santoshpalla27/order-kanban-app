@@ -132,11 +132,30 @@ export default function Layout() {
       >
         {/* Logo */}
         <div className={`h-16 flex items-center px-5 border-b ${isDark ? 'border-surface-700/50' : 'border-surface-200'}`}>
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center flex-shrink-0">
-              <LayoutDashboard className="w-4 h-4 text-white" />
-            </div>
-            {sidebarOpen && <span className="font-bold text-lg whitespace-nowrap">KanbanFlow</span>}
+          <div className="flex items-center gap-2 overflow-hidden h-full">
+            <svg viewBox="0 0 100 100" className="w-[36px] h-[36px] flex-shrink-0 drop-shadow-sm" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="50" cy="50" r="50" fill="#F0914A" />
+              <g stroke="#1e1b4b" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M 16 28 H 25 L 34 62 H 70 L 78 38 H 28" />
+                <circle cx="40" cy="75" r="5" fill="none" />
+                <circle cx="64" cy="75" r="5" fill="none" />
+                <path d="M 38 32 H 68 V 39 H 38 Z" fill="#F0914A" />
+                <path d="M 42 39 V 56 H 64 V 39" fill="#F0914A" />
+                <path d="M 53 32 V 56" />
+                <path d="M 53 32 C 45 18 36 24 44 32" fill="#F0914A" />
+                <path d="M 53 32 C 61 18 70 24 62 32" fill="#F0914A" />
+              </g>
+            </svg>
+            {sidebarOpen && (
+              <div className="flex flex-col justify-center translate-y-px">
+                <span className={`font-extrabold text-[22px] tracking-tighter leading-none ${isDark ? 'text-white' : 'text-[#1e1b4b]'}`} style={{ fontFamily: "'Outfit', sans-serif" }}>
+                  <span className="text-[#F0914A]">Gift</span> Highway
+                </span>
+                <span className={`text-[9px] uppercase tracking-[0.15em] font-bold ${isDark ? 'text-surface-400' : 'text-surface-500'}`}>
+                  Enriching Every Moment
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

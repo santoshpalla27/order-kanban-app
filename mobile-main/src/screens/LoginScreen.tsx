@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, ActivityIndicator, Alert, ScrollView,
+  KeyboardAvoidingView, ActivityIndicator, Alert, ScrollView, Image,
 } from 'react-native';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../api/services';
@@ -72,11 +72,9 @@ export default function LoginScreen() {
 
         {/* Logo */}
         <View style={styles.logoArea}>
-          <View style={styles.logoIcon}>
-            <Text style={styles.logoEmoji}>⚡</Text>
-          </View>
-          <Text style={styles.appName}>KanbanFlow</Text>
-          <Text style={styles.tagline}>Team Order Management</Text>
+          <Image source={require('../../assets/icon.png')} style={styles.logoImage} resizeMode="contain" />
+          <Text style={styles.appName}>Gift Highway</Text>
+          <Text style={styles.tagline}>Enriching Every Moment</Text>
         </View>
 
         {/* Card */}
@@ -183,16 +181,11 @@ function makeStyles(c: ThemeColors) {
     screen: { flex: 1, backgroundColor: c.bg },
     container: { flexGrow: 1, justifyContent: 'center', padding: 24, gap: 32 },
     logoArea: { alignItems: 'center', gap: 8 },
-    logoIcon: {
-      width: 64,
-      height: 64,
-      borderRadius: 18,
-      backgroundColor: c.brand,
-      alignItems: 'center',
-      justifyContent: 'center',
+    logoImage: {
+      width: 86,
+      height: 86,
       marginBottom: 4,
     },
-    logoEmoji: { fontSize: 32 },
     appName: { fontSize: 26, fontWeight: '800', color: c.text, letterSpacing: -0.5 },
     tagline: { fontSize: 13, color: c.textMuted },
     card: {
