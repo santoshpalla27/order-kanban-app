@@ -9,6 +9,9 @@ import {
   TrendingUp,
   Users,
   BarChart3,
+  CircleDashed,
+  Play,
+  Search,
 } from 'lucide-react';
 
 interface StatusBreakdown {
@@ -64,6 +67,13 @@ const STATUS_TEXT: Record<string, string> = {
   working: 'text-blue-500',
   review: 'text-amber-500',
   done: 'text-emerald-500',
+};
+
+const STATUS_ICONS: Record<string, React.ElementType> = {
+  yet_to_start: CircleDashed,
+  working: Play,
+  review: Search,
+  done: CheckCircle2,
 };
 
 function UserAvatarSmall({ name }: { name: string }) {
@@ -218,35 +228,60 @@ export default function StatsPage() {
       {/* Status breakdown + Period cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Status breakdown */}
-        <div className={`rounded-2xl p-5 border relative overflow-hidden shadow-sm transition-all duration-300 lg:col-span-1 ${isDark ? 'bg-surface-900/60 backdrop-blur-md border-surface-700/50 before:absolute before:inset-0 before:border-t before:border-white/5 before:rounded-2xl before:pointer-events-none' : 'bg-white/80 backdrop-blur-md border-surface-200'}`}>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center">
-              <Package className="w-4 h-4 text-white" />
+        <div className={`rounded-[2rem] p-6 border relative overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 lg:col-span-1 flex flex-col ${isDark ? 'bg-gradient-to-br from-surface-800/80 to-surface-900/95 backdrop-blur-xl border-surface-700/50' : 'bg-gradient-to-br from-white to-surface-50/80 backdrop-blur-xl border-surface-200'}`}>
+          <div className="flex items-center justify-between mb-8 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 border border-brand-500/20 shadow-inner">
+                <BarChart3 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold tracking-tight">Orders</h3>
+                <p className={`text-[10px] uppercase tracking-widest font-semibold mt-0.5 ${isDark ? 'text-surface-400' : 'text-surface-500'}`}>Current Status</p>
+              </div>
             </div>
-            <p className="text-sm font-semibold">Status Breakdown</p>
+            <div className="text-right">
+              <span className={`text-3xl font-black tracking-tighter ${isDark ? 'text-white' : 'text-surface-900'}`}>{totalStatus}</span>
+              <p className={`text-[10px] uppercase font-bold text-surface-400`}>Total</p>
+            </div>
           </div>
-          <div className="space-y-3">
-            {(['yet_to_start', 'working', 'review', 'done'] as const).map((s) => {
-              const count = status_breakdown[s];
-              const pct = totalStatus > 0 ? Math.round((count / totalStatus) * 100) : 0;
-              return (
-                <div key={s}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-medium ${STATUS_TEXT[s]}`}>{STATUS_LABELS[s]}</span>
-                    <span className="text-xs font-bold">{count} <span className={`font-normal ${isDark ? 'text-surface-500' : 'text-surface-400'}`}>({pct}%)</span></span>
-                  </div>
-                  <ProgressBar value={count} max={totalStatus} colorClass={STATUS_COLORS[s]} />
-                </div>
-              );
-            })}
-          </div>
-          {/* Inline mini-bar */}
-          <div className="mt-4 h-3 rounded-full overflow-hidden flex">
+
+          {/* Stacked Bar */}
+          <div className="relative h-3 rounded-full overflow-hidden flex mb-8 bg-surface-200 dark:bg-surface-800/80 shadow-[inset_0_1px_3px_rgba(0,0,0,0.2)]">
             {(['yet_to_start', 'working', 'review', 'done'] as const).map((s) => {
               const pct = totalStatus > 0 ? (status_breakdown[s] / totalStatus) * 100 : 0;
               return pct > 0 ? (
-                <div key={s} className={`${STATUS_COLORS[s]} h-full`} style={{ width: `${pct}%` }} title={`${STATUS_LABELS[s]}: ${status_breakdown[s]}`} />
+                <div 
+                  key={s} 
+                  className={`${STATUS_COLORS[s]} h-full transition-all duration-1000 ease-out hover:brightness-110`} 
+                  style={{ width: `${pct}%` }} 
+                  title={`${STATUS_LABELS[s]}: ${status_breakdown[s]}`} 
+                />
               ) : null;
+            })}
+          </div>
+
+          {/* List */}
+          <div className="flex flex-col gap-2 mt-auto">
+            {(['yet_to_start', 'working', 'review', 'done'] as const).map((s) => {
+              const count = status_breakdown[s];
+              const pct = totalStatus > 0 ? Math.round((count / totalStatus) * 100) : 0;
+              const Icon = STATUS_ICONS[s] || Package;
+              return (
+                <div key={s} className={`group relative px-4 py-3 rounded-2xl border transition-all duration-300 ${isDark ? 'bg-surface-800/40 border-surface-700/30 hover:bg-surface-700/60 hover:border-surface-600' : 'bg-white/60 border-surface-100 hover:bg-white hover:border-surface-200 hover:shadow-md'}`}>
+                  <div className="flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform duration-300 group-hover:scale-110 ${isDark ? 'bg-surface-800 shadow-sm border border-surface-700' : 'bg-white shadow-sm border border-surface-100'}`}>
+                        <Icon className={`w-4 h-4 ${STATUS_TEXT[s]}`} />
+                      </div>
+                      <span className={`text-sm font-semibold transition-colors duration-300 ${isDark ? 'text-surface-300 group-hover:text-surface-100' : 'text-surface-600 group-hover:text-surface-900'} group-hover:${STATUS_TEXT[s]}`}>{STATUS_LABELS[s]}</span>
+                    </div>
+                    <div className="flex items-baseline justify-end gap-3 min-w-[70px]">
+                      <span className={`text-[11px] font-bold w-8 text-right transition-colors duration-300 ${isDark ? 'text-surface-500 group-hover:text-surface-400' : 'text-surface-400 group-hover:text-surface-500'}`}>{pct}%</span>
+                      <span className="text-base font-black w-6 text-right">{count}</span>
+                    </div>
+                  </div>
+                </div>
+              );
             })}
           </div>
         </div>
