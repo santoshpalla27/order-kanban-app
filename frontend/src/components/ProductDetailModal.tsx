@@ -306,6 +306,18 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   const { has } = useProductBadges();
 
+  // Wrap onClose: clear status_change badge when modal is dismissed (status is visible just by opening)
+  const handleClose = () => {
+    if (has(productId, 'status_change')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES).then(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+        queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+      });
+    }
+    onClose();
+  };
+
   useEffect(() => {
     if (activeTab === 'comments' && has(productId, 'comments')) {
       notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES).then(() => {
@@ -319,16 +331,6 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
         queryClient.invalidateQueries({ queryKey: ['unread-count'] });
         queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
       });
-    } else if (activeTab === 'details' && has(productId, 'status_change')) {
-      // Delay so user can see the badge before it clears
-      const t = setTimeout(() => {
-        notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES).then(() => {
-          queryClient.invalidateQueries({ queryKey: ['notifications'] });
-          queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-          queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
-        });
-      }, 2000);
-      return () => clearTimeout(t);
     }
   }, [activeTab, productId, commentsData]);
 
@@ -345,7 +347,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
         <div className="w-full max-w-2xl max-h-[85vh] glass rounded-2xl flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center justify-between p-5 border-b border-surface-700/50">
             <h2 className="text-lg font-semibold">{product?.product_id || 'Loading...'}</h2>
@@ -367,7 +369,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
                   </select>
                 </div>
               )}
-              <button onClick={onClose} className="btn-ghost p-2 rounded-lg"><X className="w-5 h-5" /></button>
+              <button onClick={handleClose} className="btn-ghost p-2 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
           </div>
           <div className="flex border-b border-surface-700/50">

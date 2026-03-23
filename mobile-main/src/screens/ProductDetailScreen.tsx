@@ -1664,6 +1664,26 @@ export default function ProductDetailScreen() {
   const { has, refreshBadges } = useProductBadges();
   const { refreshUnreadCount } = useNotificationStore();
 
+  // Keep refs so the beforeRemove listener always sees the latest values
+  const hasRef = useRef(has);
+  hasRef.current = has;
+  const refreshBadgesRef = useRef(refreshBadges);
+  refreshBadgesRef.current = refreshBadges;
+  const refreshUnreadCountRef = useRef(refreshUnreadCount);
+  refreshUnreadCountRef.current = refreshUnreadCount;
+
+  // On screen close, mark status_change (movement) badges as read —
+  // since the status is visible just by opening the product, closing should clear it
+  useEffect(() => {
+    return navigation.addListener('beforeRemove', () => {
+      if (hasRef.current(productId, 'status_change')) {
+        notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES)
+          .then(() => { refreshBadgesRef.current(); refreshUnreadCountRef.current(); })
+          .catch(() => {});
+      }
+    });
+  }, [navigation, productId]);
+
   // Mark notifications as read and refresh badge state when user opens a tab
   useEffect(() => {
     if (activeTab === 'comments' && has(productId, 'comments')) {
@@ -1674,14 +1694,6 @@ export default function ProductDetailScreen() {
       notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES)
         .then(() => { refreshBadges(); refreshUnreadCount(); })
         .catch(() => {});
-    } else if (activeTab === 'details' && has(productId, 'status_change')) {
-      // Delay so user can see the badge before it clears
-      const t = setTimeout(() => {
-        notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES)
-          .then(() => { refreshBadges(); refreshUnreadCount(); })
-          .catch(() => {});
-      }, 2000);
-      return () => clearTimeout(t);
     }
   }, [activeTab, productId]);
 

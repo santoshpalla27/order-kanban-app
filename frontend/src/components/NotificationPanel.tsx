@@ -48,10 +48,14 @@ export default function NotificationPanel({ onClose }: Props) {
   const notifications: Notification[] = data?.data?.data || [];
 
   const markRead = useMutation({
-    mutationFn: (id: number) => notificationsApi.markAsRead(id),
+    mutationFn: (n: Notification) =>
+      n.entity_type === 'product' && n.entity_id
+        ? notificationsApi.markReadByEntityAndTypes('product', n.entity_id, [n.type])
+        : notificationsApi.markAsRead(n.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
     },
   });
 
@@ -74,7 +78,7 @@ export default function NotificationPanel({ onClose }: Props) {
   };
 
   const handleClick = (n: Notification) => {
-    if (!n.is_read) markRead.mutate(n.id);
+    if (!n.is_read) markRead.mutate(n);
     const link = getNotificationLink(n);
     if (link) { onClose(); navigate(link); }
   };
@@ -153,7 +157,7 @@ export default function NotificationPanel({ onClose }: Props) {
                   {!n.is_read && (
                     <button
                       title="Mark as read"
-                      onClick={(e) => { e.stopPropagation(); markRead.mutate(n.id); }}
+                      onClick={(e) => { e.stopPropagation(); markRead.mutate(n); }}
                       className="p-0.5 text-surface-500 hover:text-brand-400 transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />

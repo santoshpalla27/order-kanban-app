@@ -101,10 +101,18 @@ export default function NotificationsScreen() {
   useEffect(() => { load(); }, [load]);
   useWsEvents({ onNotification: () => load() });
 
-  const markRead = async (id: number) => {
+  const markRead = async (n: Notification) => {
     try {
-      await notificationsApi.markAsRead(id);
-      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, is_read: true } : n));
+      if (n.entity_type === 'product' && n.entity_id) {
+        await notificationsApi.markReadByEntityAndTypes('product', n.entity_id, [n.type]);
+        setNotifications((prev) => prev.map((nn) =>
+          nn.entity_type === 'product' && nn.entity_id === n.entity_id && nn.type === n.type
+            ? { ...nn, is_read: true } : nn
+        ));
+      } else {
+        await notificationsApi.markAsRead(n.id);
+        setNotifications((prev) => prev.map((nn) => nn.id === n.id ? { ...nn, is_read: true } : nn));
+      }
       const countRes = await notificationsApi.getUnreadCount();
       setUnreadCount(countRes.data?.count ?? 0);
       refreshBadges();
@@ -121,7 +129,7 @@ export default function NotificationsScreen() {
   };
 
   const handlePress = (n: Notification) => {
-    if (!n.is_read) markRead(n.id);
+    if (!n.is_read) markRead(n);
     if (n.entity_type === 'product' && n.entity_id) {
       navigation.navigate('ProductDetail', { productId: n.entity_id });
     }
@@ -334,7 +342,7 @@ export default function NotificationsScreen() {
                   {!n.is_read && (
                     <TouchableOpacity
                       style={s.eyeBtn}
-                      onPress={(e) => { e.stopPropagation?.(); markRead(n.id); }}
+                      onPress={(e) => { e.stopPropagation?.(); markRead(n); }}
                       hitSlop={8}
                     >
                       <Text style={s.eyeIcon}>👁</Text>

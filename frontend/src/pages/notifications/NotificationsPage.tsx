@@ -82,11 +82,15 @@ export default function NotificationsPage() {
   );
 
   const markRead = useMutation({
-    mutationFn: (id: number) => notificationsApi.markAsRead(id),
+    mutationFn: (n: Notification) =>
+      n.entity_type === 'product' && n.entity_id
+        ? notificationsApi.markReadByEntityAndTypes('product', n.entity_id, [n.type])
+        : notificationsApi.markAsRead(n.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications-full'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
     },
   });
 
@@ -338,7 +342,7 @@ export default function NotificationsPage() {
                       </span>
                       {!n.is_read && (
                         <button
-                          onClick={() => markRead.mutate(n.id)}
+                          onClick={() => markRead.mutate(n)}
                           disabled={markRead.isPending}
                           title="Mark as read"
                           className={`p-1 rounded-md transition-colors disabled:opacity-50 ${
