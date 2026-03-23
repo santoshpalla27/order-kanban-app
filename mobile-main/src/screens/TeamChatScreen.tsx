@@ -12,6 +12,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { chatApi, usersApi, productsApi } from '../api/services';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
+import { useNotificationStore } from '../store/notificationStore';
 import { RootStackParamList } from '../navigation';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
@@ -150,6 +151,12 @@ function MsgText({
 export default function TeamChatScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const user       = useAuthStore((s) => s.user);
+
+  // Suppress chat notification toasts while this screen is active
+  useEffect(() => {
+    useNotificationStore.getState().setChatScreenActive(true);
+    return () => { useNotificationStore.getState().setChatScreenActive(false); };
+  }, []);
 
   const isDark = useThemeStore((s) => s.isDark);
   const c = isDark ? darkColors : lightColors;

@@ -67,19 +67,24 @@ export function useWsEvents(callbacks?: WsCallbacks) {
             });
           }
           break;
-        case 'notification':
+        case 'notification': {
           cb?.onNotification?.();
-          // Re-fetch real count from API (accurate, no guessing)
           refreshUnreadCount();
-          addToast({
-            message: data.payload?.message || 'New notification',
-            content: data.payload?.content || '',
-            type: data.payload?.notif_type || 'notification',
-            entityType: data.payload?.entity_type || '',
-            entityId: data.payload?.entity_id || 0,
-            senderName: data.payload?.sender_name || '',
-          });
+          const entityType = data.payload?.entity_type || '';
+          // Suppress chat notification toasts when the user is already on the chat screen
+          const isChatNotif = entityType === 'chat';
+          if (!isChatNotif || !useNotificationStore.getState().chatScreenActive) {
+            addToast({
+              message: data.payload?.message || 'New notification',
+              content: data.payload?.content || '',
+              type: data.payload?.notif_type || 'notification',
+              entityType,
+              entityId: data.payload?.entity_id || 0,
+              senderName: data.payload?.sender_name || '',
+            });
+          }
           break;
+        }
         case 'chat_message':
           cb?.onChatMessage?.(data.payload);
           break;

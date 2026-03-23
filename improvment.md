@@ -45,7 +45,6 @@ npx expo prebuild --clean --platform android
 
 cd android
 ./gradlew assembleRelease --max-workers=2
-APK will be at:
 
 cd app/build/outputs/apk/release/
 

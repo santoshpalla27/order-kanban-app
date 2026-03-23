@@ -1638,7 +1638,17 @@ export default function ProductDetailScreen() {
 
   useEffect(() => { loadAttachments(); }, [loadAttachments]);
 
-  useWsEvents({ onProductsChanged: loadProduct, onAttachmentsChanged: loadAttachments });
+  useWsEvents({
+    onProductsChanged: loadProduct,
+    onAttachmentsChanged: loadAttachments,
+    onCommentsChanged: () => {
+      if (activeTab === 'comments') {
+        notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES)
+          .then(() => { refreshBadges(); refreshUnreadCount(); })
+          .catch(() => {});
+      }
+    },
+  });
 
   const { has, refreshBadges } = useProductBadges();
   const { refreshUnreadCount } = useNotificationStore();

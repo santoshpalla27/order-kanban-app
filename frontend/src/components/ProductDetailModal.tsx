@@ -320,7 +320,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
         queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
       });
     }
-  }, [activeTab, productId]);
+  }, [activeTab, productId, commentsData]);
 
   const statusMutation = useMutation({
     mutationFn: (newStatus: string) => productsApi.updateStatus(productId, newStatus),

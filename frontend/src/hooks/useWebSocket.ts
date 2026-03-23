@@ -92,18 +92,19 @@ export function useWebSocket() {
           case 'notification': {
             queryClient.invalidateQueries({ queryKey: ['notifications'] });
             queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+            const entityType = (data.payload?.entity_type as string) || '';
+            const isChatNotif = entityType === 'chat';
+            // Suppress toast and sound when user is already on the chat page
+            if (isChatNotif && window.location.pathname.includes('/chat')) break;
             const msg = data.payload?.message || 'New notification';
             const ntype = data.payload?.notif_type || 'notification';
-            const entityType = (data.payload?.entity_type as string) || '';
             const entityId = (data.payload?.entity_id as number) || 0;
             const content = (data.payload?.content as string) || '';
             const senderName = (data.payload?.sender_name as string) || '';
             let link: string | null = null;
             if (entityType === 'product' && entityId) link = `/?product=${entityId}`;
-            else if (entityType === 'chat') link = '/chat';
+            else if (isChatNotif) link = '/chat';
             addToast({ message: msg, content, type: ntype, link, entityType, entityId, senderName });
-            // Chat notifications get a distinct sound; everything else uses the default.
-            const isChatNotif = entityType === 'chat';
             if (isChatNotif) playChatSound(); else playNotificationSound();
             break;
           }
