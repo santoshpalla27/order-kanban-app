@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as FileSystem from 'expo-file-system';
 import api from './client';
 import { API_BASE_URL } from '../utils/config';
 import { tokenManager } from '../utils/tokenManager';
@@ -58,23 +59,25 @@ export const attachmentsApi = {
     });
     const { upload_url, s3_key, content_type } = presignRes.data;
 
-    // 2. Upload directly to R2 via fetch (supports progress via XMLHttpRequest)
-    await new Promise<void>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('PUT', upload_url);
-      xhr.setRequestHeader('Content-Type', content_type || mimeType);
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed: ${xhr.status}`));
-      xhr.onerror = () => reject(new Error('Upload network error'));
-
-      // Fetch the file as blob then send
-      fetch(uri)
-        .then((r) => r.blob())
-        .then((blob) => xhr.send(blob))
-        .catch(reject);
-    });
+    // 2. Upload directly to R2 using expo-file-system (reliable on Android production APKs).
+    //    The fetch→blob→XHR pattern is unreliable in production builds.
+    const task = FileSystem.createUploadTask(
+      upload_url,
+      uri,
+      {
+        httpMethod: 'PUT',
+        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { 'Content-Type': content_type || mimeType },
+      },
+      (progress) => {
+        const total = progress.totalBytesExpectedToSend;
+        if (total > 0) onProgress(Math.round((progress.totalBytesSent / total) * 100));
+      },
+    );
+    const result = await task.uploadAsync();
+    if (!result || result.status < 200 || result.status >= 300) {
+      throw new Error(`Upload failed: ${result?.status ?? 'unknown'}`);
+    }
 
     // 3. Confirm upload
     const ext = '.' + fileName.split('.').pop()?.toLowerCase();
