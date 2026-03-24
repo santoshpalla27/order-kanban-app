@@ -45,23 +45,10 @@ function getAvatarGradient(name: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
-function UserAvatar({ user, size = 'sm' }: { user: { name: string; avatar_url?: string }; size?: 'sm' | 'md' }) {
-  const [imgError, setImgError] = useState(false);
+function UserAvatar({ user, size = 'sm' }: { user: { name: string }; size?: 'sm' | 'md' }) {
   const gradient = getAvatarGradient(user.name);
   const initial = user.name.charAt(0).toUpperCase();
   const sizeClass = size === 'sm' ? 'w-7 h-7 text-xs' : 'w-8 h-8 text-sm';
-
-  if (user.avatar_url && !imgError) {
-    return (
-      <img
-        src={user.avatar_url}
-        alt={user.name}
-        className={`${sizeClass} rounded-full object-cover flex-shrink-0`}
-        onError={() => setImgError(true)}
-      />
-    );
-  }
-
   return (
     <div className={`${sizeClass} rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-bold text-white flex-shrink-0`}>
       {initial}

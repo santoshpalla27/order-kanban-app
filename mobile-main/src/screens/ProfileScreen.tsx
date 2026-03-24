@@ -1,10 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
-  TextInput, Alert, ActivityIndicator, Image, Modal, Switch, KeyboardAvoidingView,
+  TextInput, Alert, ActivityIndicator, Modal, Switch, KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
@@ -39,12 +38,10 @@ export default function ProfileScreen() {
   const c = isDark ? darkColors : lightColors;
   const s = useMemo(() => makeStyles(c), [c]);
 
-  const [editingName, setEditingName]   = useState(false);
-  const [nameInput, setNameInput]       = useState(user?.name ?? '');
-  const [savingName, setSavingName]     = useState(false);
-  const [uploadingAvatar, setUploading] = useState(false);
-  const [uploadProgress, setProgress]  = useState(0);
-  const [showLogout, setShowLogout]     = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput]     = useState(user?.name ?? '');
+  const [savingName, setSavingName]   = useState(false);
+  const [showLogout, setShowLogout]   = useState(false);
 
   const roleName = user?.role?.name ?? 'employee';
   const meta     = ROLE_META[roleName] ?? ROLE_META.employee;
@@ -67,52 +64,6 @@ export default function ProfileScreen() {
     setSavingName(false);
   };
 
-  // ── Pick & upload avatar ───────────────────────────────────────────────────
-  const pickAvatar = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert('Permission needed', 'Allow photo library access to change your picture.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.85,
-    });
-    if (result.canceled || !result.assets[0]) return;
-
-    const asset    = result.assets[0];
-    const filename = asset.uri.split('/').pop() || 'avatar.jpg';
-    const mime     = asset.mimeType || 'image/jpeg';
-
-    setUploading(true);
-    setProgress(0);
-    try {
-      const presignRes = await profileApi.getAvatarUploadUrl(filename);
-      const { upload_url, s3_key, content_type } = presignRes.data;
-
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', upload_url);
-        xhr.setRequestHeader('Content-Type', content_type || mime);
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onload  = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error('Upload failed')));
-        xhr.onerror = () => reject(new Error('Network error'));
-        fetch(asset.uri).then((r) => r.blob()).then((blob) => xhr.send(blob)).catch(reject);
-      });
-
-      const updated = await profileApi.update({ avatar_key: s3_key });
-      updateUser(updated.data);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to upload photo');
-    }
-    setUploading(false);
-    setProgress(0);
-  };
-
   // ── Logout ─────────────────────────────────────────────────────────────────
   const doLogout = async () => {
     setShowLogout(false);
@@ -127,25 +78,9 @@ export default function ProfileScreen() {
 
         {/* ── Avatar + name header ─────────────────────────────────── */}
         <View style={s.header}>
-          <TouchableOpacity style={s.avatarWrap} onPress={pickAvatar} disabled={uploadingAvatar}>
-            {user?.avatar_url
-              ? <Image source={{ uri: user.avatar_url }} style={s.avatar} />
-              : (
-                <View style={[s.avatar, s.avatarFallback, { backgroundColor: avatarBg }]}>
-                  <Text style={s.initials}>{initials}</Text>
-                </View>
-              )}
-            <View style={s.cameraOverlay}>
-              {uploadingAvatar
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={{ fontSize: 15 }}>📷</Text>}
-            </View>
-            {uploadingAvatar && uploadProgress > 0 && (
-              <View style={s.progressBadge}>
-                <Text style={s.progressText}>{uploadProgress}%</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={[s.avatar, s.avatarFallback, { backgroundColor: avatarBg }]}>
+            <Text style={s.initials}>{initials}</Text>
+          </View>
 
           <Text style={s.displayName}>{user?.name ?? 'Unknown'}</Text>
           <View style={[s.rolePill, { backgroundColor: meta.bg }]}>

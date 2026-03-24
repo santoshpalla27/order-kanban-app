@@ -194,9 +194,7 @@ export const usersApi = {
 
 // Profile
 export const profileApi = {
-  getAvatarUploadUrl: (filename: string) =>
-    api.get('/users/me/avatar-presign', { params: { filename } }),
-  update: (data: { name?: string; avatar_key?: string }) =>
+  update: (data: { name?: string }) =>
     api.patch('/users/me', data),
   getMe: () => api.get('/auth/me'),
 };
