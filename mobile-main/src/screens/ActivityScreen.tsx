@@ -79,22 +79,13 @@ export default function ActivityScreen() {
     return !/[a-z0-9]/i.test(p[q.length]);
   };
 
-  // Check if a product ID appears as a standalone token in a details string.
-  const idInDetails = (details: string, productId: string) => {
-    const escaped = productId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:[^a-zA-Z0-9]|$)`, 'i').test(details);
-  };
-
   const filteredLogs = useMemo(() => {
     const q = productSearch.trim();
     if (!q) return logs;
     const matching = allProducts.filter(p => matchProductId(p.product_id, q));
     if (matching.length === 0) return [];
     const ids = new Set(matching.map(p => p.id));
-    return logs.filter(log =>
-      (log.entity === 'product' && ids.has(log.entity_id)) ||
-      matching.some(p => idInDetails(log.details, p.product_id))
-    );
+    return logs.filter(log => log.entity === 'product' && ids.has(log.entity_id));
   }, [logs, productSearch, allProducts]);
 
   // Build grouped flat list

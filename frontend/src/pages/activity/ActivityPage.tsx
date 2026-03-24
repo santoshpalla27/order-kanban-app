@@ -101,12 +101,6 @@ export default function ActivityPage() {
     return !/[a-z0-9]/i.test(p[q.length]);
   };
 
-  // Check if a product ID appears as a standalone token in a details string.
-  // "cs" in "product CS-001" matches; "cs" in "product CSA-001" does NOT.
-  const idInDetails = (details: string, productId: string) => {
-    const escaped = productId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:[^a-zA-Z0-9]|$)`, 'i').test(details);
-  };
 
   const matchingProducts = useMemo(() =>
     productFilter.trim()
@@ -134,9 +128,7 @@ export default function ActivityPage() {
       if (productFilter.trim()) {
         if (matchingProducts.length === 0) return false;
         const ids = new Set(matchingProducts.map(p => p.id));
-        const matchDirect = log.entity === 'product' && ids.has(log.entity_id);
-        const matchDetails = matchingProducts.some(p => idInDetails(log.details, p.product_id));
-        if (!matchDirect && !matchDetails) return false;
+        if (!(log.entity === 'product' && ids.has(log.entity_id))) return false;
       }
       if (search) {
         const q = search.toLowerCase();
