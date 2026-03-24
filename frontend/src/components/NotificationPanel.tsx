@@ -64,6 +64,7 @@ export default function NotificationPanel({ onClose }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
     },
   });
 

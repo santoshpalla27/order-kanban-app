@@ -100,6 +100,7 @@ export default function NotificationsPage() {
       queryClient.invalidateQueries({ queryKey: ['notifications-full'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
     },
   });
 
