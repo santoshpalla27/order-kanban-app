@@ -10,6 +10,7 @@ import { useWsEvents } from '../hooks/useWsEvents';
 import { ActivityLog } from '../types';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
+import { Feather } from '@expo/vector-icons';
 
 function formatRelative(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -24,12 +25,12 @@ function formatRelative(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const ACTION_META: Record<string, { emoji: string; color: string; bg: string; label: string }> = {
-  created:        { emoji: '➕', color: '#34D399', bg: 'rgba(52,211,153,0.12)',  label: 'Created'  },
-  updated:        { emoji: '✏️', color: '#60A5FA', bg: 'rgba(96,165,250,0.12)',  label: 'Updated'  },
-  deleted:        { emoji: '🗑',  color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   label: 'Deleted'  },
-  status_changed: { emoji: '🔄', color: '#FBBF24', bg: 'rgba(251,191,36,0.12)',  label: 'Moved'    },
-  role_changed:   { emoji: '🛡',  color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', label: 'Role'     },
+const ACTION_META: Record<string, { icon: string; color: string; bg: string; label: string }> = {
+  created:        { icon: 'plus', color: '#34D399', bg: 'rgba(52,211,153,0.12)',  label: 'Created'  },
+  updated:        { icon: 'edit-2', color: '#60A5FA', bg: 'rgba(96,165,250,0.12)',  label: 'Updated'  },
+  deleted:        { icon: 'trash-2',  color: '#EF4444', bg: 'rgba(239,68,68,0.12)',   label: 'Deleted'  },
+  status_changed: { icon: 'refresh-cw', color: '#FBBF24', bg: 'rgba(251,191,36,0.12)',  label: 'Moved'    },
+  role_changed:   { icon: 'shield',  color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', label: 'Role'     },
 };
 
 const AVATAR_COLORS = ['#EC4899', '#F97316', '#10B981', '#06B6D4', '#8B5CF6', '#D946EF'];
@@ -107,9 +108,12 @@ export default function ActivityScreen() {
     <SafeAreaView style={s.screen}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Text style={s.backIcon}>←</Text>
+          <Feather name="arrow-left" size={24} color={c.textSec} style={{ marginTop: 2 }} />
         </TouchableOpacity>
-        <Text style={s.title}>⚡  Activity</Text>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Feather name="zap" size={20} color={c.text} />
+          <Text style={s.title}>Activity</Text>
+        </View>
         {filteredLogs.length > 0 && (
           <View style={s.countBadge}>
             <Text style={s.countText}>
@@ -121,7 +125,7 @@ export default function ActivityScreen() {
 
       {/* Product filter */}
       <View style={s.searchBar}>
-        <Text style={s.searchIcon}>🔍</Text>
+        <Feather name="search" size={16} color={c.textMuted} style={{ marginRight: 4 }} />
         <TextInput
           style={s.searchInput}
           placeholder="Filter by product ID or name..."
@@ -132,7 +136,7 @@ export default function ActivityScreen() {
         />
         {productSearch.length > 0 && (
           <TouchableOpacity onPress={() => setProductSearch('')} style={s.clearBtn}>
-            <Text style={s.clearTxt}>✕</Text>
+            <Feather name="x" size={16} color={c.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -143,7 +147,7 @@ export default function ActivityScreen() {
         </View>
       ) : grouped.length === 0 ? (
         <View style={s.center}>
-          <Text style={{ fontSize: 40 }}>⚡</Text>
+          <Feather name="zap" size={40} color={c.textMuted} />
           <Text style={s.emptyText}>{productSearch ? 'No activity for this product' : 'No activity yet'}</Text>
         </View>
       ) : (
@@ -163,7 +167,7 @@ export default function ActivityScreen() {
 
             const { log } = item as { type: 'log'; log: ActivityLog };
             const meta = ACTION_META[log.action] ?? {
-              emoji: '⚡', color: '#94A3B8', bg: 'rgba(148,163,184,0.1)', label: log.action,
+              icon: 'zap', color: '#94A3B8', bg: 'rgba(148,163,184,0.1)', label: log.action,
             };
             const name = log.user?.name || 'Unknown';
 
@@ -179,7 +183,7 @@ export default function ActivityScreen() {
                   <View style={s.topLine}>
                     <Text style={s.name}>{name}</Text>
                     <View style={[s.badge, { backgroundColor: meta.bg }]}>
-                      <Text style={s.badgeEmoji}>{meta.emoji}</Text>
+                      <Feather name={meta.icon as any} size={10} color={meta.color} />
                       <Text style={[s.badgeLabel, { color: meta.color }]}>{meta.label}</Text>
                     </View>
                     <Text style={s.entity}>{log.entity}</Text>
@@ -199,7 +203,7 @@ export default function ActivityScreen() {
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: c.bg },
+    screen: { flex: 1, backgroundColor: c.surface },
 
     header: {
       flexDirection: 'row', alignItems: 'center', gap: 12,
@@ -208,7 +212,7 @@ function makeStyles(c: ThemeColors) {
     },
     backBtn: { padding: 4 },
     backIcon: { fontSize: 22, color: c.textSec },
-    title: { flex: 1, fontSize: 17, fontWeight: '700', color: c.text },
+    title: { fontSize: 17, fontWeight: '700', color: c.text },
     countBadge: {
       backgroundColor: c.surface2, borderRadius: 99,
       paddingHorizontal: 8, paddingVertical: 3,
@@ -234,11 +238,11 @@ function makeStyles(c: ThemeColors) {
 
     dateHeader: {
       paddingHorizontal: 16, paddingVertical: 8,
-      backgroundColor: c.headerBg,
+      backgroundColor: c.surface,
       borderBottomWidth: 1, borderBottomColor: c.surface2,
     },
     dateLabel: {
-      fontSize: 11, fontWeight: '700', color: c.textMuted,
+      fontSize: 13, fontWeight: '800', color: c.text,
       textTransform: 'uppercase', letterSpacing: 0.6,
     },
 
@@ -246,6 +250,7 @@ function makeStyles(c: ThemeColors) {
       flexDirection: 'row', alignItems: 'flex-start', gap: 10,
       paddingHorizontal: 16, paddingVertical: 12,
       borderBottomWidth: 1, borderBottomColor: c.surface2,
+      backgroundColor: c.surface,
     },
     avatar: {
       width: 28, height: 28, borderRadius: 14,
@@ -263,7 +268,7 @@ function makeStyles(c: ThemeColors) {
     badgeEmoji: { fontSize: 10 },
     badgeLabel: { fontSize: 10, fontWeight: '600' },
     entity: { fontSize: 10, color: c.textMuted, textTransform: 'capitalize' },
-    details: { fontSize: 12, color: c.textMuted, marginTop: 3 },
+    details: { fontSize: 13, color: c.text, marginTop: 3 },
 
     time: { fontSize: 10, color: c.textDim, marginTop: 2 },
   });

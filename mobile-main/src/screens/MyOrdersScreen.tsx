@@ -32,7 +32,7 @@ const TABS: Array<{ key: string; label: string }> = [
 
 const TAB_COLORS: Record<string, string> = {
   '':           '#818CF8',
-  yet_to_start: '#9CA3AF',
+  yet_to_start: '#EF4444',
   working:      '#60A5FA',
   review:       '#FBBF24',
   done:         '#34D399',
@@ -176,9 +176,11 @@ export default function MyOrdersScreen() {
     setFilters((prev) => ({ ...prev, ...f, assigned_to: userId }));
   };
 
-  const hasActiveFilters = Object.entries(filters).some(
-    ([k, v]) => k !== 'status' && k !== 'assigned_to' && v !== '',
-  );
+  const activeFilterCount = Object.entries(filters).filter(
+    ([k, v]) => k !== 'status' && k !== 'assigned_to' && k !== 'search' && v !== '',
+  ).length;
+
+  const hasActiveFilters = activeFilterCount > 0 || filters.search !== '';
 
   return (
     <View style={styles.screen}>
@@ -198,7 +200,12 @@ export default function MyOrdersScreen() {
           onPress={() => setShowFilters(true)}
         >
           <Feather name="filter" size={14} color={hasActiveFilters ? c.brand : c.textSec} />
-          <Text style={[styles.filterBtnText, hasActiveFilters && { color: c.brand }]}>Filters{hasActiveFilters ? ' •' : ''}</Text>
+          <Text style={[styles.filterBtnText, hasActiveFilters && { color: c.brand }]}>Filters</Text>
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -222,6 +229,9 @@ export default function MyOrdersScreen() {
                 ]}
                 onPress={() => setFilters((f) => ({ ...f, status: tab.key }))}
               >
+                {tab.key !== '' && (
+                  <View style={[styles.statusDot, { backgroundColor: color }]} />
+                )}
                 <Text style={[styles.tabText, active && { color }]}>
                   {tab.label}
                 </Text>
@@ -337,17 +347,36 @@ function makeStyles(c: ThemeColors) {
     },
     filterBtnActive: { borderColor: c.brand, backgroundColor: 'rgba(99,102,241,0.12)' },
     filterBtnText: { color: c.textSec, fontSize: 13, fontWeight: '600' },
+    filterBadge: {
+      backgroundColor: c.brand,
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 4,
+    },
+    filterBadgeText: {
+      color: '#fff',
+      fontSize: 10,
+      fontWeight: '800',
+    },
     tabsWrapper: { borderBottomWidth: 1, borderBottomColor: c.surface2 },
     tabs: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
     tab: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 5,
-      paddingHorizontal: 14,
-      paddingVertical: 7,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
       borderRadius: 99,
       borderWidth: 1,
       borderColor: c.border2,
+    },
+    statusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 6,
     },
     tabText: { fontSize: 13, fontWeight: '600', color: c.textMuted },
     countBadge: {

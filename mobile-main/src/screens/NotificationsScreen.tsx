@@ -188,12 +188,13 @@ export default function NotificationsScreen() {
             style={s.iconBtn}
             disabled={refreshing}
           >
-            <Text style={[s.iconBtnText, refreshing && { opacity: 0.4 }]}>↻</Text>
+            <Feather name="refresh-cw" size={18} color={c.textSec} style={refreshing && { opacity: 0.4 }} />
           </TouchableOpacity>
           {/* Mark all read */}
           {unread > 0 && (
             <TouchableOpacity onPress={markAllRead} style={s.markAllBtn}>
-              <Text style={s.markAllText}>✓✓ All read</Text>
+              <Feather name="check-square" size={14} color="#fff" />
+              <Text style={s.markAllText}>All read</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -243,7 +244,7 @@ export default function NotificationsScreen() {
           <Text style={s.dropdownLabel}>
             {typeFilter === 'all' ? 'All types' : humanizeType(typeFilter)}
           </Text>
-          <Text style={s.dropdownChevron}>▾</Text>
+          <Feather name="chevron-down" size={16} color={c.textMuted} />
         </TouchableOpacity>
 
         <Modal
@@ -267,7 +268,7 @@ export default function NotificationsScreen() {
                   <Text style={[s.dropdownOptionText, typeFilter === t && s.dropdownOptionTextActive]}>
                     {t === 'all' ? 'All types' : humanizeType(t)}
                   </Text>
-                  {typeFilter === t && <Text style={s.dropdownCheck}>✓</Text>}
+                  {typeFilter === t && <Feather name="check" size={16} color={c.brand} />}
                 </TouchableOpacity>
               ))}
             </View>
@@ -349,7 +350,7 @@ export default function NotificationsScreen() {
                       onPress={(e) => { e.stopPropagation?.(); markRead(n); }}
                       hitSlop={8}
                     >
-                      <Text style={s.eyeIcon}>👁</Text>
+                      <Feather name="eye" size={16} color={c.textMuted} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -364,7 +365,7 @@ export default function NotificationsScreen() {
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    screen: { flex: 1, backgroundColor: c.bg },
+    screen: { flex: 1, backgroundColor: c.surface },
 
     // Header
     header: {
@@ -379,6 +380,7 @@ function makeStyles(c: ThemeColors) {
     iconBtn:     { padding: 6 },
     iconBtnText: { fontSize: 20, color: c.textSec, fontWeight: '600' },
     markAllBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 4,
       paddingHorizontal: 10, paddingVertical: 6,
       borderRadius: 99, backgroundColor: c.brand,
     },
@@ -477,6 +479,7 @@ function makeStyles(c: ThemeColors) {
       flexDirection: 'row', alignItems: 'flex-start', gap: 10,
       paddingHorizontal: 16, paddingVertical: 18,
       borderBottomWidth: 1, borderBottomColor: c.surface2,
+      backgroundColor: c.surface,
     },
     itemUnread:  { backgroundColor: 'rgba(99,102,241,0.08)' },
 

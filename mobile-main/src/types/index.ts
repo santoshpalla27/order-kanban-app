@@ -115,7 +115,7 @@ export const STATUS_LABELS: Record<ProductStatus, string> = {
 export const STATUS_ORDER: ProductStatus[] = ['yet_to_start', 'working', 'review', 'done'];
 
 export const STATUS_COLORS: Record<ProductStatus, { bg: string; text: string; border: string; dot: string }> = {
-  yet_to_start: { bg: '#374151', text: '#9CA3AF', border: '#4B5563', dot: '#9CA3AF' },
+  yet_to_start: { bg: 'rgba(239,68,68,0.12)', text: '#EF4444', border: 'rgba(239,68,68,0.2)', dot: '#EF4444' },
   working:      { bg: '#1E3A5F', text: '#60A5FA', border: '#2563EB', dot: '#60A5FA' },
   review:       { bg: '#3D2A00', text: '#FBBF24', border: '#D97706', dot: '#FBBF24' },
   done:         { bg: '#064E3B', text: '#34D399', border: '#059669', dot: '#34D399' },
