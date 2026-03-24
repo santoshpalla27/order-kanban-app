@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"kanban-app/database"
 	"kanban-app/internal/models"
@@ -89,14 +90,17 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	senderName := userName.(string)
 	message := fmt.Sprintf("%s commented on %s", senderName, productLabel)
 
+	// Attachment comments (contain "[attachment:") already triggered an attachment_uploaded
+	// notification when the file was saved — skip the comment_added one to avoid duplicates.
+	isAttachmentComment := strings.Contains(req.Message, "[attachment:")
+
 	// Mention notifications first — returns IDs of users who will receive a mention toast.
 	mentionMsg := fmt.Sprintf("%s mentioned you in %s", senderName, productLabel)
 	mentionedIDs := services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID), req.Message, senderName)
 
-	// If the message contains @mentions, only the mentioned users are notified —
-	// the rest of the team did not need a ping.
-	// If there are no @mentions it is a general chat message, so notify everyone.
-	if len(mentionedIDs) == 0 {
+	// If the message contains @mentions, only the mentioned users are notified.
+	// If there are no @mentions and it's not an attachment comment, notify everyone.
+	if len(mentionedIDs) == 0 && !isAttachmentComment {
 		services.CreateNotificationForAllExcept(userID, nil, message, "comment_added", "product", uint(productID), req.Message, senderName)
 	}
 
