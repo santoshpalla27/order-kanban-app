@@ -16,6 +16,7 @@ import { useNotificationStore } from '../store/notificationStore';
 import { RootStackParamList } from '../navigation';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
+import { Feather } from '@expo/vector-icons';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -484,11 +485,11 @@ export default function TeamChatScreen() {
       {/* ── Header ── */}
       <View style={st.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={st.backBtn}>
-          <Text style={st.backArrow}>←</Text>
+          <Feather name="arrow-left" size={24} color={c.textSec} style={{ marginTop: 2 }} />
         </TouchableOpacity>
 
         <View style={st.hashPill}>
-          <Text style={st.hashText}>#</Text>
+          <Feather name="hash" size={18} color="#fff" />
         </View>
 
         <View style={st.headerInfo}>
@@ -536,7 +537,7 @@ export default function TeamChatScreen() {
                   {loadingMore
                     ? <ActivityIndicator size="small" color={c.brand} />
                     : <>
-                        <Text style={st.loadMoreArrow}>↑</Text>
+                        <Feather name="chevron-up" size={14} color={c.textMuted} style={{ marginRight: 4 }} />
                         <Text style={st.loadMoreText}>Load older messages</Text>
                       </>
                   }
@@ -546,7 +547,7 @@ export default function TeamChatScreen() {
             ListEmptyComponent={
               <View style={st.empty}>
                 <View style={st.emptyIcon}>
-                  <Text style={{ fontSize: 34 }}>💬</Text>
+                  <Feather name="message-square" size={32} color={c.textMuted} />
                 </View>
                 <Text style={st.emptyTitle}>No messages yet</Text>
                 <Text style={st.emptySub}>Start the conversation!</Text>
@@ -609,7 +610,7 @@ export default function TeamChatScreen() {
                         activeOpacity={0.75}
                       >
                         <View style={st.mentionOrderIcon}>
-                          <Text style={st.mentionOrderEmoji}>📦</Text>
+                          <Feather name="package" size={14} color="#F59E0B" />
                         </View>
                         <View style={st.mentionOrderInfo}>
                           <Text style={st.mentionOrderId}>{e.item.product_id}</Text>
@@ -656,7 +657,7 @@ export default function TeamChatScreen() {
             onPress={() => { setShowEmoji((v) => !v); setMentionQuery(null); }}
             activeOpacity={0.8}
           >
-            <Text style={{ fontSize: 20 }}>😊</Text>
+            <Feather name="smile" size={20} color={c.textSec} />
           </TouchableOpacity>
 
           {/* Text field */}
@@ -692,7 +693,7 @@ export default function TeamChatScreen() {
           >
             {sending
               ? <ActivityIndicator size="small" color="#fff" />
-              : <Text style={st.sendArrow}>↑</Text>
+              : <Feather name="send" size={16} color="#fff" />
             }
           </TouchableOpacity>
         </View>
@@ -718,7 +719,7 @@ function makeStyles(c: ThemeColors) {
     backBtn:    { padding: 4 },
     backArrow:  { fontSize: 22, color: c.textSec },
     hashPill: {
-      width: 38, height: 38, borderRadius: 11,
+      width: 38, height: 38, borderRadius: 12,
       backgroundColor: '#4F46E5',
       alignItems: 'center', justifyContent: 'center',
       shadowColor: c.brand, shadowOffset: { width: 0, height: 2 },
@@ -851,7 +852,7 @@ function makeStyles(c: ThemeColors) {
     // Order rows in mention dropdown
     mentionOrderLoading: { paddingVertical: 10, alignItems: 'center' },
     mentionOrderIcon: {
-      width: 30, height: 30, borderRadius: 8,
+      width: 30, height: 30, borderRadius: 10,
       backgroundColor: 'rgba(245,158,11,0.15)',
       alignItems: 'center', justifyContent: 'center',
     },
@@ -878,7 +879,7 @@ function makeStyles(c: ThemeColors) {
       backgroundColor: c.headerBg,
     },
     inputIconBtn: {
-      width: 40, height: 40, borderRadius: 11,
+      width: 40, height: 40, borderRadius: 12,
       backgroundColor: c.card,
       alignItems: 'center', justifyContent: 'center',
     },
@@ -888,8 +889,8 @@ function makeStyles(c: ThemeColors) {
       flex: 1,
       minHeight: 40, maxHeight: 120,
       backgroundColor: c.card,
-      borderRadius: 12, borderWidth: 1, borderColor: c.surface2,
-      paddingHorizontal: 12,
+      borderRadius: 20, borderWidth: 1, borderColor: c.surface2,
+      paddingHorizontal: 16,
       paddingTop:    Platform.OS === 'ios' ? 10 : 8,
       paddingBottom: Platform.OS === 'ios' ? 10 : 8,
       fontSize: 14, color: c.text,
