@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  ActivityIndicator,
+  ActivityIndicator, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { activityApi } from '../api/services';
+import { activityApi, productsApi } from '../api/services';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { ActivityLog } from '../types';
 import { useThemeStore } from '../store/themeStore';
@@ -50,6 +50,8 @@ export default function ActivityScreen() {
   const navigation = useNavigation();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [productSearch, setProductSearch] = useState('');
+  const [allProducts, setAllProducts] = useState<{ id: number; product_id: string }[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -62,10 +64,43 @@ export default function ActivityScreen() {
   useEffect(() => { load(); }, [load]);
   useWsEvents({ onActivityChanged: load });
 
+  useEffect(() => {
+    productsApi.getPaged(undefined, 500).then(res => {
+      setAllProducts((res.data?.data || []).map((p: any) => ({ id: p.id, product_id: p.product_id })));
+    }).catch(() => {});
+  }, []);
+
+  // Precise match: "cs" matches "CS-001" but NOT "CSA-001"
+  const matchProductId = (pid: string, query: string) => {
+    const q = query.toLowerCase();
+    const p = pid.toLowerCase();
+    if (p === q) return true;
+    if (!p.startsWith(q)) return false;
+    return !/[a-z0-9]/i.test(p[q.length]);
+  };
+
+  // Check if a product ID appears as a standalone token in a details string.
+  const idInDetails = (details: string, productId: string) => {
+    const escaped = productId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:[^a-zA-Z0-9]|$)`, 'i').test(details);
+  };
+
+  const filteredLogs = useMemo(() => {
+    const q = productSearch.trim();
+    if (!q) return logs;
+    const matching = allProducts.filter(p => matchProductId(p.product_id, q));
+    if (matching.length === 0) return [];
+    const ids = new Set(matching.map(p => p.id));
+    return logs.filter(log =>
+      (log.entity === 'product' && ids.has(log.entity_id)) ||
+      matching.some(p => idInDetails(log.details, p.product_id))
+    );
+  }, [logs, productSearch, allProducts]);
+
   // Build grouped flat list
   const grouped: ListItem[] = [];
   let lastDate = '';
-  for (const log of logs) {
+  for (const log of filteredLogs) {
     const d = new Date(log.created_at);
     const today = new Date();
     const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
@@ -84,10 +119,30 @@ export default function ActivityScreen() {
           <Text style={s.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={s.title}>⚡  Activity</Text>
-        {logs.length > 0 && (
+        {filteredLogs.length > 0 && (
           <View style={s.countBadge}>
-            <Text style={s.countText}>{logs.length}</Text>
+            <Text style={s.countText}>
+              {productSearch ? `${filteredLogs.length} / ${logs.length}` : logs.length}
+            </Text>
           </View>
+        )}
+      </View>
+
+      {/* Product filter */}
+      <View style={s.searchBar}>
+        <Text style={s.searchIcon}>🔍</Text>
+        <TextInput
+          style={s.searchInput}
+          placeholder="Filter by product ID or name..."
+          placeholderTextColor={c.textMuted}
+          value={productSearch}
+          onChangeText={setProductSearch}
+          clearButtonMode="while-editing"
+        />
+        {productSearch.length > 0 && (
+          <TouchableOpacity onPress={() => setProductSearch('')} style={s.clearBtn}>
+            <Text style={s.clearTxt}>✕</Text>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -98,7 +153,7 @@ export default function ActivityScreen() {
       ) : grouped.length === 0 ? (
         <View style={s.center}>
           <Text style={{ fontSize: 40 }}>⚡</Text>
-          <Text style={s.emptyText}>No activity yet</Text>
+          <Text style={s.emptyText}>{productSearch ? 'No activity for this product' : 'No activity yet'}</Text>
         </View>
       ) : (
         <FlatList
@@ -171,6 +226,20 @@ function makeStyles(c: ThemeColors) {
 
     center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
     emptyText: { fontSize: 14, color: c.textMuted },
+
+    searchBar: {
+      flexDirection: 'row', alignItems: 'center', gap: 8,
+      paddingHorizontal: 14, paddingVertical: 10,
+      borderBottomWidth: 1, borderBottomColor: c.surface2,
+      backgroundColor: c.headerBg,
+    },
+    searchIcon: { fontSize: 14 },
+    searchInput: {
+      flex: 1, fontSize: 14, color: c.text,
+      paddingVertical: 6,
+    },
+    clearBtn: { padding: 4 },
+    clearTxt: { fontSize: 13, color: c.textMuted },
 
     dateHeader: {
       paddingHorizontal: 16, paddingVertical: 8,

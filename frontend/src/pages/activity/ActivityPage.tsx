@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { activityApi } from '../../api/client';
+import { activityApi, productsApi } from '../../api/client';
 import { formatDate, formatDateTime } from '../../utils/date';
 import { useThemeStore } from '../../store/themeStore';
 import {
   Plus, Trash2, RefreshCw, Edit3, ShieldCheck, Activity,
-  Search, Filter, X, ChevronDown, Paperclip, MessageSquare,
+  Search, Filter, X, ChevronDown, Paperclip, MessageSquare, Package,
 } from 'lucide-react';
 
 interface ActivityLog {
@@ -74,6 +74,7 @@ export default function ActivityPage() {
   const [actionFilter, setActionFilter] = useState('all');
   const [entityFilter, setEntityFilter] = useState('all');
   const [userFilter, setUserFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
@@ -81,6 +82,37 @@ export default function ActivityPage() {
     queryKey: ['activity-full'],
     queryFn: () => activityApi.getRecent(500),
   });
+
+  const { data: productsData } = useQuery({
+    queryKey: ['products-list-for-filter'],
+    queryFn: () => productsApi.getAll(),
+    staleTime: 60000,
+  });
+  const allProducts: { id: number; product_id: string; customer_name: string }[] =
+    productsData?.data || [];
+
+  // Precise product ID match: "cs" matches "CS-001" but NOT "CSA-001"
+  // After the typed prefix, the next char must be a separator or end of string.
+  const matchProductId = (pid: string, query: string) => {
+    const q = query.toLowerCase();
+    const p = pid.toLowerCase();
+    if (p === q) return true;
+    if (!p.startsWith(q)) return false;
+    return !/[a-z0-9]/i.test(p[q.length]);
+  };
+
+  // Check if a product ID appears as a standalone token in a details string.
+  // "cs" in "product CS-001" matches; "cs" in "product CSA-001" does NOT.
+  const idInDetails = (details: string, productId: string) => {
+    const escaped = productId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:[^a-zA-Z0-9]|$)`, 'i').test(details);
+  };
+
+  const matchingProducts = useMemo(() =>
+    productFilter.trim()
+      ? allProducts.filter(p => matchProductId(p.product_id, productFilter.trim()))
+      : [],
+  [productFilter, allProducts]);
 
   const logs: ActivityLog[] = data?.data || [];
 
@@ -99,6 +131,13 @@ export default function ActivityPage() {
       if (actionFilter !== 'all' && log.action !== actionFilter) return false;
       if (entityFilter !== 'all' && log.entity !== entityFilter) return false;
       if (userFilter && log.user?.name.toLowerCase().includes(userFilter.toLowerCase()) === false) return false;
+      if (productFilter.trim()) {
+        if (matchingProducts.length === 0) return false;
+        const ids = new Set(matchingProducts.map(p => p.id));
+        const matchDirect = log.entity === 'product' && ids.has(log.entity_id);
+        const matchDetails = matchingProducts.some(p => idInDetails(log.details, p.product_id));
+        if (!matchDirect && !matchDetails) return false;
+      }
       if (search) {
         const q = search.toLowerCase();
         const matches = log.details.toLowerCase().includes(q)
@@ -118,15 +157,16 @@ export default function ActivityPage() {
       }
       return true;
     });
-  }, [logs, actionFilter, entityFilter, userFilter, search, dateFrom, dateTo]);
+  }, [logs, actionFilter, entityFilter, userFilter, productFilter, search, dateFrom, dateTo, allProducts]);
 
-  const hasFilters = actionFilter !== 'all' || entityFilter !== 'all' || userFilter || search || dateFrom || dateTo;
+  const hasFilters = actionFilter !== 'all' || entityFilter !== 'all' || userFilter || productFilter || search || dateFrom || dateTo;
 
   const clearFilters = () => {
     setSearch('');
     setActionFilter('all');
     setEntityFilter('all');
     setUserFilter('');
+    setProductFilter('');
     setDateFrom('');
     setDateTo('');
   };
@@ -227,6 +267,25 @@ export default function ActivityPage() {
               ))}
             </select>
             <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 pointer-events-none" />
+          </div>
+
+          {/* Product filter */}
+          <div className="relative">
+            <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Product ID (e.g. CS-001)"
+              value={productFilter}
+              onChange={e => setProductFilter(e.target.value)}
+              className={`${inputCls} !pl-9 w-full`}
+            />
+            {productFilter.trim() && (
+              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-medium ${
+                matchingProducts.length > 0 ? 'text-emerald-400' : 'text-red-400'
+              }`}>
+                {matchingProducts.length > 0 ? `${matchingProducts.length} match` : 'no match'}
+              </span>
+            )}
           </div>
 
           {/* User filter */}
