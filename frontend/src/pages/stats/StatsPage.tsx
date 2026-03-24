@@ -56,14 +56,14 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  yet_to_start: 'bg-surface-400',
+  yet_to_start: 'bg-red-500',
   working: 'bg-blue-500',
   review: 'bg-amber-500',
   done: 'bg-emerald-500',
 };
 
 const STATUS_TEXT: Record<string, string> = {
-  yet_to_start: 'text-surface-500',
+  yet_to_start: 'text-red-500',
   working: 'text-blue-500',
   review: 'text-amber-500',
   done: 'text-emerald-500',

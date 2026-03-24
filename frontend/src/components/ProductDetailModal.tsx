@@ -12,6 +12,7 @@ import {
   Send, Edit2, Image, FileText, File, ImagePlus, Plus, Reply, MoreVertical,
   ExternalLink,
 } from 'lucide-react';
+import { UserAvatar } from './UserAvatar';
 
 function todayAtMidnight() {
   const d = new Date();
@@ -526,9 +527,10 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
                   {editAssigneeIds.map(id => {
                     const u = usersList.find((u: any) => u.id === id);
                     return u ? (
-                      <span key={id} className="inline-flex items-center gap-1 bg-brand-500/15 text-brand-300 text-xs px-2.5 py-1 rounded-full border border-brand-500/30">
+                      <span key={id} className="inline-flex items-center gap-1.5 text-surface-200 text-xs pl-1 pr-2 py-1 rounded-full border border-surface-700/50 shadow-sm transition-colors hover:border-brand-500/30">
+                        <UserAvatar user={u} size="xs" />
                         {(u as any).name}
-                        <button type="button" onClick={() => setEditAssigneeIds(prev => prev.filter(x => x !== id))} className="hover:text-red-400 transition-colors ml-0.5">
+                        <button type="button" onClick={() => setEditAssigneeIds(prev => prev.filter(x => x !== id))} className="text-surface-500 hover:text-red-400 transition-colors ml-0.5">
                           <X className="w-3 h-3" />
                         </button>
                       </span>
@@ -567,7 +569,19 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
             <DetailRow label="Customer Phone" value={product.customer_phone || '—'} />
             <DetailRow label="Description" value={product.description || '—'} />
             <DetailRow label="Delivery Date & Time" value={product.delivery_at ? formatDateTime(product.delivery_at) : '—'} />
-            <DetailRow label="Assigned To" value={(product.assignees && product.assignees.length > 0) ? product.assignees.map(u => u.name).join(', ') : '—'} />
+            <DetailRow
+              label="Assigned To"
+              value={(product.assignees && product.assignees.length > 0) ? (
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {product.assignees.map(u => (
+                    <div key={u.id} className="flex items-center gap-2 px-2 py-1.5 rounded-xl border border-surface-700/30 hover:border-brand-500/30 transition-colors">
+                      <UserAvatar user={u} size="xs" />
+                      <span className="text-sm font-medium">{u.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : '—'}
+            />
           </>
         )}
         <DetailRow label="Created By" value={product.creator?.name || '—'} />
@@ -622,7 +636,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs font-medium text-surface-500 uppercase tracking-wider">{label}</span>
@@ -999,7 +1013,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
                   <div className={`relative px-3.5 py-2 shadow-sm ${
                     isOwn 
                       ? 'bg-brand-600 text-white rounded-2xl rounded-tr-sm' 
-                      : 'bg-surface-800 text-surface-200 rounded-2xl rounded-tl-sm border border-surface-700/50'
+                      : 'text-surface-200 rounded-2xl rounded-tl-sm border border-surface-700/50 shadow-sm'
                   }`}>
                     {/* Reply reference */}
                     {parsed.replyToId && parsed.replyPreview && (
@@ -1112,7 +1126,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
 
       {/* Reply bar */}
       {replyTo && (
-        <div className="flex items-center gap-2 mb-2 bg-surface-800/60 border-l-2 border-brand-500 pl-3 pr-2 py-2 rounded-r-lg">
+        <div className="flex items-center gap-2 mb-2 bg-brand-500/5 border-l-2 border-brand-500 pl-3 pr-2 py-2 rounded-r-lg">
           <Reply className="w-3.5 h-3.5 text-brand-400 flex-shrink-0 rotate-180" />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-brand-400 font-medium">{replyTo.user?.name}</p>

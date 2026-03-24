@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { usersApi, productsApi } from '../api/client';
 import { User } from '../types';
 import { Package } from 'lucide-react';
+import { UserAvatar } from './UserAvatar';
 
 interface MentionInputProps {
   value: string;
@@ -198,11 +199,7 @@ const MentionInput = forwardRef<MentionInputHandle, MentionInputProps>(
                         : 'hover:bg-surface-700/50 text-surface-200'
                     }`}
                   >
-                    <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center text-[10px] font-bold ${
-                      idx === highlightIdx ? 'bg-white/20 text-white' : 'bg-brand-600/80 text-white'
-                    }`}>
-                      {user.name.charAt(0).toUpperCase()}
-                    </div>
+                    <UserAvatar user={user} size="xs" className={idx === highlightIdx ? 'ring-1 ring-white/30' : ''} />
                     <span className="text-sm font-medium truncate">{user.name}</span>
                     <span className={`text-[10px] ml-auto flex-shrink-0 ${idx === highlightIdx ? 'text-white/60' : 'text-surface-500'}`}>
                       {user.role?.name}

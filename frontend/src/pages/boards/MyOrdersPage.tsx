@@ -24,10 +24,18 @@ const TABS: Array<{ key: TabKey; label: string }> = [
 
 const TAB_ACTIVE: Record<string, string> = {
   '':           'bg-brand-500/15 text-brand-400 border-brand-500/40',
-  yet_to_start: 'bg-surface-500/15 text-surface-300 border-surface-500/40',
+  yet_to_start: 'bg-red-500/15 text-red-500 border-red-500/40',
   working:      'bg-blue-500/15 text-blue-400 border-blue-500/40',
   review:       'bg-amber-500/15 text-amber-400 border-amber-500/40',
   done:         'bg-emerald-500/15 text-emerald-400 border-emerald-500/40',
+};
+
+const TAB_DOTS: Record<string, string> = {
+  '':           'bg-brand-400',
+  yet_to_start: 'bg-red-500',
+  working:      'bg-blue-400',
+  review:       'bg-amber-400',
+  done:         'bg-emerald-400',
 };
 
 const TAB_IDLE = 'text-surface-400 border-transparent hover:text-surface-200 hover:bg-surface-800/60';
@@ -179,6 +187,7 @@ export default function MyOrdersPage() {
                 isActive ? TAB_ACTIVE[key] : TAB_IDLE
               }`}
             >
+              <div className={`w-2 h-2 rounded-full ${TAB_DOTS[key]}`} />
               {label}
               {count !== null && (
                 <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${

@@ -115,7 +115,7 @@ export default function ActivityPanel({ onClose }: { onClose: () => void }) {
         ) : (
           grouped.map(({ date, items }) => (
             <div key={date}>
-              <div className="px-4 py-2 bg-surface-800/40 border-b border-surface-700/30 sticky top-0">
+              <div className="px-4 py-2 border-b border-surface-700/30 sticky top-0 bg-surface-900/40 backdrop-blur-md">
                 <span className="text-[11px] font-medium text-surface-400 uppercase tracking-wider">{date}</span>
               </div>
               {items.map((log) => {

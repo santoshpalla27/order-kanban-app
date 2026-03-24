@@ -137,7 +137,7 @@ export default function KanbanBoard() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const columnColors: Record<ProductStatus, { bg: string; border: string; dot: string }> = {
-    yet_to_start: { bg: 'bg-gray-500/5',    border: 'border-gray-600/30',   dot: 'bg-gray-400'    },
+    yet_to_start: { bg: 'bg-red-500/5',     border: 'border-red-600/30',    dot: 'bg-red-500'     },
     working:      { bg: 'bg-blue-500/5',    border: 'border-blue-600/30',   dot: 'bg-blue-400'    },
     review:       { bg: 'bg-amber-500/5',   border: 'border-amber-600/30',  dot: 'bg-amber-400'   },
     done:         { bg: 'bg-emerald-500/5', border: 'border-emerald-600/30', dot: 'bg-emerald-400' },

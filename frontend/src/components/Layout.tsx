@@ -11,6 +11,7 @@ import NotificationPanel from './NotificationPanel';
 import ActivityPanel from './ActivityPanel';
 import NotificationToast from './NotificationToast';
 import ProfileModal from './ProfileModal';
+import { UserAvatar } from './UserAvatar';
 import {
   LayoutDashboard,
   List,
@@ -30,31 +31,6 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-const AVATAR_COLORS = [
-  'from-violet-500 to-purple-500',
-  'from-blue-500 to-cyan-500',
-  'from-emerald-500 to-teal-500',
-  'from-amber-500 to-orange-500',
-  'from-rose-500 to-pink-500',
-  'from-fuchsia-500 to-purple-500',
-];
-
-function getAvatarGradient(name: string) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
-
-function UserAvatar({ user, size = 'sm' }: { user: { name: string }; size?: 'sm' | 'md' }) {
-  const gradient = getAvatarGradient(user.name);
-  const initial = user.name.charAt(0).toUpperCase();
-  const sizeClass = size === 'sm' ? 'w-7 h-7 text-xs' : 'w-8 h-8 text-sm';
-  return (
-    <div className={`${sizeClass} rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center font-bold text-white flex-shrink-0`}>
-      {initial}
-    </div>
-  );
-}
 
 export default function Layout() {
   const { user, logout, isAdmin, canAccessTrash, canViewStats } = useAuthStore();
