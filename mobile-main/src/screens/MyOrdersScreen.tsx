@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Feather } from '@expo/vector-icons';
 import { productsApi } from '../api/services';
 import { usersApi } from '../api/services';
 import { useAuthStore } from '../store/authStore';
@@ -196,7 +197,8 @@ export default function MyOrdersScreen() {
           style={[styles.filterBtn, hasActiveFilters && styles.filterBtnActive]}
           onPress={() => setShowFilters(true)}
         >
-          <Text style={styles.filterBtnText}>⚙ Filters{hasActiveFilters ? ' •' : ''}</Text>
+          <Feather name="filter" size={14} color={hasActiveFilters ? c.brand : c.textSec} />
+          <Text style={[styles.filterBtnText, hasActiveFilters && { color: c.brand }]}>Filters{hasActiveFilters ? ' •' : ''}</Text>
         </TouchableOpacity>
       </View>
 
@@ -252,7 +254,7 @@ export default function MyOrdersScreen() {
           onEndReachedThreshold={0.3}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>📋</Text>
+              <Feather name="clipboard" size={48} color={c.textMuted} style={{ marginBottom: 4 }} />
               <Text style={styles.emptyTitle}>No orders assigned to you</Text>
               <Text style={styles.emptySubtitle}>
                 {filters.search ? 'Try a different search term' : 'Orders assigned to you will appear here'}
@@ -314,20 +316,23 @@ function makeStyles(c: ThemeColors) {
     searchInput: {
       flex: 1,
       backgroundColor: c.surface,
-      borderRadius: 12,
+      borderRadius: 99,
       borderWidth: 1,
       borderColor: c.border2,
       color: c.text,
-      paddingHorizontal: 14,
+      paddingHorizontal: 16,
       paddingVertical: 10,
       fontSize: 14,
     },
     filterBtn: {
       backgroundColor: c.surface,
-      borderRadius: 12,
+      borderRadius: 99,
       borderWidth: 1,
       borderColor: c.border2,
-      paddingHorizontal: 14,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       justifyContent: 'center',
     },
     filterBtnActive: { borderColor: c.brand, backgroundColor: 'rgba(99,102,241,0.12)' },

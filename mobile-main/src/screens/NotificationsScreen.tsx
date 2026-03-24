@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Feather } from '@expo/vector-icons';
 import { notificationsApi } from '../api/services';
 import { useNotificationStore } from '../store/notificationStore';
 import { useBadgeStore } from '../store/badgeStore';
@@ -172,11 +173,14 @@ export default function NotificationsScreen() {
       {/* ── Header ── */}
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-          <Text style={s.backIcon}>←</Text>
+          <Feather name="arrow-left" size={24} color={c.textSec} style={{ marginTop: 2 }} />
         </TouchableOpacity>
-        <Text style={s.title} numberOfLines={1}>
-          🔔  Notifications{unread > 0 ? ` (${unread})` : ''}
-        </Text>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Feather name="bell" size={18} color={c.text} />
+          <Text style={s.title} numberOfLines={1}>
+            Notifications{unread > 0 ? ` (${unread})` : ''}
+          </Text>
+        </View>
         <View style={s.headerActions}>
           {/* Refresh */}
           <TouchableOpacity
@@ -290,7 +294,7 @@ export default function NotificationsScreen() {
           keyExtractor={(n) => String(n.id)}
           ListEmptyComponent={
             <View style={s.emptyWrap}>
-              <Text style={{ fontSize: 40 }}>🔔</Text>
+              <Feather name="bell" size={48} color={c.textMuted} />
               <Text style={s.emptyText}>
                 {hasFilters ? 'No notifications match your filters' : 'No notifications yet'}
               </Text>
@@ -370,13 +374,13 @@ function makeStyles(c: ThemeColors) {
     },
     backBtn:  { padding: 4 },
     backIcon: { fontSize: 22, color: c.textSec },
-    title:    { flex: 1, fontSize: 16, fontWeight: '700', color: c.text },
+    title:    { fontSize: 16, fontWeight: '700', color: c.text },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     iconBtn:     { padding: 6 },
     iconBtnText: { fontSize: 20, color: c.textSec, fontWeight: '600' },
     markAllBtn: {
       paddingHorizontal: 10, paddingVertical: 6,
-      borderRadius: 8, backgroundColor: c.brand,
+      borderRadius: 99, backgroundColor: c.brand,
     },
     markAllText: { fontSize: 11, color: '#fff', fontWeight: '600' },
 
@@ -390,10 +394,10 @@ function makeStyles(c: ThemeColors) {
       flex: 1,
       height: 38,
       backgroundColor: c.inputBg,
-      borderRadius: 10,
+      borderRadius: 99,
       borderWidth: 1,
       borderColor: c.surface2,
-      paddingHorizontal: 12,
+      paddingHorizontal: 16,
       fontSize: 14,
       color: c.text,
     },
@@ -409,7 +413,7 @@ function makeStyles(c: ThemeColors) {
     tab: {
       flex: 1, alignItems: 'center',
       paddingVertical: 7,
-      borderRadius: 8,
+      borderRadius: 99,
       backgroundColor: c.inputBg,
       borderWidth: 1, borderColor: c.surface2,
     },
@@ -426,9 +430,9 @@ function makeStyles(c: ThemeColors) {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
       height: 38,
       backgroundColor: c.inputBg,
-      borderRadius: 10,
+      borderRadius: 99,
       borderWidth: 1, borderColor: c.surface2,
-      paddingHorizontal: 12,
+      paddingHorizontal: 16,
     },
     dropdownLabel:   { fontSize: 14, color: c.text, flex: 1 },
     dropdownChevron: { fontSize: 14, color: c.textMuted, marginLeft: 6 },
@@ -440,7 +444,7 @@ function makeStyles(c: ThemeColors) {
     },
     dropdownMenu: {
       backgroundColor: c.inputBg,
-      borderRadius: 12,
+      borderRadius: 16,
       borderWidth: 1, borderColor: c.surface2,
       overflow: 'hidden',
     },
@@ -464,17 +468,17 @@ function makeStyles(c: ThemeColors) {
     emptyText: { fontSize: 14, color: c.textMuted },
     emptyClrBtn: {
       marginTop: 4, paddingHorizontal: 14, paddingVertical: 7,
-      borderRadius: 8, borderWidth: 1, borderColor: '#EF4444',
+      borderRadius: 99, borderWidth: 1, borderColor: '#EF4444',
     },
     emptyClrText: { fontSize: 13, color: '#EF4444' },
 
     // Notification items
     item: {
       flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-      paddingHorizontal: 16, paddingVertical: 14,
+      paddingHorizontal: 16, paddingVertical: 18,
       borderBottomWidth: 1, borderBottomColor: c.surface2,
     },
-    itemUnread:  { backgroundColor: 'rgba(99,102,241,0.05)' },
+    itemUnread:  { backgroundColor: 'rgba(99,102,241,0.08)' },
 
     // Avatar
     avatar: {
@@ -493,7 +497,7 @@ function makeStyles(c: ThemeColors) {
 
     typeBadge: {
       paddingHorizontal: 7, paddingVertical: 2,
-      borderRadius: 6, borderWidth: 1,
+      borderRadius: 12, borderWidth: 1,
     },
     typeBadgeText: { fontSize: 10, fontWeight: '600' },
 

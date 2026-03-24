@@ -5,6 +5,7 @@ import StatusChip from './StatusChip';
 import { formatDate } from '../utils/helpers';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
+import { Feather } from '@expo/vector-icons';
 
 interface Props {
   product: Product;
@@ -31,15 +32,21 @@ export default function ProductCard({ product, onPress, showStatus = true, hasBa
 
       {/* Bottom row: assignees left, delivery date right */}
       <View style={styles.footer}>
-        <Text style={styles.assignees} numberOfLines={1}>
-          {product.assignees && product.assignees.length > 0
-            ? '👤 ' + product.assignees.map((a) => a.name).join(', ')
-            : '👤 Unassigned'}
-        </Text>
-        {product.delivery_at && (
-          <Text style={styles.delivery}>
-            📅 {formatDate(product.delivery_at)}
+        <View style={styles.assigneeWrap}>
+          <Feather name="user" size={12} color={c.textSec} style={{ marginTop: 1 }} />
+          <Text style={styles.assignees} numberOfLines={1}>
+            {product.assignees && product.assignees.length > 0
+              ? product.assignees.map((a) => a.name).join(', ')
+              : 'Unassigned'}
           </Text>
+        </View>
+        {product.delivery_at && (
+          <View style={styles.deliveryWrap}>
+            <Feather name="calendar" size={12} color="#FBBF24" style={{ marginTop: 1 }} />
+            <Text style={styles.delivery}>
+              {formatDate(product.delivery_at)}
+            </Text>
+          </View>
         )}
       </View>
     </TouchableOpacity>
@@ -50,12 +57,17 @@ function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     card: {
       backgroundColor: c.surface,
-      borderRadius: 14,
-      padding: 16,
-      marginBottom: 10,
+      borderRadius: 20,
+      padding: 18,
+      marginBottom: 12,
       borderWidth: 1,
       borderColor: c.border2,
-      gap: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: c.isDark ? 0.3 : 0.05,
+      shadowRadius: 12,
+      elevation: 3,
+      gap: 12,
     },
     row: {
       flexDirection: 'row',
@@ -100,14 +112,26 @@ function makeStyles(c: ThemeColors) {
       gap: 10,
       marginTop: 6,
     },
+    assigneeWrap: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
     assignees: {
       fontSize: 12,
       color: c.textSec,
-      flex: 1,
+      flexShrink: 1,
+    },
+    deliveryWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
     },
     delivery: {
       fontSize: 11,
       color: '#FBBF24',
+      fontWeight: '600',
     },
   });
 }

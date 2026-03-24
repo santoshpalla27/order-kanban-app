@@ -6,6 +6,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import { productsApi } from '../api/services';
 import { usersApi } from '../api/services';
 import { useAuthStore } from '../store/authStore';
@@ -214,7 +215,8 @@ export default function ListScreen() {
           style={[styles.filterBtn, hasActiveFilters && styles.filterBtnActive]}
           onPress={() => setShowFilters(true)}
         >
-          <Text style={styles.filterBtnText}>⚙ Filters{hasActiveFilters ? ' •' : ''}</Text>
+          <Feather name="filter" size={14} color={hasActiveFilters ? c.brand : c.textSec} />
+          <Text style={[styles.filterBtnText, hasActiveFilters && { color: c.brand }]}>Filters{hasActiveFilters ? ' •' : ''}</Text>
         </TouchableOpacity>
       </View>
 
@@ -270,7 +272,7 @@ export default function ListScreen() {
           onEndReachedThreshold={0.3}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Text style={styles.emptyIcon}>📦</Text>
+              <Feather name="package" size={48} color={c.textMuted} />
               <Text style={styles.emptyTitle}>No products found</Text>
               <Text style={styles.emptySubtitle}>
                 {filters.search ? 'Try a different search term' : 'Create your first product'}
@@ -312,7 +314,7 @@ export default function ListScreen() {
           style={[styles.fab, { bottom: insets.bottom + 20 }]}
           onPress={() => navigation.navigate('CreateProduct')}
         >
-          <Text style={styles.fabText}>＋</Text>
+          <Feather name="plus" size={32} color="#fff" />
         </TouchableOpacity>
       )}
 
@@ -341,7 +343,7 @@ function makeStyles(c: ThemeColors) {
     searchInput: {
       flex: 1,
       backgroundColor: c.surface,
-      borderRadius: 12,
+      borderRadius: 99,
       borderWidth: 1,
       borderColor: c.border2,
       color: c.text,
@@ -351,10 +353,13 @@ function makeStyles(c: ThemeColors) {
     },
     filterBtn: {
       backgroundColor: c.surface,
-      borderRadius: 12,
+      borderRadius: 99,
       borderWidth: 1,
       borderColor: c.border2,
-      paddingHorizontal: 14,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       justifyContent: 'center',
     },
     filterBtnActive: { borderColor: c.brand, backgroundColor: 'rgba(99,102,241,0.12)' },
@@ -394,14 +399,17 @@ function makeStyles(c: ThemeColors) {
       position: 'absolute',
       bottom: 24,
       right: 20,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 60,
+      height: 60,
+      borderRadius: 30,
       backgroundColor: c.brand,
       alignItems: 'center',
       justifyContent: 'center',
-      elevation: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.35,
+      shadowRadius: 16,
+      elevation: 8,
     },
-    fabText: { color: '#fff', fontSize: 28, lineHeight: 30 },
   });
 }

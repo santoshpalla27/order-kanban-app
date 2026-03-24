@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
 import { profileApi, authApi } from '../api/services';
+import { Feather } from '@expo/vector-icons';
 
 const ROLE_META: Record<string, { label: string; color: string; bg: string }> = {
   admin:     { label: 'Admin',     color: '#F87171', bg: 'rgba(239,68,68,0.15)' },
@@ -94,7 +95,7 @@ export default function ProfileScreen() {
           {/* Full Name */}
           <View style={s.row}>
             <View style={s.rowLeft}>
-              <Text style={s.rowIcon}>👤</Text>
+              <View style={s.rowIcon}><Feather name="user" size={20} color={c.textSec} /></View>
               <View>
                 <Text style={s.rowLabel}>Full Name</Text>
                 {editingName ? (
@@ -139,7 +140,7 @@ export default function ProfileScreen() {
           {/* Email */}
           <View style={s.row}>
             <View style={s.rowLeft}>
-              <Text style={s.rowIcon}>✉️</Text>
+              <View style={s.rowIcon}><Feather name="mail" size={20} color={c.textSec} /></View>
               <View>
                 <Text style={s.rowLabel}>Email</Text>
                 <Text style={s.rowValue}>{user?.email ?? '—'}</Text>
@@ -152,7 +153,7 @@ export default function ProfileScreen() {
           {/* Role */}
           <View style={s.row}>
             <View style={s.rowLeft}>
-              <Text style={s.rowIcon}>🎖️</Text>
+              <View style={s.rowIcon}><Feather name="award" size={20} color={c.textSec} /></View>
               <View>
                 <Text style={s.rowLabel}>Role</Text>
                 <Text style={[s.rowValue, { color: meta.color }]}>{meta.label}</Text>
@@ -165,7 +166,7 @@ export default function ProfileScreen() {
           {/* Theme toggle */}
           <View style={s.row}>
             <View style={s.rowLeft}>
-              <Text style={s.rowIcon}>{isDark ? '🌙' : '☀️'}</Text>
+              <View style={s.rowIcon}><Feather name={isDark ? 'moon' : 'sun'} size={20} color={c.textSec} /></View>
               <View>
                 <Text style={s.rowLabel}>Appearance</Text>
                 <Text style={s.rowValue}>{isDark ? 'Dark Mode' : 'Light Mode'}</Text>
@@ -182,7 +183,7 @@ export default function ProfileScreen() {
 
         {/* ── Logout ──────────────────────────────────────────────── */}
         <TouchableOpacity style={s.logoutBtn} onPress={() => setShowLogout(true)}>
-          <Text style={s.logoutIcon}>🚪</Text>
+          <Feather name="log-out" size={20} color="#EF4444" style={s.logoutIcon} />
           <Text style={s.logoutTxt}>Sign Out</Text>
         </TouchableOpacity>
 
@@ -192,7 +193,7 @@ export default function ProfileScreen() {
       <Modal visible={showLogout} transparent animationType="fade" onRequestClose={() => setShowLogout(false)}>
         <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={() => setShowLogout(false)}>
           <View style={s.logoutModal}>
-            <Text style={{ fontSize: 44, marginBottom: 12 }}>🚪</Text>
+            <Feather name="log-out" size={44} color="#EF4444" style={{ marginBottom: 16 }} />
             <Text style={s.logoutTitle}>Sign Out?</Text>
             <Text style={s.logoutSub}>You'll need to log in again to access the app.</Text>
             <TouchableOpacity style={s.logoutConfirm} onPress={doLogout}>
@@ -218,7 +219,12 @@ function makeStyles(c: ThemeColors) {
     header: { alignItems: 'center', marginBottom: 8, gap: 12 },
 
     avatarWrap: { position: 'relative' },
-    avatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: c.brand },
+    avatar: { 
+      width: 110, height: 110, borderRadius: 55, 
+      borderWidth: 2, borderColor: c.brand,
+      shadowColor: c.brand, shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.2, shadowRadius: 12, elevation: 6
+    },
     avatarFallback: { alignItems: 'center', justifyContent: 'center' },
     initials: { fontSize: 38, fontWeight: '800', color: '#fff', letterSpacing: 1 },
 
@@ -242,34 +248,34 @@ function makeStyles(c: ThemeColors) {
 
     // ── Card
     card: {
-      backgroundColor: c.card, borderRadius: 20,
+      backgroundColor: c.card, borderRadius: 24,
       borderWidth: 1, borderColor: c.border,
       overflow: 'hidden',
-      shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: c.isDark ? 0.25 : 0.08, shadowRadius: 10, elevation: 5,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.isDark ? 0.25 : 0.04, shadowRadius: 16, elevation: 4,
     },
     divider: { height: 1, backgroundColor: c.border, marginHorizontal: 16 },
 
     row: {
       flexDirection: 'row', alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 18, paddingVertical: 16,
+      paddingHorizontal: 18, paddingVertical: 18,
     },
     rowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 },
-    rowIcon:  { fontSize: 20, width: 28, textAlign: 'center' },
+    rowIcon:  { width: 28, alignItems: 'center' },
     rowLabel: { fontSize: 11, color: c.textMuted, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 3 },
     rowValue: { fontSize: 15, color: c.text, fontWeight: '600' },
 
     // Name edit
     nameInput: {
-      backgroundColor: c.surface, borderRadius: 8, borderWidth: 1,
+      backgroundColor: c.surface, borderRadius: 12, borderWidth: 1,
       borderColor: c.brand, color: c.text, paddingHorizontal: 10,
       paddingVertical: 6, fontSize: 15, fontWeight: '600', minWidth: 140,
     },
     editActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     saveBtn: {
       backgroundColor: c.brand, paddingHorizontal: 14, paddingVertical: 7,
-      borderRadius: 9, minWidth: 52, alignItems: 'center',
+      borderRadius: 12, minWidth: 52, alignItems: 'center',
     },
     saveBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
     cancelTxt:  { color: c.textMuted, fontWeight: '700', fontSize: 17, paddingHorizontal: 4 },
@@ -282,12 +288,12 @@ function makeStyles(c: ThemeColors) {
 
     // ── Logout button
     logoutBtn: {
-      backgroundColor: 'rgba(239,68,68,0.07)', borderRadius: 16, borderWidth: 1,
+      backgroundColor: 'rgba(239,68,68,0.07)', borderRadius: 24, borderWidth: 1,
       borderColor: 'rgba(239,68,68,0.18)', flexDirection: 'row',
       alignItems: 'center', justifyContent: 'center',
       paddingVertical: 15, gap: 10,
     },
-    logoutIcon: { fontSize: 20 },
+    logoutIcon: {},
     logoutTxt:  { fontSize: 15, fontWeight: '700', color: '#EF4444' },
 
     // ── Logout modal
@@ -296,7 +302,7 @@ function makeStyles(c: ThemeColors) {
       alignItems: 'center', justifyContent: 'center', padding: 28,
     },
     logoutModal: {
-      backgroundColor: c.card, borderRadius: 26, borderWidth: 1,
+      backgroundColor: c.card, borderRadius: 28, borderWidth: 1,
       borderColor: c.border, padding: 30, width: '100%', alignItems: 'center',
       shadowColor: '#000', shadowOffset: { width: 0, height: 10 },
       shadowOpacity: 0.4, shadowRadius: 24, elevation: 14,
@@ -305,12 +311,12 @@ function makeStyles(c: ThemeColors) {
     logoutSub:   { fontSize: 14, color: c.textMuted, textAlign: 'center', marginBottom: 28, lineHeight: 20 },
     logoutConfirm: {
       backgroundColor: '#EF4444', width: '100%', paddingVertical: 15,
-      borderRadius: 14, alignItems: 'center', marginBottom: 10,
+      borderRadius: 16, alignItems: 'center', marginBottom: 10,
     },
     logoutConfirmTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
     logoutCancel: {
       backgroundColor: c.surface, width: '100%', paddingVertical: 15,
-      borderRadius: 14, alignItems: 'center',
+      borderRadius: 16, alignItems: 'center',
     },
     logoutCancelTxt: { fontSize: 15, fontWeight: '600', color: c.textMuted },
   });

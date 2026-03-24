@@ -10,6 +10,7 @@ import { productsApi, usersApi } from '../api/services';
 import { User } from '../types';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
+import { Feather } from '@expo/vector-icons';
 
 function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -81,9 +82,12 @@ export default function CreateProductScreen() {
         {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={s.backBtn}>
-            <Text style={s.backIcon}>←</Text>
+            <Feather name="arrow-left" size={24} color={c.textSec} style={{ marginTop: 2 }} />
           </TouchableOpacity>
-          <Text style={s.title}>📦  New Product</Text>
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name="package" size={20} color={c.text} />
+            <Text style={s.title}>New Product</Text>
+          </View>
           <TouchableOpacity
             style={[s.createBtn, loading && { opacity: 0.6 }]}
             onPress={handleSubmit}
@@ -180,7 +184,7 @@ export default function CreateProductScreen() {
                   style={{
                     backgroundColor: c.surface,
                     border: `1px solid ${c.border2}`,
-                    borderRadius: 12,
+                    borderRadius: 14,
                     color: deliveryAt ? c.text : c.textDim,
                     padding: '13px 16px',
                     fontSize: 15,
@@ -203,7 +207,7 @@ export default function CreateProductScreen() {
                   <Text style={deliveryAt ? s.dateBtnText : s.dateBtnPlaceholder}>
                     {deliveryAt ? formatDateTime(deliveryAt.toISOString()) : 'Pick date & time'}
                   </Text>
-                  <Text style={s.dateBtnIcon}>📅</Text>
+                  <Feather name="calendar" size={16} color={c.textSec} />
                 </TouchableOpacity>
                 {deliveryAt && (
                   <TouchableOpacity style={s.clearDate} onPress={() => setDeliveryAt(null)}>
@@ -271,7 +275,7 @@ export default function CreateProductScreen() {
                   <View key={u.id} style={s.selectedChip}>
                     <Text style={s.selectedChipText}>{u.name}</Text>
                     <TouchableOpacity onPress={() => removeAssignee(u.id)} hitSlop={6}>
-                      <Text style={s.selectedChipRemove}>✕</Text>
+                      <Feather name="x" size={14} color={c.brandLight} style={{ marginLeft: 2 }} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -282,12 +286,13 @@ export default function CreateProductScreen() {
             {availableUsers.length > 0 && (
               <>
                 <Text style={s.subLabel}>
-                  {selectedUsers.length > 0 ? 'Add more' : '+ Add assignee'}
+                  {selectedUsers.length > 0 ? 'Add more users' : 'Add assignee'}
                 </Text>
                 <View style={s.availableChips}>
                   {availableUsers.map((u) => (
                     <TouchableOpacity key={u.id} style={s.availableChip} onPress={() => addAssignee(u.id)}>
-                      <Text style={s.availableChipText}>+ {u.name}</Text>
+                      <Feather name="plus" size={12} color={c.textMuted} style={{ marginRight: 4 }} />
+                      <Text style={s.availableChipText}>{u.name}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -316,8 +321,8 @@ function makeStyles(c: ThemeColors) {
     },
     backBtn:       { padding: 4 },
     backIcon:      { fontSize: 22, color: c.textSec },
-    title:         { flex: 1, fontSize: 17, fontWeight: '700', color: c.text },
-    createBtn:     { backgroundColor: c.brand, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 10 },
+    title:         { fontSize: 17, fontWeight: '700', color: c.text },
+    createBtn:     { backgroundColor: c.brand, paddingHorizontal: 18, paddingVertical: 8, borderRadius: 99 },
     createBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
     body:    { flex: 1 },
@@ -335,7 +340,7 @@ function makeStyles(c: ThemeColors) {
     subLabel: { fontSize: 12, color: c.textDim, marginTop: 4 },
 
     input: {
-      backgroundColor: c.surface, borderRadius: 12, borderWidth: 1,
+      backgroundColor: c.surface, borderRadius: 14, borderWidth: 1,
       borderColor: c.border2, color: c.text,
       paddingHorizontal: 16, paddingVertical: 13, fontSize: 15,
     },
@@ -344,7 +349,7 @@ function makeStyles(c: ThemeColors) {
     // Date picker button
     dateBtn: {
       flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-      backgroundColor: c.surface, borderRadius: 12, borderWidth: 1,
+      backgroundColor: c.surface, borderRadius: 14, borderWidth: 1,
       borderColor: c.border2, paddingHorizontal: 16, paddingVertical: 13,
     },
     dateBtnText:        { fontSize: 15, color: c.text },
@@ -355,7 +360,7 @@ function makeStyles(c: ThemeColors) {
 
     doneBtn: {
       alignSelf: 'flex-end', marginTop: 8,
-      backgroundColor: c.brand, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 10,
+      backgroundColor: c.brand, paddingHorizontal: 20, paddingVertical: 8, borderRadius: 12,
     },
     doneBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
@@ -372,6 +377,7 @@ function makeStyles(c: ThemeColors) {
 
     availableChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
     availableChip: {
+      flexDirection: 'row', alignItems: 'center',
       paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99,
       borderWidth: 1, borderColor: c.border2, backgroundColor: c.surface,
     },

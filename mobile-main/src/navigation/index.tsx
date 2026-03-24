@@ -16,6 +16,7 @@ import { darkColors, lightColors } from '../theme';
 import { useWsEvents } from '../hooks/useWsEvents';
 import { useNotificationStore } from '../store/notificationStore';
 import { usePushToken } from '../hooks/usePushToken';
+import { Feather } from '@expo/vector-icons';
 
 import LoginScreen          from '../screens/LoginScreen';
 import ListScreen           from '../screens/ListScreen';
@@ -54,16 +55,19 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 function HeaderIcons() {
   const navigation  = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+
   return (
     <View style={h.row}>
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('TeamChat')}>
-        <Text style={h.icon}>💬</Text>
+        <Feather name="message-square" size={20} color={c.text} />
       </TouchableOpacity>
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('Activity')}>
-        <Text style={h.icon}>⚡</Text>
+        <Feather name="zap" size={20} color={c.text} />
       </TouchableOpacity>
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('Notifications')}>
-        <Text style={h.icon}>🔔</Text>
+        <Feather name="bell" size={20} color={c.text} />
         {unreadCount > 0 && (
           <View style={h.badge}>
             <Text style={h.badgeText}>{unreadCount > 99 ? '99+' : String(unreadCount)}</Text>
@@ -122,7 +126,7 @@ function MainTabs() {
         options={{
           title: 'Products',
           tabBarLabel: 'Products',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>📦</Text>,
+          tabBarIcon: ({ color }) => <Feather name="package" size={20} color={color} />,
           tabBarBadge: unreadProductCount > 0 ? unreadProductCount : undefined,
         }}
       />
@@ -132,7 +136,7 @@ function MainTabs() {
         options={{
           title: 'My Orders',
           tabBarLabel: 'My Orders',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>📋</Text>,
+          tabBarIcon: ({ color }) => <Feather name="clipboard" size={20} color={color} />,
           tabBarBadge: myOrdersBadgeCount > 0 ? myOrdersBadgeCount : undefined,
         }}
       />
@@ -142,7 +146,7 @@ function MainTabs() {
         options={{
           title: 'Profile',
           tabBarLabel: 'Profile',
-          tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>👤</Text>,
+          tabBarIcon: ({ color }) => <Feather name="user" size={20} color={color} />,
           headerShown: true,
         }}
       />

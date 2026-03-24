@@ -25,6 +25,7 @@ import StatusChip from '../components/StatusChip';
 import { RootStackParamList } from '../navigation';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
+import { Feather } from '@expo/vector-icons';
 
 type RouteT = RouteProp<RootStackParamList, 'ProductDetail'>;
 
@@ -1751,7 +1752,7 @@ export default function ProductDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+          <Feather name="arrow-left" size={24} color={c.textSec} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.productId}>{product.product_id}</Text>
@@ -1774,7 +1775,7 @@ export default function ProductDetailScreen() {
           )}
           {canDeleteProduct() && (
             <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-              <Text style={styles.deleteBtnText}>🗑</Text>
+              <Feather name="trash-2" size={18} color="#EF4444" />
             </TouchableOpacity>
           )}
         </View>
@@ -1853,12 +1854,11 @@ function makeScreenStyles(c: ThemeColors) {
     backIcon: { fontSize: 22, color: c.textSec },
     productId: { fontSize: 12, fontWeight: '700', color: c.brandLight, fontFamily: 'monospace' },
     customerName: { fontSize: 16, fontWeight: '700', color: c.text },
-    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
     deleteBtn: {
       width: 34, height: 34, borderRadius: 10,
       backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center',
     },
-    deleteBtnText: { fontSize: 16 },
     tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.surface2 },
     tab: {
       flex: 1, paddingVertical: 13, alignItems: 'center',
