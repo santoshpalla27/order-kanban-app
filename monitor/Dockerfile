@@ -4,14 +4,12 @@ FROM golang:1.25-alpine AS builder
 WORKDIR /app
 
 # Resolve and cache dependencies before copying source
-COPY go.mod ./
-RUN go mod download 2>/dev/null; true
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
 
-# go mod tidy regenerates go.sum in case it's missing or stale
-RUN go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o monitor .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o monitor .
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM alpine:3.20
