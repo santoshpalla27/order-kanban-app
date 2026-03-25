@@ -125,7 +125,7 @@ services:
 
   # ── Glances — system metrics dashboard (g.santoshdevops.cloud) ──────────────
   glances:
-    image: nicolargo/glances:stable-full
+    image: nicolargo/glances:latest-full
     container_name: kanban-glances
     restart: unless-stopped
     pid: host
