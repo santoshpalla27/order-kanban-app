@@ -209,5 +209,10 @@ export const statsApi = {
 
 export const purgeApi = {
   getStatus: () => api.get('/purge-status'),
-  runJob: (job: string) => api.post(`/purge-status/run/${job}`),
+  previewJob: (job: string) => api.get(`/purge-status/preview/${job}`),
+  getRows: (job: string, limit = 25, cursor?: number) =>
+    api.get<{ data: any[]; next_cursor: number | null; has_more: boolean }>(`/purge-status/rows/${job}`, {
+      params: { limit, ...(cursor != null ? { cursor } : {}) },
+    }),
+  runJob: (job: string, force = false) => api.post(`/purge-status/run/${job}${force ? '?force=true' : ''}`),
 };

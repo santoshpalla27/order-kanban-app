@@ -212,13 +212,18 @@ func RestoreProduct(id uint) error {
 }
 
 // PurgeExpiredDeletedProducts hard-deletes products whose grace period has elapsed.
-func PurgeExpiredDeletedProducts() (int64, error) {
-	graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
+// Pass force=true to skip the grace period and purge all soft-deleted products immediately.
+func PurgeExpiredDeletedProducts(force ...bool) (int64, error) {
+	forceAll := len(force) > 0 && force[0]
+
+	query := database.DB.Unscoped().Model(&models.Product{}).Where("deleted_at IS NOT NULL")
+	if !forceAll {
+		graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
+		query = query.Where("deleted_at < ?", graceCutoff)
+	}
 
 	var productIDs []uint
-	if err := database.DB.Unscoped().Model(&models.Product{}).
-		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
-		Pluck("id", &productIDs).Error; err != nil {
+	if err := query.Pluck("id", &productIDs).Error; err != nil {
 		return 0, err
 	}
 	if len(productIDs) == 0 {
@@ -247,8 +252,6 @@ func PurgeExpiredDeletedProducts() (int64, error) {
 		slog.Error("purge: failed to delete attachments", "error", err)
 	}
 
-	tx := database.DB.Unscoped().
-		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
-		Delete(&models.Product{})
-	return tx.RowsAffected, tx.Error
+	deleteQuery := database.DB.Unscoped().Where("id IN ?", productIDs).Delete(&models.Product{})
+	return deleteQuery.RowsAffected, deleteQuery.Error
 }

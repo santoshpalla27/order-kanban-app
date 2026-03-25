@@ -145,6 +145,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 			purge.Use(middleware.RBACMiddleware("admin"))
 			{
 				purge.GET("", purgeHandler.GetStatus)
+				purge.GET("/preview/:job", purgeHandler.PreviewJob)
+				purge.GET("/rows/:job", purgeHandler.GetRows)
 				purge.POST("/run/:job", purgeHandler.RunJob)
 			}
 

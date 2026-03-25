@@ -91,7 +91,7 @@ func main() {
 		}
 	}()
 
-	tracked("trash",        6*time.Hour,  services.PurgeExpiredDeletedProducts)
+	tracked("trash",        6*time.Hour,  func() (int64, error) { return services.PurgeExpiredDeletedProducts() })
 	tracked("notification", 24*time.Hour, func() (int64, error) { return services.PurgeOldNotifications(5) })
 	tracked("activity_log", 24*time.Hour, func() (int64, error) { return services.PurgeOldActivityLogs(10) })
 	tracked("chat_message", 24*time.Hour, func() (int64, error) { return services.PurgeOldChatMessages(30) })
