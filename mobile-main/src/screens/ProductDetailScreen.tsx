@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as DocumentPicker from 'expo-document-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -90,6 +91,8 @@ function DetailsTab({
   const styles = useMemo(() => makeDetailsStyles(c), [c]);
 
   const [editing, setEditing] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [form, setForm] = useState({
     product_id: product.product_id,
     customer_name: product.customer_name,
@@ -161,6 +164,56 @@ function DetailsTab({
             placeholderTextColor={c.textMuted}
             multiline
           />
+        </View>
+
+        {/* Delivery Date */}
+        <View>
+          <Text style={styles.label}>Delivery Date & Time</Text>
+          <TouchableOpacity
+            style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={{ color: form.delivery_at ? c.text : c.textMuted, fontSize: 14 }}>
+              {form.delivery_at
+                ? new Date(form.delivery_at).toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                : 'No delivery date'}
+            </Text>
+            <Feather name="calendar" size={16} color={c.textMuted} />
+          </TouchableOpacity>
+          {form.delivery_at ? (
+            <TouchableOpacity onPress={() => setForm((f) => ({ ...f, delivery_at: '' }))} style={{ marginTop: 4 }}>
+              <Text style={{ fontSize: 12, color: c.textMuted }}>Clear date</Text>
+            </TouchableOpacity>
+          ) : null}
+          {showDatePicker && (
+            <DateTimePicker
+              value={form.delivery_at ? new Date(form.delivery_at) : new Date()}
+              mode="date"
+              display="default"
+              onChange={(_, date) => {
+                setShowDatePicker(false);
+                if (date) {
+                  const base = form.delivery_at ? new Date(form.delivery_at) : new Date();
+                  date.setHours(base.getHours(), base.getMinutes());
+                  setForm((f) => ({ ...f, delivery_at: date.toISOString().slice(0, 16) }));
+                  setShowTimePicker(true);
+                }
+              }}
+            />
+          )}
+          {showTimePicker && (
+            <DateTimePicker
+              value={form.delivery_at ? new Date(form.delivery_at) : new Date()}
+              mode="time"
+              display="default"
+              onChange={(_, date) => {
+                setShowTimePicker(false);
+                if (date) {
+                  setForm((f) => ({ ...f, delivery_at: date.toISOString().slice(0, 16) }));
+                }
+              }}
+            />
+          )}
         </View>
 
         <View>
