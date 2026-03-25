@@ -35,6 +35,8 @@ Thumbs.db
 
 # Go
 backend/tmp/
+backend/main
+backend/server
 *.exe
 *.test
 *.out
