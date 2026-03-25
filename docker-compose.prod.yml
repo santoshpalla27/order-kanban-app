@@ -14,8 +14,10 @@
 #   Traefik:        64 MB
 #   PostgreSQL:    512 MB
 #   Backend:       128 MB
+#   Push-service:   64 MB
 #   Frontend:       32 MB
-#   Buffer/cache:  ~800 MB
+#   Monitor:        32 MB
+#   Buffer/cache:  ~672 MB
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -179,6 +181,40 @@ services:
       options:
         max-size: "5m"
         max-file: "3"
+
+  # ── Monitor — server & Docker dashboard (m.santoshdevops.cloud) ─────────────
+  monitor:
+    image: santoshpalla27/gift-highway:monitor
+    container_name: kanban-monitor
+    restart: unless-stopped
+    environment:
+      - PORT=9090
+      - HOST_PROC=/host/proc
+      - HOST_SYS=/host/sys
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - kanban-net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.monitor.rule=Host(`m.santoshdevops.cloud`)
+      - traefik.http.routers.monitor.entrypoints=websecure
+      - traefik.http.routers.monitor.tls.certresolver=letsencrypt
+      - traefik.http.routers.monitor.middlewares=monitor-auth
+      - traefik.http.services.monitor.loadbalancer.server.port=9090
+      - traefik.http.middlewares.monitor-auth.basicauth.users=${ADMIN_AUTH}
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: "0.10"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
 
 volumes:
   postgres-data:
