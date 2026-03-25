@@ -14,9 +14,11 @@
 #   Traefik:        64 MB
 #   PostgreSQL:    512 MB
 #   Backend:       128 MB
+#   Push-service:   64 MB
 #   Frontend:       32 MB
-#   Netdata:       150 MB
-#   Buffer/cache:  ~650 MB
+#   Glances:       100 MB
+#   Dozzle:         30 MB
+#   Buffer/cache:  ~560 MB
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -155,6 +157,38 @@ services:
         max-size: "20m"
         max-file: "5"
 
+  push-service:
+    image: santoshpalla27/gift-highway:push-service
+    container_name: kanban-push-service
+    restart: unless-stopped
+    environment:
+      - PORT=4001
+      - DATABASE_URL=postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kanban}?sslmode=disable
+      - EXPO_ACCESS_TOKEN=${EXPO_ACCESS_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kanban-net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.push.rule=Host(`${DOMAIN}`) && PathPrefix(`/push-api`)
+      - traefik.http.routers.push.entrypoints=websecure
+      - traefik.http.routers.push.tls.certresolver=letsencrypt
+      - traefik.http.middlewares.push-strip.stripprefix.prefixes=/push-api
+      - traefik.http.routers.push.middlewares=push-strip
+      - traefik.http.services.push.loadbalancer.server.port=4001
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   frontend:
     image: santoshpalla27/gift-highway:frontend
     container_name: kanban-frontend
@@ -181,46 +215,62 @@ services:
         max-size: "5m"
         max-file: "3"
 
-  netdata:
-    image: netdata/netdata:stable
-    container_name: kanban-netdata
+  # ── Glances — system metrics dashboard (g.santoshdevops.cloud) ──────────────
+  glances:
+    image: nicolargo/glances:stable-full
+    container_name: kanban-glances
     restart: unless-stopped
-    pid: host          # required: lets Netdata see host processes
-    cap_add:
-      - SYS_PTRACE    # required: process monitoring
-      - SYS_ADMIN     # required: eBPF / disk stats
-    security_opt:
-      - apparmor:unconfined
+    pid: host
     environment:
-      - NETDATA_DISABLE_CLOUD=1   # no outbound cloud streaming
-      - DO_NOT_TRACK=1
+      - GLANCES_OPT=-w
     volumes:
-      - ./netdata/netdata.conf:/etc/netdata/netdata.conf:ro
-      - netdata-lib:/var/lib/netdata
-      - netdata-cache:/var/cache/netdata
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /etc/os-release:/host/etc/os-release:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro  # container monitoring
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/os-release:/etc/os-release:ro
     networks:
       - kanban-net
     labels:
       - traefik.enable=true
-      # Route m.santoshdevops.cloud → Netdata (port 19999)
-      - traefik.http.routers.netdata.rule=Host(`m.santoshdevops.cloud`)
-      - traefik.http.routers.netdata.entrypoints=websecure
-      - traefik.http.routers.netdata.tls.certresolver=letsencrypt
-      - traefik.http.routers.netdata.middlewares=netdata-auth
-      - traefik.http.services.netdata.loadbalancer.server.port=19999
-      # Basic-auth protection — set NETDATA_AUTH in .env (see below)
-      - traefik.http.middlewares.netdata-auth.basicauth.users=${NETDATA_AUTH}
+      - traefik.http.routers.glances.rule=Host(`g.santoshdevops.cloud`)
+      - traefik.http.routers.glances.entrypoints=websecure
+      - traefik.http.routers.glances.tls.certresolver=letsencrypt
+      - traefik.http.routers.glances.middlewares=glances-auth
+      - traefik.http.services.glances.loadbalancer.server.port=61208
+      - traefik.http.middlewares.glances-auth.basicauth.users=${ADMIN_AUTH}
     deploy:
       resources:
         limits:
-          memory: 150M
-          cpus: "0.25"
+          memory: 100M
+          cpus: "0.15"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ── Dozzle — container log viewer (d.santoshdevops.cloud) ────────────────────
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: kanban-dozzle
+    restart: unless-stopped
+    environment:
+      - DOZZLE_NO_ANALYTICS=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - kanban-net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dozzle.rule=Host(`d.santoshdevops.cloud`)
+      - traefik.http.routers.dozzle.entrypoints=websecure
+      - traefik.http.routers.dozzle.tls.certresolver=letsencrypt
+      - traefik.http.routers.dozzle.middlewares=dozzle-auth
+      - traefik.http.services.dozzle.loadbalancer.server.port=8080
+      - traefik.http.middlewares.dozzle-auth.basicauth.users=${ADMIN_AUTH}
+    deploy:
+      resources:
+        limits:
+          memory: 30M
+          cpus: "0.10"
     logging:
       driver: json-file
       options:
@@ -230,8 +280,6 @@ services:
 volumes:
   postgres-data:
   letsencrypt-data:
-  netdata-lib:
-  netdata-cache:
 
 networks:
   kanban-net:

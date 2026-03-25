@@ -123,44 +123,62 @@ services:
       - traefik.http.routers.frontend.tls.certresolver=letsencrypt
       - traefik.http.services.frontend.loadbalancer.server.port=80
 
-  netdata:
-    image: netdata/netdata:stable
-    container_name: kanban-netdata
+  # ── Glances — system metrics dashboard (g.santoshdevops.cloud) ──────────────
+  glances:
+    image: nicolargo/glances:stable-full
+    container_name: kanban-glances
     restart: unless-stopped
     pid: host
-    cap_add:
-      - SYS_PTRACE
-      - SYS_ADMIN
-    security_opt:
-      - apparmor:unconfined
     environment:
-      - NETDATA_DISABLE_CLOUD=1
-      - DO_NOT_TRACK=1
+      - GLANCES_OPT=-w
     volumes:
-      - ./netdata/netdata.conf:/etc/netdata/netdata.conf:ro
-      - netdata-lib:/var/lib/netdata
-      - netdata-cache:/var/cache/netdata
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /etc/passwd:/host/etc/passwd:ro
-      - /etc/group:/host/etc/group:ro
-      - /etc/os-release:/host/etc/os-release:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /etc/os-release:/etc/os-release:ro
+    networks:
+      - kanban-net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.glances.rule=Host(`g.santoshdevops.cloud`)
+      - traefik.http.routers.glances.entrypoints=websecure
+      - traefik.http.routers.glances.tls.certresolver=letsencrypt
+      - traefik.http.routers.glances.middlewares=glances-auth
+      - traefik.http.services.glances.loadbalancer.server.port=61208
+      - traefik.http.middlewares.glances-auth.basicauth.users=${ADMIN_AUTH}
+    deploy:
+      resources:
+        limits:
+          memory: 100M
+          cpus: "0.15"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ── Dozzle — container log viewer (d.santoshdevops.cloud) ────────────────────
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: kanban-dozzle
+    restart: unless-stopped
+    environment:
+      - DOZZLE_NO_ANALYTICS=1
+    volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - kanban-net
     labels:
       - traefik.enable=true
-      - traefik.http.routers.netdata.rule=Host(`m.santoshdevops.cloud`)
-      - traefik.http.routers.netdata.entrypoints=websecure
-      - traefik.http.routers.netdata.tls.certresolver=letsencrypt
-      - traefik.http.routers.netdata.middlewares=netdata-auth
-      - traefik.http.services.netdata.loadbalancer.server.port=19999
-      - traefik.http.middlewares.netdata-auth.basicauth.users=${NETDATA_AUTH}
+      - traefik.http.routers.dozzle.rule=Host(`d.santoshdevops.cloud`)
+      - traefik.http.routers.dozzle.entrypoints=websecure
+      - traefik.http.routers.dozzle.tls.certresolver=letsencrypt
+      - traefik.http.routers.dozzle.middlewares=dozzle-auth
+      - traefik.http.services.dozzle.loadbalancer.server.port=8080
+      - traefik.http.middlewares.dozzle-auth.basicauth.users=${ADMIN_AUTH}
     deploy:
       resources:
         limits:
-          memory: 150M
-          cpus: "0.25"
+          memory: 30M
+          cpus: "0.10"
     logging:
       driver: json-file
       options:
@@ -170,8 +188,6 @@ services:
 volumes:
   postgres_data:
   letsencrypt-data:
-  netdata-lib:
-  netdata-cache:
 
 networks:
   kanban-net:
