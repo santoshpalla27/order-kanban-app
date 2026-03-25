@@ -1,18 +1,68 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"strings"
 	"time"
-
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/pkg/stdcopy"
 )
+
+const dockerAPI = "http://localhost/v1.43"
+
+// dockerClient dials Docker's Unix socket directly — no SDK needed.
+func dockerClient() *http.Client {
+	return &http.Client{
+		Timeout: 15 * time.Second,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				return (&net.Dialer{}).DialContext(ctx, "unix", "/var/run/docker.sock")
+			},
+		},
+	}
+}
+
+// ── Types decoded from the Docker REST API ───────────────────────────────────
+
+type dockerContainer struct {
+	ID      string   `json:"Id"`
+	Names   []string `json:"Names"`
+	Image   string   `json:"Image"`
+	State   string   `json:"State"`
+	Status  string   `json:"Status"`
+	Created int64    `json:"Created"`
+}
+
+type dockerStats struct {
+	CPUStats struct {
+		CPUUsage struct {
+			TotalUsage  uint64   `json:"total_usage"`
+			PercpuUsage []uint64 `json:"percpu_usage"`
+		} `json:"cpu_usage"`
+		SystemUsage uint64 `json:"system_cpu_usage"`
+		OnlineCPUs  uint32 `json:"online_cpus"`
+	} `json:"cpu_stats"`
+	PreCPUStats struct {
+		CPUUsage struct {
+			TotalUsage uint64 `json:"total_usage"`
+		} `json:"cpu_usage"`
+		SystemUsage uint64 `json:"system_cpu_usage"`
+	} `json:"precpu_stats"`
+	MemoryStats struct {
+		Usage uint64            `json:"usage"`
+		Limit uint64            `json:"limit"`
+		Stats map[string]uint64 `json:"stats"`
+	} `json:"memory_stats"`
+	Networks map[string]struct {
+		RxBytes uint64 `json:"rx_bytes"`
+		TxBytes uint64 `json:"tx_bytes"`
+	} `json:"networks"`
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
 
 type ContainerStat struct {
 	ID         string  `json:"id"`
@@ -29,22 +79,17 @@ type ContainerStat struct {
 	Created    int64   `json:"created"`
 }
 
-func newDockerClient() (*client.Client, error) {
-	return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-}
-
 func collectContainers() ([]ContainerStat, error) {
-	cli, err := newDockerClient()
+	cli := dockerClient()
+
+	resp, err := cli.Get(dockerAPI + "/containers/json?all=1")
 	if err != nil {
 		return nil, err
 	}
-	defer cli.Close()
+	defer resp.Body.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	list, err := cli.ContainerList(ctx, types.ContainerListOptions{All: true})
-	if err != nil {
+	var list []dockerContainer
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		return nil, err
 	}
 
@@ -61,7 +106,7 @@ func collectContainers() ([]ContainerStat, error) {
 			cs.Name = strings.TrimPrefix(c.Names[0], "/")
 		}
 		if c.State == "running" {
-			if raw, err := containerStats(cli, c.ID); err == nil {
+			if raw, err := getContainerStats(cli, c.ID); err == nil {
 				cs.CPUPercent = raw.cpu
 				cs.MemUsed = raw.memUsed
 				cs.MemLimit = raw.memLimit
@@ -75,6 +120,24 @@ func collectContainers() ([]ContainerStat, error) {
 	return out, nil
 }
 
+func fetchLogs(id string, tail int) ([]string, error) {
+	cli := dockerClient()
+	url := fmt.Sprintf("%s/containers/%s/logs?stdout=1&stderr=1&tail=%d&timestamps=1", dockerAPI, id, tail)
+	resp, err := cli.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return parseDockerLogs(body), nil
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
 type rawStat struct {
 	cpu      float64
 	memUsed  uint64
@@ -84,17 +147,14 @@ type rawStat struct {
 	netTx    uint64
 }
 
-func containerStats(cli *client.Client, id string) (rawStat, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	resp, err := cli.ContainerStats(ctx, id, false)
+func getContainerStats(cli *http.Client, id string) (rawStat, error) {
+	resp, err := cli.Get(fmt.Sprintf("%s/containers/%s/stats?stream=0", dockerAPI, id))
 	if err != nil {
 		return rawStat{}, err
 	}
 	defer resp.Body.Close()
 
-	var v types.StatsJSON
+	var v dockerStats
 	if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
 		return rawStat{}, err
 	}
@@ -111,7 +171,7 @@ func containerStats(cli *client.Client, id string) (rawStat, error) {
 		cpuPct = (cpuDelta / sysDelta) * numCPU * 100.0
 	}
 
-	// Memory — works for cgroups v1 and v2
+	// Memory — cgroups v1: "cache", cgroups v2: "inactive_file"
 	cache := v.MemoryStats.Stats["cache"]
 	if cache == 0 {
 		cache = v.MemoryStats.Stats["inactive_file"]
@@ -143,38 +203,28 @@ func containerStats(cli *client.Client, id string) (rawStat, error) {
 	}, nil
 }
 
-func fetchLogs(id string, tail int) ([]string, error) {
-	cli, err := newDockerClient()
-	if err != nil {
-		return nil, err
+// parseDockerLogs strips Docker's 8-byte multiplexing frame headers from log output.
+// Frame format: [stream(1)] [0 0 0] [size(4 big-endian)] [payload...]
+func parseDockerLogs(data []byte) []string {
+	var lines []string
+	i := 0
+	for i+8 <= len(data) {
+		size := int(data[i+4])<<24 | int(data[i+5])<<16 | int(data[i+6])<<8 | int(data[i+7])
+		i += 8
+		end := i + size
+		if end > len(data) {
+			end = len(data)
+		}
+		chunk := strings.TrimRight(string(data[i:end]), "\n")
+		i = end
+		for _, line := range strings.Split(chunk, "\n") {
+			if line != "" {
+				lines = append(lines, line)
+			}
+		}
 	}
-	defer cli.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	opts := types.ContainerLogsOptions{
-		ShowStdout: true,
-		ShowStderr: true,
-		Tail:       fmt.Sprintf("%d", tail),
-		Timestamps: true,
+	if len(lines) == 0 {
+		return []string{}
 	}
-	reader, err := cli.ContainerLogs(ctx, id, opts)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-
-	var buf bytes.Buffer
-	if _, err := stdcopy.StdCopy(&buf, &buf, reader); err != nil && err != io.EOF {
-		// Fallback: some containers use raw stream (no multiplexing header)
-		buf.Reset()
-		io.Copy(&buf, reader) //nolint:errcheck
-	}
-
-	raw := strings.TrimSpace(buf.String())
-	if raw == "" {
-		return []string{}, nil
-	}
-	return strings.Split(raw, "\n"), nil
+	return lines
 }
