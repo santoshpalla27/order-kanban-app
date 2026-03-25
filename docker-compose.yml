@@ -123,9 +123,55 @@ services:
       - traefik.http.routers.frontend.tls.certresolver=letsencrypt
       - traefik.http.services.frontend.loadbalancer.server.port=80
 
+  netdata:
+    image: netdata/netdata:stable
+    container_name: kanban-netdata
+    restart: unless-stopped
+    pid: host
+    cap_add:
+      - SYS_PTRACE
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      - NETDATA_DISABLE_CLOUD=1
+      - DO_NOT_TRACK=1
+    volumes:
+      - ./netdata/netdata.conf:/etc/netdata/netdata.conf:ro
+      - netdata-lib:/var/lib/netdata
+      - netdata-cache:/var/cache/netdata
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /etc/passwd:/host/etc/passwd:ro
+      - /etc/group:/host/etc/group:ro
+      - /etc/os-release:/host/etc/os-release:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - kanban-net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.netdata.rule=Host(`m.santoshdevops.cloud`)
+      - traefik.http.routers.netdata.entrypoints=websecure
+      - traefik.http.routers.netdata.tls.certresolver=letsencrypt
+      - traefik.http.routers.netdata.middlewares=netdata-auth
+      - traefik.http.services.netdata.loadbalancer.server.port=19999
+      - traefik.http.middlewares.netdata-auth.basicauth.users=${NETDATA_AUTH}
+    deploy:
+      resources:
+        limits:
+          memory: 150M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
 volumes:
   postgres_data:
   letsencrypt-data:
+  netdata-lib:
+  netdata-cache:
 
 networks:
   kanban-net:
