@@ -63,8 +63,9 @@ func GetAllRecentActivityLogs(limit int) ([]models.ActivityLog, error) {
 
 // PurgeOldActivityLogs hard-deletes activity logs older than the given number of days.
 // Called on a background goroutine every 24 hours.
-func PurgeOldActivityLogs(days int) error {
-	return database.DB.
+func PurgeOldActivityLogs(days int) (int64, error) {
+	tx := database.DB.
 		Where("created_at < NOW() - INTERVAL '1 day' * ?", days).
-		Delete(&models.ActivityLog{}).Error
+		Delete(&models.ActivityLog{})
+	return tx.RowsAffected, tx.Error
 }

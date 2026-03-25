@@ -212,17 +212,17 @@ func RestoreProduct(id uint) error {
 }
 
 // PurgeExpiredDeletedProducts hard-deletes products whose grace period has elapsed.
-func PurgeExpiredDeletedProducts() error {
+func PurgeExpiredDeletedProducts() (int64, error) {
 	graceCutoff := time.Now().Add(-gracePeriodDays * 24 * time.Hour)
 
 	var productIDs []uint
 	if err := database.DB.Unscoped().Model(&models.Product{}).
 		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
 		Pluck("id", &productIDs).Error; err != nil {
-		return err
+		return 0, err
 	}
 	if len(productIDs) == 0 {
-		return nil
+		return 0, nil
 	}
 
 	if R2 != nil {
@@ -247,7 +247,8 @@ func PurgeExpiredDeletedProducts() error {
 		slog.Error("purge: failed to delete attachments", "error", err)
 	}
 
-	return database.DB.Unscoped().
+	tx := database.DB.Unscoped().
 		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
-		Delete(&models.Product{}).Error
+		Delete(&models.Product{})
+	return tx.RowsAffected, tx.Error
 }

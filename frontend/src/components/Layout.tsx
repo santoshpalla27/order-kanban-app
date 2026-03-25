@@ -29,6 +29,7 @@ import {
   UserCircle,
   Trash2,
   BarChart3,
+  ShieldAlert,
 } from 'lucide-react';
 
 
@@ -82,6 +83,7 @@ export default function Layout() {
     { to: '/chat', icon: MessageSquare, label: 'Team Chat' },
     ...(canViewStats() ? [{ to: '/stats', icon: BarChart3, label: 'Statistics' }] : []),
     ...(isAdmin() ? [{ to: '/admin', icon: Users, label: 'Admin Panel' }] : []),
+    ...(isAdmin() ? [{ to: '/purge-status', icon: ShieldAlert, label: 'Purge Status' }] : []),
     ...(canAccessTrash() ? [{ to: '/trash', icon: Trash2, label: 'Trash' }] : []),
   ];
 

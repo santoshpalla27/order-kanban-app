@@ -18,6 +18,7 @@ const TrashPage = lazy(() => import('./pages/boards/TrashPage'));
 const ActivityPage = lazy(() => import('./pages/activity/ActivityPage'));
 const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'));
 const StatsPage = lazy(() => import('./pages/stats/StatsPage'));
+const PurgeStatusPage = lazy(() => import('./pages/purge/PurgeStatusPage'));
 
 const PageLoader = () => (
   <div className="flex justify-center items-center py-20">
@@ -53,6 +54,7 @@ function ProtectedRoute({ children, adminOnly = false, trashOnly = false, statsO
   if (statsOnly && !canViewStats()) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
+
 
 // Validates the persisted token against the backend on startup.
 // If invalid (new DB, expired, etc.) clears auth so the user lands on /login.
@@ -116,6 +118,14 @@ export default function App() {
                 element={
                   <ProtectedRoute statsOnly>
                     <LazyRoute><StatsPage /></LazyRoute>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/purge-status"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <LazyRoute><PurgeStatusPage /></LazyRoute>
                   </ProtectedRoute>
                 }
               />

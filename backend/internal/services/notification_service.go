@@ -234,8 +234,9 @@ func MarkReadByEntityAndTypes(userID uint, entityType string, entityID uint, typ
 
 // PurgeOldNotifications hard-deletes notifications older than the given number of days.
 // Called on a background goroutine every 24 hours.
-func PurgeOldNotifications(days int) error {
-	return database.DB.
+func PurgeOldNotifications(days int) (int64, error) {
+	tx := database.DB.
 		Where("created_at < NOW() - INTERVAL '1 day' * ?", days).
-		Delete(&models.Notification{}).Error
+		Delete(&models.Notification{})
+	return tx.RowsAffected, tx.Error
 }

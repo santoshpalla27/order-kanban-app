@@ -44,6 +44,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	notificationHandler := handlers.NewNotificationHandler()
 	userHandler := handlers.NewUserHandler()
 	statsHandler := handlers.NewStatsHandler()
+	purgeHandler := handlers.NewPurgeHandler()
 
 	api := r.Group("/api")
 	{
@@ -138,6 +139,14 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 			// Stats — admin and manager only
 			protected.GET("/stats", middleware.RBACMiddleware("admin", "manager"), statsHandler.GetStats)
+
+			// Purge status — admin only
+			purge := protected.Group("/purge-status")
+			purge.Use(middleware.RBACMiddleware("admin"))
+			{
+				purge.GET("", purgeHandler.GetStatus)
+				purge.POST("/run/:job", purgeHandler.RunJob)
+			}
 
 			// Users list for filters (all authenticated users)
 			protected.GET("/users/list", func(c *gin.Context) {

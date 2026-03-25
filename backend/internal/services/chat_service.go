@@ -74,8 +74,9 @@ func CreateChatMessage(msg *models.ChatMessage) error {
 
 // PurgeOldChatMessages hard-deletes chat messages older than the given number of days.
 // Called on a background goroutine every 24 hours.
-func PurgeOldChatMessages(days int) error {
-	return database.DB.
+func PurgeOldChatMessages(days int) (int64, error) {
+	tx := database.DB.
 		Where("created_at < NOW() - INTERVAL '1 day' * ?", days).
-		Delete(&models.ChatMessage{}).Error
+		Delete(&models.ChatMessage{})
+	return tx.RowsAffected, tx.Error
 }

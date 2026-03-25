@@ -65,24 +65,36 @@ func main() {
 
 	// ── Background purge jobs ─────────────────────────────────────────────────
 
-	purge := func(name string, interval time.Duration, fn func() error) {
+	// tracked jobs record their result in purge_logs for the Purge Status page.
+	tracked := func(name string, interval time.Duration, fn func() (int64, error)) {
 		go func() {
 			for {
 				time.Sleep(interval)
-				if err := fn(); err != nil {
+				count, err := fn()
+				services.RecordPurgeLog(name, count, err)
+				if err != nil {
 					slog.Error("purge job failed", "job", name, "error", err)
 				} else {
-					slog.Info("purge job completed", "job", name)
+					slog.Info("purge job completed", "job", name, "rows_deleted", count)
 				}
 			}
 		}()
 	}
 
-	purge("trash",         6*time.Hour,  services.PurgeExpiredDeletedProducts)
-	purge("refresh_token", 1*time.Hour,  services.PurgeExpiredRefreshTokens)
-	purge("notification",  24*time.Hour, func() error { return services.PurgeOldNotifications(5) })
-	purge("activity_log",  24*time.Hour, func() error { return services.PurgeOldActivityLogs(10) })
-	purge("chat_message",  24*time.Hour, func() error { return services.PurgeOldChatMessages(30) })
+	// refresh_token is internal — no need to surface it in the UI.
+	go func() {
+		for {
+			time.Sleep(1 * time.Hour)
+			if err := services.PurgeExpiredRefreshTokens(); err != nil {
+				slog.Error("purge job failed", "job", "refresh_token", "error", err)
+			}
+		}
+	}()
+
+	tracked("trash",        6*time.Hour,  services.PurgeExpiredDeletedProducts)
+	tracked("notification", 24*time.Hour, func() (int64, error) { return services.PurgeOldNotifications(5) })
+	tracked("activity_log", 24*time.Hour, func() (int64, error) { return services.PurgeOldActivityLogs(10) })
+	tracked("chat_message", 24*time.Hour, func() (int64, error) { return services.PurgeOldChatMessages(30) })
 
 	// ── HTTP server ───────────────────────────────────────────────────────────
 

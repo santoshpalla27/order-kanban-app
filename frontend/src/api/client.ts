@@ -206,3 +206,8 @@ export const activityApi = {
 export const statsApi = {
   getStats: () => api.get('/stats'),
 };
+
+export const purgeApi = {
+  getStatus: () => api.get('/purge-status'),
+  runJob: (job: string) => api.post(`/purge-status/run/${job}`),
+};
