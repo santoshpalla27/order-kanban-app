@@ -238,6 +238,15 @@ func PurgeExpiredDeletedProducts() error {
 		}
 	}
 
+	// Delete child records first — comments and attachments have FK constraints on
+	// product_id with no ON DELETE CASCADE, so the product DELETE would be rejected.
+	if err := database.DB.Where("product_id IN ?", productIDs).Delete(&models.Comment{}).Error; err != nil {
+		slog.Error("purge: failed to delete comments", "error", err)
+	}
+	if err := database.DB.Where("product_id IN ?", productIDs).Delete(&models.Attachment{}).Error; err != nil {
+		slog.Error("purge: failed to delete attachments", "error", err)
+	}
+
 	return database.DB.Unscoped().
 		Where("deleted_at IS NOT NULL AND deleted_at < ?", graceCutoff).
 		Delete(&models.Product{}).Error
