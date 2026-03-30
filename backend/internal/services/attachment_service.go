@@ -9,6 +9,13 @@ import (
 
 func GetAttachmentsByProduct(productID uint) ([]models.Attachment, error) {
 	var attachments []models.Attachment
+	err := database.DB.Preload("Uploader").Where("product_id = ? AND source = 'attachment'", productID).
+		Order("uploaded_at DESC").Find(&attachments).Error
+	return attachments, err
+}
+
+func GetAllAttachmentsByProduct(productID uint) ([]models.Attachment, error) {
+	var attachments []models.Attachment
 	err := database.DB.Preload("Uploader").Where("product_id = ?", productID).
 		Order("uploaded_at DESC").Find(&attachments).Error
 	return attachments, err

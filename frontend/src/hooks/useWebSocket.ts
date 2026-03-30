@@ -58,6 +58,9 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['products'] });
             queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
             break;
+          case 'customer_message':
+            queryClient.invalidateQueries({ queryKey: ['customer-messages'] });
+            break;
           case 'chat_message':
             queryClient.invalidateQueries({ queryKey: ['chat'] });
             // Show badge on Team Chat nav if the message is from someone else

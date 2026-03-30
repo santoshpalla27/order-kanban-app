@@ -39,8 +39,8 @@ export interface Attachment {
   file_name: string;
   file_type: string;
   file_size: number;
-  uploaded_by: number;
-  uploader: User;
+  uploaded_by?: number | null;
+  uploader?: User;
   uploaded_at: string;
   view_url?: string; // S3 presigned view URL (when S3 enabled)
 }
@@ -74,6 +74,27 @@ export interface Notification {
   content?: string;
   sender_name?: string;
   is_read: boolean;
+  created_at: string;
+}
+
+export interface CustomerLink {
+  id: number;
+  product_id: number;
+  token: string;
+  expires_at?: string | null;
+  revoked: boolean;
+  created_by: number;
+  created_at: string;
+}
+
+export interface CustomerMessage {
+  id: number;
+  product_id: number;
+  sender_type: 'customer' | 'staff';
+  sender_name: string;
+  message: string;
+  reply_to_id?: number | null;
+  reply_to?: CustomerMessage | null;
   created_at: string;
 }
 

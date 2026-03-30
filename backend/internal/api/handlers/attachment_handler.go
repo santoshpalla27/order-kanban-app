@@ -90,10 +90,14 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		FileName string `json:"file_name" binding:"required"`
 		FileSize int64  `json:"file_size"`
 		FileType string `json:"file_type"`
+		Source   string `json:"source"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: s3_key and file_name required"})
 		return
+	}
+	if req.Source == "" {
+		req.Source = "attachment"
 	}
 
 	userID := c.GetUint("user_id")
@@ -106,7 +110,8 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		FileName:   req.FileName,
 		FileType:   req.FileType,
 		FileSize:   req.FileSize,
-		UploadedBy: userID,
+		Source:     req.Source,
+		UploadedBy: &userID,
 		UploadedAt: time.Now(),
 	}
 
@@ -141,7 +146,12 @@ func (h *AttachmentHandler) GetByProduct(c *gin.Context) {
 		return
 	}
 
-	attachments, err := services.GetAttachmentsByProduct(uint(productID))
+	var attachments []models.Attachment
+	if c.Query("all") == "true" {
+		attachments, err = services.GetAllAttachmentsByProduct(uint(productID))
+	} else {
+		attachments, err = services.GetAttachmentsByProduct(uint(productID))
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch attachments"})
 		return
@@ -201,7 +211,7 @@ func (h *AttachmentHandler) Delete(c *gin.Context) {
 	userID := c.GetUint("user_id")
 	role, _ := c.Get("role")
 	roleName := role.(string)
-	if attachment.UploadedBy != userID && roleName != "admin" && roleName != "manager" {
+	if (attachment.UploadedBy == nil || *attachment.UploadedBy != userID) && roleName != "admin" && roleName != "manager" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Can only delete your own attachments"})
 		return
 	}

@@ -99,6 +99,9 @@ export const attachmentsApi = {
   getByProduct: (productId: number) =>
     api.get(`/products/${productId}/attachments`),
 
+  getAllByProduct: (productId: number) =>
+    api.get(`/products/${productId}/attachments`, { params: { all: 'true' } }),
+
   upload: (productId: number, file: File) =>
     attachmentsApi.uploadWithProgress(productId, file, () => {}),
 
@@ -107,6 +110,7 @@ export const attachmentsApi = {
     file: File,
     onProgress: (pct: number) => void,
     signal?: AbortSignal,
+    source: 'attachment' | 'comment' = 'attachment',
   ) => {
     const presignRes = await api.get(`/products/${productId}/attachments/presign`, {
       params: { filename: file.name },
@@ -137,6 +141,7 @@ export const attachmentsApi = {
       file_name: file.name,
       file_size: file.size,
       file_type: '.' + file.name.split('.').pop()?.toLowerCase(),
+      source,
     }, { signal });
   },
 
@@ -215,4 +220,77 @@ export const purgeApi = {
       params: { limit, ...(cursor != null ? { cursor } : {}) },
     }),
   runJob: (job: string, force = false) => api.post(`/purge-status/run/${job}${force ? '?force=true' : ''}`),
+};
+
+// Customer portal — staff endpoints (authenticated)
+export const customerApi = {
+  getLink: (productId: number) =>
+    api.get(`/products/${productId}/customer-link`),
+  createLink: (productId: number, expiresInHours?: number | null) =>
+    api.post(`/products/${productId}/customer-link`, {
+      expires_in_hours: expiresInHours ?? null,
+    }),
+  revokeLink: (productId: number) =>
+    api.delete(`/products/${productId}/customer-link`),
+  getMessages: (productId: number) =>
+    api.get(`/products/${productId}/customer-messages`),
+  staffReply: (productId: number, message: string, replyToId?: number | null) =>
+    api.post(`/products/${productId}/customer-messages`, { message, reply_to_id: replyToId }),
+
+  // Staff attachment upload for customer_reply (not shown in Attachments tab)
+  staffAttachmentUpload: async (
+    productId: number,
+    file: File,
+    onProgress: (pct: number) => void,
+    signal?: AbortSignal,
+  ) => {
+    const presignRes = await api.get(
+      `/products/${productId}/customer-messages/attachments/presign`,
+      { params: { filename: file.name }, signal },
+    );
+    const { upload_url, s3_key, content_type } = presignRes.data;
+    await axios.put(upload_url, file, {
+      headers: { 'Content-Type': content_type },
+      signal,
+      onUploadProgress: (e) => { if (e.total) onProgress(Math.round((e.loaded / e.total) * 100)); },
+    });
+    return api.post(
+      `/products/${productId}/customer-messages/attachments/confirm`,
+      { s3_key, file_name: file.name, file_size: file.size, file_type: '.' + file.name.split('.').pop()?.toLowerCase() },
+      { signal },
+    );
+  },
+};
+
+// Customer portal — public endpoints (no auth, token in URL)
+export const customerPortalApi = {
+  getInfo: (token: string) =>
+    axios.get(`${API_BASE}/customer/${token}`),
+  getMessages: (token: string) =>
+    axios.get(`${API_BASE}/customer/${token}/messages`),
+  sendMessage: (token: string, message: string, senderName: string, replyToId?: number | null) =>
+    axios.post(`${API_BASE}/customer/${token}/messages`, { message, sender_name: senderName, reply_to_id: replyToId }),
+  getAttachments: (token: string) =>
+    axios.get(`${API_BASE}/customer/${token}/attachments`),
+
+  uploadAttachment: async (
+    token: string,
+    file: File,
+    onProgress: (pct: number) => void,
+  ) => {
+    const presignRes = await axios.get(`${API_BASE}/customer/${token}/attachments/presign`, {
+      params: { filename: file.name },
+    });
+    const { upload_url, s3_key, content_type } = presignRes.data;
+    await axios.put(upload_url, file, {
+      headers: { 'Content-Type': content_type },
+      onUploadProgress: (e) => { if (e.total) onProgress(Math.round((e.loaded / e.total) * 100)); },
+    });
+    return axios.post(`${API_BASE}/customer/${token}/attachments/confirm`, {
+      s3_key,
+      file_name: file.name,
+      file_size: file.size,
+      file_type: '.' + file.name.split('.').pop()?.toLowerCase(),
+    });
+  },
 };

@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi } from '../api/client';
+import { productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi, customerApi } from '../api/client';
 import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES } from '../hooks/useProductBadges';
 import { formatDate, formatDateTime, formatTime } from '../utils/date';
 import { useAuthStore } from '../store/authStore';
-import { Product, Attachment, Comment, STATUS_LABELS, STATUS_ORDER } from '../types';
+import { Product, Attachment, Comment, CustomerLink, CustomerMessage, STATUS_LABELS, STATUS_ORDER } from '../types';
 import MentionInput, { renderWithMentions, MentionInputHandle } from './MentionInput';
 import {
   X, Paperclip, MessageSquare, Package, Upload, Download, Trash2,
   Send, Edit2, Image, FileText, File, ImagePlus, Plus, Reply, MoreVertical,
-  ExternalLink,
+  ExternalLink, Link2, Copy, Clock, UserCircle2, CheckCheck, RefreshCw,
 } from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
 
@@ -151,7 +151,7 @@ function useMultiUpload(productId: number) {
   const [uploading, setUploading] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  const uploadFiles = async (files: FileList | File[], onFileDone?: (att: any) => void) => {
+  const uploadFiles = async (files: FileList | File[], onFileDone?: (att: any) => void, source: 'attachment' | 'comment' = 'attachment') => {
     const fileArray = Array.from(files);
     if (fileArray.length === 0) return;
 
@@ -172,6 +172,7 @@ function useMultiUpload(productId: number) {
           fileArray[i],
           (pct) => setUploadFiles_state(prev => prev.map((f, idx) => idx === i ? { ...f, progress: pct } : f)),
           controller.signal,
+          source,
         );
         setUploadFiles_state(prev => prev.map((f, idx) => idx === i ? { ...f, progress: 100, status: 'done' } : f));
         onFileDone?.(res.data);
@@ -185,6 +186,7 @@ function useMultiUpload(productId: number) {
     }
 
     queryClient.invalidateQueries({ queryKey: ['attachments', productId] });
+    queryClient.invalidateQueries({ queryKey: ['attachments-all', productId] });
     await new Promise(r => setTimeout(r, 900));
     setUploading(false);
     setUploadFiles_state([]);
@@ -292,7 +294,7 @@ function ImageLightbox({ src, alt, attId, onClose }: { src: string; alt: string;
 
 // ── Main Modal ──
 export default function ProductDetailModal({ productId, onClose }: Props) {
-  const [activeTab, setActiveTab] = useState<'details' | 'attachments' | 'comments'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'attachments' | 'comments' | 'customer'>('details');
   const [commentingAttachment, setCommentingAttachment] = useState<Attachment | null>(null);
   const queryClient = useQueryClient();
 
@@ -301,6 +303,9 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   const { data: attachmentsData } = useQuery({ queryKey: ['attachments', productId], queryFn: () => attachmentsApi.getByProduct(productId) });
   const attachments: Attachment[] = attachmentsData?.data || [];
+
+  const { data: allAttachmentsData } = useQuery({ queryKey: ['attachments-all', productId], queryFn: () => attachmentsApi.getAllByProduct(productId) });
+  const allAttachments: Attachment[] = allAttachmentsData?.data || [];
 
   const { data: commentsData } = useQuery({ queryKey: ['comments', productId], queryFn: () => commentsApi.getByProduct(productId) });
   const comments: Comment[] = commentsData?.data || [];
@@ -341,9 +346,10 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
   });
 
   const tabs = [
-    { id: 'details' as const, label: 'Details', icon: Package, badge: has(productId, 'status_change') },
-    { id: 'attachments' as const, label: `Attachments (${attachments.length})`, icon: Paperclip, badge: has(productId, 'attachments') },
-    { id: 'comments' as const, label: `Comments (${comments.length})`, icon: MessageSquare, badge: has(productId, 'comments') },
+    { id: 'details' as const,     label: 'Details',                           icon: Package,      badge: has(productId, 'status_change') },
+    { id: 'attachments' as const, label: `Attachments (${attachments.length})`, icon: Paperclip,  badge: has(productId, 'attachments') },
+    { id: 'comments' as const,    label: `Comments (${comments.length})`,     icon: MessageSquare, badge: has(productId, 'comments') },
+    { id: 'customer' as const,    label: 'Customer',                          icon: UserCircle2,  badge: false },
   ];
 
   return (
@@ -384,7 +390,8 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
           <div className="flex-1 overflow-y-auto p-5">
             {activeTab === 'details' && product && <DetailsTab product={product} productId={productId} attachments={attachments} onViewAll={() => setActiveTab('attachments')} onCommentAttachment={setCommentingAttachment} />}
             {activeTab === 'attachments' && <AttachmentsTab productId={productId} attachments={attachments} onCommentAttachment={setCommentingAttachment} />}
-            {activeTab === 'comments' && <CommentsTab productId={productId} comments={comments} attachments={attachments} />}
+            {activeTab === 'comments' && <CommentsTab productId={productId} comments={comments} attachments={allAttachments} />}
+            {activeTab === 'customer' && <CustomerTab productId={productId} allAttachments={allAttachments} />}
           </div>
         </div>
       </div>
@@ -909,7 +916,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
     if (!files || files.length === 0) return;
     uploadFiles(files, (att) => {
       createMutation.mutate(`📎 Uploaded: ${att.file_name}\n[attachment:${att.id}:${att.file_name}]`);
-    });
+    }, 'comment');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -1155,6 +1162,402 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
       {/* Image lightbox */}
       {lightbox && <ImageLightbox src={lightbox.src} alt={lightbox.filename} attId={lightbox.attId} onClose={() => setLightbox(null)} />}
     </div>
+    </>
+  );
+}
+
+// ── Customer Tab ──────────────────────────────────────────────────────────────
+
+const EXPIRY_OPTIONS = [
+  { label: 'No expiry',  value: null },
+  { label: '1 hour',    value: 1 },
+  { label: '24 hours',  value: 24 },
+  { label: '7 days',    value: 168 },
+  { label: '30 days',   value: 720 },
+];
+
+function CustomerTab({ productId, allAttachments }: { productId: number; allAttachments: Attachment[] }) {
+  const queryClient = useQueryClient();
+  const endRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [message, setMessage] = useState('');
+  const [replyTo, setReplyTo] = useState<CustomerMessage | null>(null);
+  const [showLinkForm, setShowLinkForm] = useState(false);
+  const [selectedExpiry, setSelectedExpiry] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [lightbox, setLightbox] = useState<{ src: string; filename: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // ── Queries ──
+  const { data: linkData, isLoading: linkLoading } = useQuery({
+    queryKey: ['customer-link', productId],
+    queryFn: () => customerApi.getLink(productId),
+    refetchOnWindowFocus: false,
+  });
+  const link: CustomerLink | null = linkData?.data?.link || null;
+
+  const { data: msgsData, refetch: refetchMsgs } = useQuery({
+    queryKey: ['customer-messages', productId],
+    queryFn: () => customerApi.getMessages(productId),
+    enabled: !!link,
+  });
+  const messages: CustomerMessage[] = msgsData?.data || [];
+
+  // Scroll to bottom when new messages arrive
+  const lastMsgId = messages[messages.length - 1]?.id;
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [lastMsgId]);
+
+  // ── Link actions ──
+  const createLinkMutation = useMutation({
+    mutationFn: () => customerApi.createLink(productId, selectedExpiry),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-link', productId] });
+      setShowLinkForm(false);
+    },
+  });
+
+  const revokeLinkMutation = useMutation({
+    mutationFn: () => customerApi.revokeLink(productId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-link', productId] });
+      queryClient.invalidateQueries({ queryKey: ['customer-messages', productId] });
+    },
+  });
+
+  const portalUrl = link ? `${window.location.origin}/c/${link.token}` : '';
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(portalUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  // ── Send message ──
+  const sendMutation = useMutation({
+    mutationFn: (msg: string) => customerApi.staffReply(productId, msg, replyTo?.id ?? null),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['customer-messages', productId] });
+      setMessage('');
+      setReplyTo(null);
+    },
+  });
+
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!message.trim() || sendMutation.isPending) return;
+    sendMutation.mutate(message.trim());
+  };
+
+  // ── File upload (staff → source='customer_reply') ──
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      const res = await customerApi.staffAttachmentUpload(productId, file, (pct) => setUploadProgress(pct));
+      const att = res.data;
+      queryClient.invalidateQueries({ queryKey: ['attachments-all', productId] });
+      const msg = `[attachment:${att.id}:${att.file_name}]`;
+      sendMutation.mutate(msg);
+      setReplyTo(null);
+    } catch {
+      alert('Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  // ── Helpers ──
+  const resolveAtt = (id?: number) => id ? allAttachments.find((a) => a.id === id) : null;
+
+  const formatExpiry = (expiresAt?: string | null) => {
+    if (!expiresAt) return null;
+    const d = new Date(expiresAt);
+    const now = new Date();
+    const diff = d.getTime() - now.getTime();
+    if (diff < 0) return 'Expired';
+    const hours = Math.round(diff / 3_600_000);
+    if (hours < 24) return `Expires in ${hours}h`;
+    return `Expires ${d.toLocaleDateString([], { day: 'numeric', month: 'short' })}`;
+  };
+
+  // ── Render ──
+  return (
+    <>
+    <div className="flex flex-col gap-4 h-full">
+
+      {/* ── Link management section ── */}
+      <div className="rounded-xl border border-surface-700/50 bg-surface-800/30 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link2 className="w-4 h-4 text-brand-400" />
+            <span className="text-sm font-semibold">Customer Portal Link</span>
+          </div>
+          {link && (
+            <button
+              onClick={() => refetchMsgs()}
+              className="btn-ghost p-1.5 rounded-lg"
+              title="Refresh messages"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-surface-400" />
+            </button>
+          )}
+        </div>
+
+        {linkLoading ? (
+          <p className="text-xs text-surface-500">Loading…</p>
+        ) : link ? (
+          <>
+            {/* Active link display */}
+            <div className="flex items-center gap-2 bg-surface-900/50 rounded-lg p-2">
+              <input
+                readOnly
+                value={portalUrl}
+                className="flex-1 text-xs text-surface-300 bg-transparent outline-none truncate"
+              />
+              <button
+                onClick={handleCopy}
+                className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition-colors flex-shrink-0 ${
+                  copied
+                    ? 'bg-emerald-500/20 text-emerald-400'
+                    : 'btn-ghost hover:bg-surface-700'
+                }`}
+              >
+                {copied ? <CheckCheck className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between">
+              {link.expires_at ? (
+                <div className="flex items-center gap-1 text-xs text-amber-400">
+                  <Clock className="w-3 h-3" />
+                  <span>{formatExpiry(link.expires_at)}</span>
+                </div>
+              ) : (
+                <span className="text-xs text-emerald-400 flex items-center gap-1">
+                  <CheckCheck className="w-3 h-3" /> Active · No expiry
+                </span>
+              )}
+              <button
+                onClick={() => revokeLinkMutation.mutate()}
+                disabled={revokeLinkMutation.isPending}
+                className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1 btn-ghost px-2 py-1 rounded-md"
+              >
+                <Trash2 className="w-3 h-3" />
+                {revokeLinkMutation.isPending ? 'Revoking…' : 'Revoke Link'}
+              </button>
+            </div>
+          </>
+        ) : showLinkForm ? (
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-surface-400 mb-1 block">Link expiry</label>
+              <div className="flex flex-wrap gap-2">
+                {EXPIRY_OPTIONS.map((opt) => (
+                  <button
+                    key={String(opt.value)}
+                    onClick={() => setSelectedExpiry(opt.value)}
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                      selectedExpiry === opt.value
+                        ? 'bg-brand-500 text-white'
+                        : 'btn-ghost border border-surface-700/50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => createLinkMutation.mutate()}
+                disabled={createLinkMutation.isPending}
+                className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
+              >
+                <Link2 className="w-3.5 h-3.5" />
+                {createLinkMutation.isPending ? 'Creating…' : 'Create Link'}
+              </button>
+              <button onClick={() => setShowLinkForm(false)} className="btn-ghost text-xs px-3 py-2">
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3 py-2">
+            <p className="text-sm text-surface-400 text-center">
+              No active portal link. Create one to share with the customer.
+            </p>
+            <button
+              onClick={() => setShowLinkForm(true)}
+              className="btn-primary text-sm px-4 py-2 flex items-center gap-2"
+            >
+              <Link2 className="w-4 h-4" /> Create Customer Link
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Chat section ── */}
+      {link && (
+        <>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto space-y-2 min-h-0" style={{ maxHeight: '360px' }}>
+            {messages.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-10">
+                <UserCircle2 className="w-8 h-8 opacity-30" />
+                <p>No messages yet. Share the link with the customer.</p>
+              </div>
+            ) : (
+              messages.map((msg) => {
+                const isStaff = msg.sender_type === 'staff';
+                const parsed = parseCommentMessage(msg.message);
+                const att = resolveAtt(parsed.attachmentId);
+
+                return (
+                  <div key={msg.id} className={`flex gap-2 group ${isStaff ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[75%] flex flex-col ${isStaff ? 'items-end' : 'items-start'}`}>
+
+                      {/* Sender name */}
+                      <p className={`text-[10px] font-medium mb-0.5 px-1 ${isStaff ? 'text-brand-400' : 'text-emerald-400'}`}>
+                        {isStaff ? (msg.sender_name || 'Support') : (msg.sender_name || 'Customer')}
+                      </p>
+
+                      <div
+                        className={`rounded-2xl px-3 py-2 text-sm leading-relaxed cursor-pointer ${
+                          isStaff
+                            ? 'bg-brand-600/30 border border-brand-500/20 text-surface-100 rounded-br-sm'
+                            : 'bg-surface-800 border border-surface-700/50 text-surface-100 rounded-bl-sm'
+                        }`}
+                        onClick={() => setReplyTo(msg)}
+                        title="Click to reply"
+                      >
+                        {/* Reply preview */}
+                        {msg.reply_to && (
+                          <div className="mb-2 pl-2 border-l-2 border-white/20 rounded">
+                            <p className="text-[10px] text-white/50 font-medium">
+                              {msg.reply_to.sender_type === 'staff' ? (msg.reply_to.sender_name || 'Support') : 'Customer'}
+                            </p>
+                            <p className="text-xs text-white/40 truncate max-w-[180px]">
+                              {parseCommentMessage(msg.reply_to.message).text || '📎 Attachment'}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Attachment */}
+                        {att && (
+                          <div className="mb-1.5">
+                            {isImageType(att.file_type) && att.view_url ? (
+                              <img
+                                src={att.view_url}
+                                alt={att.file_name}
+                                className="rounded-lg max-w-[180px] max-h-[200px] object-cover cursor-pointer"
+                                onClick={(e) => { e.stopPropagation(); setLightbox({ src: att.view_url!, filename: att.file_name }); }}
+                              />
+                            ) : att ? (
+                              <div className="flex items-center gap-2 bg-white/5 rounded-lg px-2 py-1.5">
+                                <FileText className="w-4 h-4 text-surface-400 flex-shrink-0" />
+                                <span className="text-xs truncate max-w-[140px]">{att.file_name}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        )}
+
+                        {parsed.text && <p className="whitespace-pre-wrap break-words">{parsed.text}</p>}
+
+                        <p className={`text-[10px] mt-1 text-surface-500 ${isStaff ? 'text-right' : 'text-left'}`}>
+                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={endRef} />
+          </div>
+
+          {/* Reply bar */}
+          {replyTo && (
+            <div className="flex items-center gap-2 bg-brand-500/5 border-l-2 border-brand-500 pl-3 pr-2 py-2 rounded-r-lg">
+              <Reply className="w-3.5 h-3.5 text-brand-400 flex-shrink-0 rotate-180" />
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-brand-400 font-medium">
+                  {replyTo.sender_type === 'staff' ? (replyTo.sender_name || 'You') : 'Customer'}
+                </p>
+                <p className="text-xs text-surface-400 truncate">
+                  {parseCommentMessage(replyTo.message).text || '📎 Attachment'}
+                </p>
+              </div>
+              <button onClick={() => setReplyTo(null)} className="btn-ghost p-1 rounded">
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Upload progress */}
+          {uploading && (
+            <div className="space-y-1 px-1">
+              <div className="flex items-center justify-between text-xs text-surface-400">
+                <span>Uploading…</span><span>{uploadProgress}%</span>
+              </div>
+              <div className="h-1 bg-surface-700 rounded-full overflow-hidden">
+                <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* Input */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept="image/*,.pdf,.doc,.docx,.txt,.xlsx,.csv"
+            onChange={handleFileUpload}
+          />
+          <form onSubmit={handleSend} className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="btn-ghost p-2.5 rounded-xl flex-shrink-0"
+              title="Attach file"
+            >
+              <ImagePlus className="w-4 h-4" />
+            </button>
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Reply to customer…"
+              className="flex-1 rounded-xl"
+              disabled={sendMutation.isPending || uploading}
+            />
+            <button
+              type="submit"
+              disabled={!message.trim() || sendMutation.isPending}
+              className="btn-primary px-3"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        </>
+      )}
+    </div>
+
+    {lightbox && (
+      <ImageLightbox
+        src={lightbox.src}
+        alt={lightbox.filename}
+        onClose={() => setLightbox(null)}
+      />
+    )}
     </>
   );
 }

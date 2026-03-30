@@ -10,6 +10,7 @@ import KanbanBoard from './pages/kanban/KanbanBoard';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Lazy-load non-critical routes — each becomes a separate JS chunk
+const CustomerPortalPage = lazy(() => import('./pages/customer/CustomerPortalPage'));
 const ListView = lazy(() => import('./pages/boards/ListView'));
 const MyOrdersPage = lazy(() => import('./pages/boards/MyOrdersPage'));
 const ChatPage = lazy(() => import('./pages/chat/ChatPage'));
@@ -81,6 +82,8 @@ export default function App() {
         <BrowserRouter>
           <AuthValidator>
           <Routes>
+            {/* Public customer portal — no auth required */}
+            <Route path="/c/:token" element={<LazyRoute><CustomerPortalPage /></LazyRoute>} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route

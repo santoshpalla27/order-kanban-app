@@ -45,6 +45,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	userHandler := handlers.NewUserHandler()
 	statsHandler := handlers.NewStatsHandler()
 	purgeHandler := handlers.NewPurgeHandler()
+	customerHandler := handlers.NewCustomerHandler()
 
 	api := r.Group("/api")
 	{
@@ -64,6 +65,17 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 		// Logout — no auth middleware so expired-access-token clients can still call it
 		api.POST("/auth/logout", authHandler.Logout)
+
+		// Public customer portal (token-authenticated, no JWT required)
+		customer := api.Group("/customer")
+		{
+			customer.GET("/:token",                       customerHandler.PortalInfo)
+			customer.GET("/:token/messages",              customerHandler.PortalGetMessages)
+			customer.POST("/:token/messages",             customerHandler.PortalSendMessage)
+			customer.GET("/:token/attachments",           customerHandler.PortalGetAttachments)
+			customer.GET("/:token/attachments/presign",   customerHandler.PortalAttachmentPresign)
+			customer.POST("/:token/attachments/confirm",  customerHandler.PortalAttachmentConfirm)
+		}
 
 		// Protected routes
 		protected := api.Group("")
@@ -97,6 +109,15 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 				products.GET("/:id/comments", commentHandler.GetByProduct)
 				products.POST("/:id/comments", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Create)
 			}
+
+			// Customer portal — link management + staff messaging
+			products.GET("/:id/customer-link",   customerHandler.GetLink)
+			products.POST("/:id/customer-link",  customerHandler.CreateLink)
+			products.DELETE("/:id/customer-link", customerHandler.RevokeLink)
+			products.GET("/:id/customer-messages", customerHandler.GetMessages)
+			products.POST("/:id/customer-messages", customerHandler.StaffReply)
+			products.GET("/:id/customer-messages/attachments/presign", customerHandler.StaffAttachmentPresign)
+			products.POST("/:id/customer-messages/attachments/confirm", customerHandler.StaffAttachmentConfirm)
 
 			// Standalone attachment/comment routes
 			protected.GET("/attachments/:id/download", attachmentHandler.Download)

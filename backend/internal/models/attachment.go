@@ -9,7 +9,8 @@ type Attachment struct {
 	FileName   string    `json:"file_name" gorm:"not null"`
 	FileType   string    `json:"file_type"`
 	FileSize   int64     `json:"file_size"`
-	UploadedBy uint      `json:"uploaded_by" gorm:"not null"`
+	Source     string    `json:"source" gorm:"not null;default:'attachment'"`
+	UploadedBy *uint     `json:"uploaded_by"`
 	Uploader   User      `json:"uploader" gorm:"foreignKey:UploadedBy"`
 	UploadedAt time.Time `json:"uploaded_at"`
 }
