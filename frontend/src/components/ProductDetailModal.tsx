@@ -684,84 +684,142 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ''; };
 
-  const images = attachments.filter((a) => isImageType(a.file_type));
-  const files = attachments.filter((a) => !isImageType(a.file_type));
+  const directUploads = attachments.filter((a) => a.uploaded_by != null);
+  const customerUploads = attachments.filter((a) => a.uploaded_by == null);
+
+  const renderImages = (list: Attachment[]) => {
+    const imgs = list.filter((a) => isImageType(a.file_type));
+    if (!imgs.length) return null;
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        {imgs.map((att) => (
+          <div key={att.id} className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
+            <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300" onClick={() => setLightbox({ src: getAttachmentUrl(att), attId: att.id, filename: att.file_name })} />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
+              <p className="text-xs text-white font-medium truncate mb-2">{att.file_name}</p>
+              <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
+                <button onClick={(e) => { e.stopPropagation(); downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><Download className="w-3 h-3" /> Download</button>
+                <button onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><MessageSquare className="w-3 h-3" /> Comment</button>
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }} className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"><Trash2 className="w-3 h-3" /></button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderFiles = (list: Attachment[], hasImages: boolean) => {
+    const nonImgs = list.filter((a) => !isImageType(a.file_type));
+    if (!nonImgs.length) return null;
+    return (
+      <div className="space-y-1.5">
+        {hasImages && <p className="text-xs font-medium text-surface-500 uppercase tracking-wider mt-2">Other Files</p>}
+        {nonImgs.map((att) => {
+          const Icon = getFileIcon(att.file_type);
+          return (
+            <div key={att.id} className="group flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors">
+              <div className="w-10 h-10 rounded-lg bg-surface-700 flex items-center justify-center flex-shrink-0"><Icon className="w-5 h-5 text-surface-400" /></div>
+              <div className="flex-1 min-w-0"><p className="text-sm truncate">{att.file_name}</p><p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name || 'Customer'} · {formatDate(att.uploaded_at)}</p></div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => onCommentAttachment(att)} className="btn-ghost p-1.5 rounded-lg" title="Comment"><MessageSquare className="w-3.5 h-3.5" /></button>
+                <button onClick={() => downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true)} className="btn-ghost p-1.5 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
+                <button onClick={() => handleDelete(att.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const downloadAll = async (list: Attachment[]) => {
+    for (const att of list) {
+      try {
+        await downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true);
+        await new Promise(resolve => setTimeout(resolve, 300));
+      } catch (err) { console.error(`Failed to download ${att.file_name}:`, err); }
+    }
+  };
 
   return (
     <>
     {uploading && <UploadProgressModal files={uploadFiles_state} onCancel={cancelUpload} />}
     <div className="space-y-4">
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleUpload} />
-      <div className="flex gap-2">
-        <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-2 flex-1 justify-center">
-          <Upload className="w-4 h-4" /> Upload Files
-        </button>
-        {attachments.length > 0 && (
-          <button 
-            onClick={async () => {
-              for (const att of attachments) {
-                try {
-                  await downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true);
-                  await new Promise(resolve => setTimeout(resolve, 300));
-                } catch (err) { console.error(`Failed to download ${att.file_name}:`, err); }
-              }
-            }}
-            className="btn-ghost border border-surface-700/50 hover:bg-surface-700/50 flex items-center gap-2 px-4 justify-center"
-            title="Download All Attachments"
-          >
-            <Download className="w-4 h-4" /> Download All
-          </button>
-        )}
-      </div>
 
-      {attachments.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-12 border-2 border-dashed border-surface-700/50 rounded-xl cursor-pointer hover:border-brand-500/30 hover:text-surface-400 transition-colors" onClick={() => fileInputRef.current?.click()}>
-          <Upload className="w-6 h-6 opacity-40" />
-          <span>No attachments — click to upload</span>
+      {/* Two-column section layout */}
+      <div className="grid grid-cols-2 gap-3 min-h-0">
+
+        {/* ── Column 1: Direct Uploads ── */}
+        <div className="flex flex-col gap-3 bg-brand-500/10 rounded-xl p-3 border border-brand-500/30">
+          <div className="flex items-center gap-2">
+            <Upload className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />
+            <p className="text-xs font-bold text-brand-300 uppercase tracking-wider">Direct</p>
+            <span className="ml-auto text-xs font-semibold bg-brand-500/20 text-brand-300 px-1.5 py-0.5 rounded-full">{directUploads.length}</span>
+          </div>
+
+          <div className="flex-1 space-y-3 min-h-[80px]">
+            {directUploads.length === 0 ? (
+              <div className="flex flex-col items-center gap-1.5 text-brand-400/60 text-xs py-6 border border-dashed border-brand-500/30 rounded-lg cursor-pointer hover:border-brand-400/60 hover:text-brand-300 transition-colors" onClick={() => fileInputRef.current?.click()}>
+                <Upload className="w-4 h-4" />
+                <span>No uploads yet</span>
+              </div>
+            ) : (
+              <>
+                {renderImages(directUploads)}
+                {renderFiles(directUploads, directUploads.some(a => isImageType(a.file_type)))}
+              </>
+            )}
+          </div>
+
+          <div className="flex gap-1.5 mt-auto">
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-1.5 flex-1 justify-center text-xs py-1.5 px-2">
+              <Upload className="w-3.5 h-3.5" /> Upload
+            </button>
+            {directUploads.length > 0 && (
+              <button onClick={() => downloadAll(directUploads)} className="btn-ghost border border-brand-500/40 hover:bg-brand-500/10 text-brand-300 flex items-center gap-1.5 px-2 py-1.5 text-xs justify-center">
+                <Download className="w-3.5 h-3.5" /> All
+              </button>
+            )}
+          </div>
         </div>
-      ) : (
-        <>
-          {/* Image gallery */}
-          {images.length > 0 && (
-            <div className="grid grid-cols-2 gap-3">
-              {images.map((att) => (
-                <div key={att.id} className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
-                  <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300" onClick={() => setLightbox({ src: getAttachmentUrl(att), attId: att.id, filename: att.file_name })} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
-                    <p className="text-xs text-white font-medium truncate mb-2">{att.file_name}</p>
-                    <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
-                      <button onClick={(e) => { e.stopPropagation(); downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><Download className="w-3 h-3" /> Download</button>
-                      <button onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><MessageSquare className="w-3 h-3" /> Comment</button>
-                      <button onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }} className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"><Trash2 className="w-3 h-3" /></button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
 
-          {/* Non-image files */}
-          {files.length > 0 && (
-            <div className="space-y-1.5">
-              {images.length > 0 && <p className="text-xs font-medium text-surface-500 uppercase tracking-wider mt-2">Other Files</p>}
-              {files.map((att) => {
-                const Icon = getFileIcon(att.file_type);
-                return (
-                  <div key={att.id} className="group flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors">
-                    <div className="w-10 h-10 rounded-lg bg-surface-700 flex items-center justify-center flex-shrink-0"><Icon className="w-5 h-5 text-surface-400" /></div>
-                    <div className="flex-1 min-w-0"><p className="text-sm truncate">{att.file_name}</p><p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.uploader?.name} · {formatDate(att.uploaded_at)}</p></div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => onCommentAttachment(att)} className="btn-ghost p-1.5 rounded-lg" title="Comment"><MessageSquare className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true)} className="btn-ghost p-1.5 rounded-lg"><Download className="w-3.5 h-3.5" /></button>
-                      <button onClick={() => handleDelete(att.id)} className="btn-ghost p-1.5 rounded-lg text-red-400 hover:text-red-300" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
+        {/* ── Column 2: Customer Uploads ── */}
+        <div className="flex flex-col gap-3 bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/30">
+          <div className="flex items-center gap-2">
+            <UserCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+            <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Customer</p>
+            <span className="ml-auto text-xs font-semibold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full">{customerUploads.length}</span>
+          </div>
+
+          <div className="flex-1 space-y-3 min-h-[80px]">
+            {customerUploads.length === 0 ? (
+              <div className="flex flex-col items-center gap-1.5 text-emerald-500/60 text-xs py-6 border border-dashed border-emerald-500/30 rounded-lg">
+                <UserCircle2 className="w-4 h-4" />
+                <span>No uploads yet</span>
+              </div>
+            ) : (
+              <>
+                {renderImages(customerUploads)}
+                {renderFiles(customerUploads, customerUploads.some(a => isImageType(a.file_type)))}
+              </>
+            )}
+          </div>
+
+          <div className="flex gap-1.5 mt-auto">
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-1.5 flex-1 justify-center text-xs py-1.5 px-2">
+              <Upload className="w-3.5 h-3.5" /> Upload
+            </button>
+            {customerUploads.length > 0 && (
+              <button onClick={() => downloadAll(customerUploads)} className="btn-ghost border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 flex items-center gap-1.5 px-2 py-1.5 text-xs justify-center">
+                <Download className="w-3.5 h-3.5" /> All
+              </button>
+            )}
+          </div>
+        </div>
+
+      </div>
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (

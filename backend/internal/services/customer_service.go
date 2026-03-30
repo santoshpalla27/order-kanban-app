@@ -72,7 +72,12 @@ func CreateCustomerLink(productID, createdBy uint, expiresInHours *int) (*models
 	if expiresInHours != nil && *expiresInHours > 0 {
 		t := time.Now().Add(time.Duration(*expiresInHours) * time.Hour)
 		link.ExpiresAt = &t
+	} else if expiresInHours == nil {
+		// Default 30-day expiry when caller does not specify one
+		t := time.Now().Add(30 * 24 * time.Hour)
+		link.ExpiresAt = &t
 	}
+	// expiresInHours == 0  →  no expiry (permanent), ExpiresAt stays nil
 
 	if err := database.DB.Create(link).Error; err != nil {
 		return nil, err

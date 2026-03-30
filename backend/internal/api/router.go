@@ -68,6 +68,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 
 		// Public customer portal (token-authenticated, no JWT required)
 		customer := api.Group("/customer")
+		customer.Use(middleware.RateLimitPortal())
 		{
 			customer.GET("/:token",                       customerHandler.PortalInfo)
 			customer.GET("/:token/messages",              customerHandler.PortalGetMessages)
