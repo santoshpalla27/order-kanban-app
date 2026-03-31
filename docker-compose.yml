@@ -145,9 +145,7 @@ services:
       - traefik.http.routers.monitor.rule=Host(`m.santoshdevops.cloud`)
       - traefik.http.routers.monitor.entrypoints=websecure
       - traefik.http.routers.monitor.tls.certresolver=letsencrypt
-      - traefik.http.routers.monitor.middlewares=monitor-auth
       - traefik.http.services.monitor.loadbalancer.server.port=9090
-      - traefik.http.middlewares.monitor-auth.basicauth.users=${ADMIN_AUTH}
     deploy:
       resources:
         limits:
