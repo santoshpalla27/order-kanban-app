@@ -64,6 +64,7 @@ export interface CustomerLink {
   product_id: number;
   token: string;
   is_active: boolean;
+  expires_at: string;
   created_at: string;
 }
 

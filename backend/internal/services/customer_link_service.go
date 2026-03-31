@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"time"
 
 	"kanban-app/database"
 	"kanban-app/internal/models"
@@ -39,6 +40,7 @@ func CreateCustomerLink(productID, createdBy uint) (*models.CustomerLink, error)
 		Token:     token,
 		CreatedBy: createdBy,
 		IsActive:  true,
+		ExpiresAt: time.Now().Add(7 * 24 * time.Hour),
 	}
 	if err := database.DB.Create(link).Error; err != nil {
 		return nil, err
@@ -59,10 +61,10 @@ func GetCustomerLink(productID uint) (*models.CustomerLink, error) {
 	return &link, err
 }
 
-// ValidateToken looks up a token and returns the link if it is active.
+// ValidateToken looks up a token and returns the link if it is active and not expired.
 func ValidateToken(token string) (*models.CustomerLink, error) {
 	var link models.CustomerLink
-	err := database.DB.Where("token = ? AND is_active = ?", token, true).First(&link).Error
+	err := database.DB.Where("token = ? AND is_active = ? AND expires_at > ?", token, true, time.Now()).First(&link).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}

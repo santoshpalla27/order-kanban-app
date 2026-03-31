@@ -1195,6 +1195,7 @@ function CustomerLinkSection({ productId }: { productId: number }) {
 
   if (!canCreateProduct()) return null;
 
+  const isExpired = customerLink ? new Date(customerLink.expires_at).getTime() < Date.now() : false;
   const portalUrl = customerLink
     ? `${window.location.origin}/portal/${customerLink.token}`
     : '';
@@ -1216,25 +1217,49 @@ function CustomerLinkSection({ productId }: { productId: number }) {
         <div className="h-9 bg-surface-800/50 rounded-lg animate-pulse" />
       ) : customerLink ? (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 bg-surface-800/50 rounded-lg px-3 py-2 border border-surface-700/50">
-            <span className="text-xs text-surface-300 flex-1 truncate font-mono">{portalUrl}</span>
+          {isExpired && (
+            <div className="flex items-center gap-2 p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs mb-2">
+              <span className="font-medium">Link Expired</span>
+              <span>This link has passed its 7-day expiration. Please generate a new one.</span>
+            </div>
+          )}
+          <div className={`flex items-center gap-2 bg-surface-800/50 rounded-lg px-3 py-2 border border-surface-700/50 ${isExpired ? 'opacity-50' : ''}`}>
+            <span className={`text-xs flex-1 truncate font-mono ${isExpired ? 'text-surface-500 line-through' : 'text-surface-300'}`}>{portalUrl}</span>
             <button
               onClick={handleCopy}
-              className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors flex-shrink-0"
+              disabled={isExpired}
+              className={`flex items-center gap-1 text-xs transition-colors flex-shrink-0 ${isExpired ? 'text-surface-600 cursor-not-allowed' : 'text-brand-400 hover:text-brand-300'}`}
             >
               {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               {copied ? 'Copied!' : 'Copy'}
             </button>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] text-surface-500 uppercase tracking-wider">
+              {isExpired ? (
+                <>Expired on {new Date(customerLink.expires_at).toLocaleString()}</>
+              ) : (
+                <>Expires on {new Date(customerLink.expires_at).toLocaleString()}</>
+              )}
+            </span>
             <button
               onClick={() => revokeMutation.mutate(customerLink.id)}
               disabled={revokeMutation.isPending}
               className="text-xs text-red-400 hover:text-red-300 transition-colors"
             >
-              {revokeMutation.isPending ? 'Revoking...' : 'Revoke Link'}
+              {revokeMutation.isPending ? 'Revoking...' : isExpired ? 'Remove Link' : 'Revoke Link'}
             </button>
           </div>
+          {isExpired && (
+            <button
+              onClick={() => createMutation.mutate()}
+              disabled={createMutation.isPending}
+              className="w-full mt-2 flex items-center justify-center gap-2 text-xs text-brand-400 hover:text-brand-300 bg-brand-500/10 hover:bg-brand-500/20 px-3 py-2.5 rounded-lg transition-colors border border-brand-500/20 hover:border-brand-500/30"
+            >
+              <Link2 className="w-3.5 h-3.5" />
+              {createMutation.isPending ? 'Generating...' : 'Generate New Link'}
+            </button>
+          )}
         </div>
       ) : (
         <button

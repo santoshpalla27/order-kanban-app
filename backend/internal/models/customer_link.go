@@ -9,5 +9,6 @@ type CustomerLink struct {
 	CreatedBy uint      `json:"created_by" gorm:"not null"`
 	Creator   User      `json:"creator" gorm:"foreignKey:CreatedBy"`
 	IsActive  bool      `json:"is_active" gorm:"not null;default:true"`
+	ExpiresAt time.Time `json:"expires_at" gorm:"not null;index"`
 	CreatedAt time.Time `json:"created_at"`
 }
