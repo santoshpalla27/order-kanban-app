@@ -35,6 +35,14 @@ func resolveLink(c *gin.Context) (*models.CustomerLink, bool) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Invalid or expired link"})
 		return nil, false
 	}
+
+	// Verify that the underlying product actually exists and is not soft-deleted
+	product, err := services.GetProductByIDSimple(link.ProductID)
+	if err != nil || product == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found or has been deleted"})
+		return nil, false
+	}
+
 	return link, true
 }
 
