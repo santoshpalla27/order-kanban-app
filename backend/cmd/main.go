@@ -42,6 +42,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if cfg.JWTSecret == "kanban-secret-key-change-in-production" {
+		slog.Warn("JWT_SECRET is using the default insecure value — set a strong random secret in production")
+	}
+
 	// Initialize PostgreSQL (versioned migrations + seed roles)
 	database.Init(cfg.DatabaseURL)
 

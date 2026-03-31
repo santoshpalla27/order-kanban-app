@@ -8,8 +8,32 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var allowedWSOrigins []string
+
+// InitWebSocket configures the WebSocket upgrader's allowed origins from CORS_ORIGINS.
+// Pass nil or ["*"] to allow all origins (dev only).
+func InitWebSocket(origins []string) {
+	if len(origins) == 1 && origins[0] == "*" {
+		allowedWSOrigins = nil
+		return
+	}
+	allowedWSOrigins = origins
+}
+
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		if allowedWSOrigins == nil {
+			return true // dev mode: allow all
+		}
+		origin := r.Header.Get("Origin")
+		for _, allowed := range allowedWSOrigins {
+			if allowed == origin {
+				return true
+			}
+		}
+		log.Printf("WS: rejected connection from disallowed origin: %q", origin)
+		return false
+	},
 }
 
 type WSClient struct {

@@ -19,6 +19,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	for i := range origins {
 		origins[i] = strings.TrimSpace(origins[i])
 	}
+	handlers.InitWebSocket(origins) // restrict WS to the same allowed origins
 
 	r.Use(middleware.RequestID())       // inject X-Request-ID first
 	r.Use(middleware.StructuredLogger()) // structured access log carrying request_id

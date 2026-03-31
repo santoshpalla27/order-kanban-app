@@ -90,10 +90,15 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		FileName string `json:"file_name" binding:"required"`
 		FileSize int64  `json:"file_size"`
 		FileType string `json:"file_type"`
+		Source   string `json:"source"` // "direct" (default) or "comment"
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request: s3_key and file_name required"})
 		return
+	}
+
+	if req.Source != "comment" {
+		req.Source = "direct"
 	}
 
 	userID := c.GetUint("user_id")
@@ -106,6 +111,7 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		FileName:   req.FileName,
 		FileType:   req.FileType,
 		FileSize:   req.FileSize,
+		Source:     req.Source,
 		UploadedBy: userID,
 		UploadedAt: time.Now(),
 	}

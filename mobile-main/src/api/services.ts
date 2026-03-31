@@ -1,5 +1,6 @@
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Platform } from 'react-native';
 import api from './client';
 import { API_BASE_URL } from '../utils/config';
 import { tokenManager } from '../utils/tokenManager';
@@ -52,6 +53,7 @@ export const attachmentsApi = {
     fileSize: number,
     mimeType: string,
     onProgress: (pct: number) => void,
+    source = 'direct',
   ) => {
     // 1. Get presigned upload URL
     const presignRes = await api.get(`/products/${productId}/attachments/presign`, {
@@ -59,24 +61,44 @@ export const attachmentsApi = {
     });
     const { upload_url, s3_key, content_type } = presignRes.data;
 
-    // 2. Upload directly to R2 using expo-file-system (reliable on Android production APKs).
-    //    The fetch→blob→XHR pattern is unreliable in production builds.
-    const task = FileSystem.createUploadTask(
-      upload_url,
-      uri,
-      {
-        httpMethod: 'PUT',
-        uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        headers: { 'Content-Type': content_type || mimeType },
-      },
-      (progress) => {
-        const total = progress.totalBytesExpectedToSend;
-        if (total > 0) onProgress(Math.round((progress.totalBytesSent / total) * 100));
-      },
-    );
-    const result = await task.uploadAsync();
-    if (!result || result.status < 200 || result.status >= 300) {
-      throw new Error(`Upload failed: ${result?.status ?? 'unknown'}`);
+    // 2. Upload directly to R2.
+    //    Web: XHR PUT (fetch→blob works in browsers, gives progress via xhr.upload).
+    //    Native: expo-file-system createUploadTask (reliable on Android production APKs).
+    if (Platform.OS === 'web') {
+      const blobRes = await fetch(uri);
+      const blob = await blobRes.blob();
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        });
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) { onProgress(100); resolve(); }
+          else reject(new Error(`Upload failed: ${xhr.status}`));
+        });
+        xhr.addEventListener('error', () => reject(new Error('Upload failed')));
+        xhr.open('PUT', upload_url);
+        xhr.setRequestHeader('Content-Type', content_type || mimeType);
+        xhr.send(blob);
+      });
+    } else {
+      const task = FileSystem.createUploadTask(
+        upload_url,
+        uri,
+        {
+          httpMethod: 'PUT',
+          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+          headers: { 'Content-Type': content_type || mimeType },
+        },
+        (progress) => {
+          const total = progress.totalBytesExpectedToSend;
+          if (total > 0) onProgress(Math.round((progress.totalBytesSent / total) * 100));
+        },
+      );
+      const result = await task.uploadAsync();
+      if (!result || result.status < 200 || result.status >= 300) {
+        throw new Error(`Upload failed: ${result?.status ?? 'unknown'}`);
+      }
     }
 
     // 3. Confirm upload
@@ -86,6 +108,7 @@ export const attachmentsApi = {
       file_name: fileName,
       file_size: fileSize,
       file_type: ext,
+      source,
     });
   },
 

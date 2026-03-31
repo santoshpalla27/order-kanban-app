@@ -50,6 +50,11 @@ func (h *ChatHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
+	if len([]rune(req.Message)) > 4000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Message exceeds 4000 character limit"})
+		return
+	}
+
 	userID := c.GetUint("user_id")
 	userName, _ := c.Get("user_name")
 	senderName := userName.(string)

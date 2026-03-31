@@ -49,6 +49,11 @@ func (h *CommentHandler) Create(c *gin.Context) {
 		return
 	}
 
+	if len([]rune(req.Message)) > 4000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Message exceeds 4000 character limit"})
+		return
+	}
+
 	userID := c.GetUint("user_id")
 	userName, _ := c.Get("user_name")
 
@@ -143,6 +148,11 @@ func (h *CommentHandler) Update(c *gin.Context) {
 	var req models.UpdateCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if len([]rune(req.Message)) > 4000 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Message exceeds 4000 character limit"})
 		return
 	}
 

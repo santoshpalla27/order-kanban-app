@@ -145,7 +145,7 @@ function UploadProgressModal({ files, onCancel }: { files: FileUploadState[]; on
 }
 
 // ── Shared multi-file upload hook ──
-function useMultiUpload(productId: number) {
+function useMultiUpload(productId: number, source = 'direct') {
   const queryClient = useQueryClient();
   const [uploadFiles_state, setUploadFiles_state] = useState<FileUploadState[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -172,6 +172,7 @@ function useMultiUpload(productId: number) {
           fileArray[i],
           (pct) => setUploadFiles_state(prev => prev.map((f, idx) => idx === i ? { ...f, progress: pct } : f)),
           controller.signal,
+          source,
         );
         setUploadFiles_state(prev => prev.map((f, idx) => idx === i ? { ...f, progress: 100, status: 'done' } : f));
         onFileDone?.(res.data);
@@ -301,6 +302,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   const { data: attachmentsData } = useQuery({ queryKey: ['attachments', productId], queryFn: () => attachmentsApi.getByProduct(productId) });
   const attachments: Attachment[] = attachmentsData?.data || [];
+  const directAttachmentsCount = attachments.filter((a) => !a.source || a.source === 'direct').length;
 
   const { data: commentsData } = useQuery({ queryKey: ['comments', productId], queryFn: () => commentsApi.getByProduct(productId) });
   const comments: Comment[] = commentsData?.data || [];
@@ -342,7 +344,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   const tabs = [
     { id: 'details' as const, label: 'Details', icon: Package, badge: has(productId, 'status_change') },
-    { id: 'attachments' as const, label: `Attachments (${attachments.length})`, icon: Paperclip, badge: has(productId, 'attachments') },
+    { id: 'attachments' as const, label: `Attachments (${directAttachmentsCount})`, icon: Paperclip, badge: has(productId, 'attachments') },
     { id: 'comments' as const, label: `Comments (${comments.length})`, icon: MessageSquare, badge: has(productId, 'comments') },
   ];
 
@@ -591,25 +593,25 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <Paperclip className="w-4 h-4 text-surface-400" />
-            <span className="text-xs font-medium text-surface-500 uppercase tracking-wider">Attachments ({attachments.length})</span>
+            <span className="text-xs font-medium text-surface-500 uppercase tracking-wider">Attachments ({attachments.filter((a) => !a.source || a.source === 'direct').length})</span>
           </div>
           <div className="flex items-center gap-2">
             <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleUpload} />
             <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition-colors bg-brand-500/10 hover:bg-brand-500/20 px-2.5 py-1.5 rounded-lg">
               <Plus className="w-3.5 h-3.5" /> Add Files
             </button>
-            {attachments.length > 0 && <button onClick={onViewAll} className="text-xs text-surface-400 hover:text-surface-200 transition-colors">Manage →</button>}
+            {attachments.filter((a) => !a.source || a.source === 'direct').length > 0 && <button onClick={onViewAll} className="text-xs text-surface-400 hover:text-surface-200 transition-colors">Manage →</button>}
           </div>
         </div>
-        {attachments.length === 0 ? (
+        {attachments.filter((a) => !a.source || a.source === 'direct').length === 0 ? (
           <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-6 border-2 border-dashed border-surface-700/50 rounded-xl cursor-pointer hover:border-brand-500/30 hover:text-surface-400 transition-colors" onClick={() => fileInputRef.current?.click()}>
             <Upload className="w-5 h-5 opacity-40" /><span>Click to add attachments</span>
           </div>
         ) : (
           <>
-            {attachments.filter((a) => isImageType(a.file_type)).length > 0 && (
+            {attachments.filter((a) => (!a.source || a.source === 'direct') && isImageType(a.file_type)).length > 0 && (
               <div className="grid grid-cols-3 gap-2 mb-3">
-                {attachments.filter((a) => isImageType(a.file_type)).map((att) => (
+                {attachments.filter((a) => (!a.source || a.source === 'direct') && isImageType(a.file_type)).map((att) => (
                   <div key={att.id} className="group relative aspect-square rounded-lg overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all cursor-pointer" onClick={() => onCommentAttachment(att)}>
                     <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center"><MessageSquare className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" /></div>
@@ -618,7 +620,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
                 ))}
               </div>
             )}
-            {attachments.filter((a) => !isImageType(a.file_type)).map((att) => {
+            {attachments.filter((a) => (!a.source || a.source === 'direct') && !isImageType(a.file_type)).map((att) => {
               const Icon = getFileIcon(att.file_type);
               return (
                 <div key={att.id} className="flex items-center gap-3 p-2.5 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors mb-1.5 cursor-pointer" onClick={() => onCommentAttachment(att)}>
@@ -677,8 +679,9 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
 
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ''; };
 
-  const images = attachments.filter((a) => isImageType(a.file_type));
-  const files = attachments.filter((a) => !isImageType(a.file_type));
+  const directAttachments = attachments.filter((a) => !a.source || a.source === 'direct');
+  const images = directAttachments.filter((a) => isImageType(a.file_type));
+  const files = directAttachments.filter((a) => !isImageType(a.file_type));
 
   return (
     <>
@@ -689,10 +692,10 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
         <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-2 flex-1 justify-center">
           <Upload className="w-4 h-4" /> Upload Files
         </button>
-        {attachments.length > 0 && (
-          <button 
+        {directAttachments.length > 0 && (
+          <button
             onClick={async () => {
-              for (const att of attachments) {
+              for (const att of directAttachments) {
                 try {
                   await downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true);
                   await new Promise(resolve => setTimeout(resolve, 300));
@@ -707,7 +710,7 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
         )}
       </div>
 
-      {attachments.length === 0 ? (
+      {directAttachments.length === 0 ? (
         <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-12 border-2 border-dashed border-surface-700/50 rounded-xl cursor-pointer hover:border-brand-500/30 hover:text-surface-400 transition-colors" onClick={() => fileInputRef.current?.click()}>
           <Upload className="w-6 h-6 opacity-40" />
           <span>No attachments — click to upload</span>
@@ -868,7 +871,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
   const endRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
+  const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId, 'comment');
 
   // Scroll to bottom on initial mount (tab open)
   useEffect(() => {
@@ -1053,7 +1056,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
 
                         {/* Attached image in comment */}
                         {attachmentDisplayUrl && attachmentIsImage && (
-                          <div className={`mt-2 group/img relative aspect-[4/3] w-[240px] rounded-xl overflow-hidden border-none ${
+                          <div className={`mt-2 group/img relative aspect-square w-[120px] rounded-xl overflow-hidden border-none ${
                             isOwn ? 'bg-black/10' : 'bg-surface-900'
                           }`}>
                             <img

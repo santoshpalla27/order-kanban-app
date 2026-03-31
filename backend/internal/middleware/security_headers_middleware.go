@@ -9,6 +9,10 @@ func SecurityHeaders() gin.HandlerFunc {
 		c.Header("X-Frame-Options", "DENY")
 		c.Header("X-XSS-Protection", "1; mode=block")
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		// Prevent all content embedding — this is a pure JSON API, no frames/scripts/media needed
+		c.Header("Content-Security-Policy", "default-src 'none'")
+		// Tell browsers to only connect over HTTPS for the next year (only effective over TLS)
+		c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		c.Next()
 	}
 }

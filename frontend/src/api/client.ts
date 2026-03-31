@@ -107,6 +107,7 @@ export const attachmentsApi = {
     file: File,
     onProgress: (pct: number) => void,
     signal?: AbortSignal,
+    source = 'direct',
   ) => {
     const presignRes = await api.get(`/products/${productId}/attachments/presign`, {
       params: { filename: file.name },
@@ -137,6 +138,7 @@ export const attachmentsApi = {
       file_name: file.name,
       file_size: file.size,
       file_type: '.' + file.name.split('.').pop()?.toLowerCase(),
+      source,
     }, { signal });
   },
 

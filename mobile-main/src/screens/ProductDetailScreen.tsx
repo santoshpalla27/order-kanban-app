@@ -644,7 +644,7 @@ function AttachmentsTab({
 
   // ── Download all ──
   const handleDownloadAll = async () => {
-    for (const att of attachments) {
+    for (const att of directAttachments) {
       await handleDownload(att);
       await new Promise((r) => setTimeout(r, 400));
     }
@@ -667,8 +667,9 @@ function AttachmentsTab({
     setDeleting(false);
   };
 
-  const images = attachments.filter((a) => isImage(a.file_type));
-  const files  = attachments.filter((a) => !isImage(a.file_type));
+  const directAttachments = attachments.filter((a: any) => !a.source || a.source === 'direct');
+  const images = directAttachments.filter((a: any) => isImage(a.file_type));
+  const files  = directAttachments.filter((a: any) => !isImage(a.file_type));
 
   return (
     <View style={{ flex: 1 }}>
@@ -680,7 +681,7 @@ function AttachmentsTab({
             <TouchableOpacity style={styles.uploadBtn} onPress={handleUpload}>
               <Text style={styles.uploadBtnText}>📎  Upload Files</Text>
             </TouchableOpacity>
-            {attachments.length > 0 && (
+            {directAttachments.length > 0 && (
               <TouchableOpacity style={styles.dlAllBtn} onPress={handleDownloadAll}>
                 <Text style={styles.dlAllTxt}>⬇ All</Text>
               </TouchableOpacity>
@@ -688,7 +689,7 @@ function AttachmentsTab({
           </View>
         )}
 
-        {attachments.length === 0 ? (
+        {directAttachments.length === 0 ? (
           <TouchableOpacity style={styles.emptyBox} onPress={canUpload ? handleUpload : undefined} activeOpacity={canUpload ? 0.7 : 1}>
             <Text style={{ fontSize: 32 }}>📎</Text>
             <Text style={styles.empty}>No attachments{canUpload ? ' — tap to upload' : ''}</Text>
@@ -944,8 +945,8 @@ function parseCommentMessage(raw: string): ParsedComment {
 interface MenuState { commentId: number; isOwn: boolean; text: string; authorName: string }
 
 function CommentsTab({
-  productId, canComment, userId, attachments,
-}: { productId: number; canComment: boolean; userId: number; attachments: Attachment[] }) {
+  productId, canComment, userId, attachments, onAttachmentUploaded,
+}: { productId: number; canComment: boolean; userId: number; attachments: Attachment[]; onAttachmentUploaded?: () => void }) {
   const isDark = useThemeStore((s) => s.isDark);
   const c = isDark ? darkColors : lightColors;
   const styles = useMemo(() => makeCommentsStyles(c), [c]);
@@ -967,6 +968,49 @@ function CommentsTab({
 
   // Attachment lightbox inside comments
   const [attLightbox, setAttLightbox] = useState<{ url: string; name: string; id?: number } | null>(null);
+
+  // File upload from comments
+  const [commentUploadFiles, setCommentUploadFiles] = useState<FileUploadState[]>([]);
+  const [showCommentUploadModal, setShowCommentUploadModal] = useState(false);
+
+  const handleCommentUpload = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({ multiple: true } as any);
+      if (result.canceled || !result.assets?.length) return;
+
+      const files = result.assets;
+      const states: FileUploadState[] = files.map((f) => ({
+        name: f.name, size: f.size ?? 0, progress: 0, status: 'pending',
+      }));
+      setCommentUploadFiles(states);
+      setShowCommentUploadModal(true);
+
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        setCommentUploadFiles((prev) => prev.map((s, idx) => idx === i ? { ...s, status: 'uploading' } : s));
+        try {
+          const res = await attachmentsApi.uploadWithProgress(
+            productId, f.uri, f.name, f.size ?? 0,
+            f.mimeType ?? 'application/octet-stream',
+            (pct) => setCommentUploadFiles((prev) => prev.map((s, idx) => idx === i ? { ...s, progress: pct } : s)),
+            'comment',
+          );
+          setCommentUploadFiles((prev) => prev.map((s, idx) => idx === i ? { ...s, progress: 100, status: 'done' } : s));
+          const att = res.data;
+          await commentsApi.create(productId, `📎 Uploaded: ${att.file_name}\n[attachment:${att.id}:${att.file_name}]`);
+        } catch (uploadErr: any) {
+          const msg = uploadErr?.message || uploadErr?.response?.data?.error || 'Unknown error';
+          setCommentUploadFiles((prev) => prev.map((s, idx) => idx === i ? { ...s, status: 'error', errorMsg: msg } : s));
+        }
+      }
+
+      onAttachmentUploaded?.();
+      await load();
+    } catch (err: any) {
+      Alert.alert('Upload failed', err?.message || 'Something went wrong');
+      setShowCommentUploadModal(false);
+    }
+  };
 
   // @mention state
   const inputRef     = useRef<TextInput>(null);
@@ -1337,6 +1381,9 @@ function CommentsTab({
 
       {canComment && (
         <View style={styles.inputBar}>
+          <TouchableOpacity style={styles.uploadBtn} onPress={handleCommentUpload}>
+            <Feather name="paperclip" size={20} color={c.textSec} />
+          </TouchableOpacity>
           <TextInput
             ref={inputRef}
             style={styles.input}
@@ -1366,6 +1413,14 @@ function CommentsTab({
             }
           </TouchableOpacity>
         </View>
+      )}
+
+      {/* Comment upload progress modal */}
+      {showCommentUploadModal && (
+        <UploadProgressModal
+          files={commentUploadFiles}
+          onClose={() => { setShowCommentUploadModal(false); setCommentUploadFiles([]); }}
+        />
       )}
 
       {/* Context menu modal */}
@@ -1538,7 +1593,7 @@ function makeCommentsStyles(c: ThemeColors) {
 
     // Attachment image thumbnail inside bubble
     attThumb: { borderRadius: 10, overflow: 'hidden', marginTop: 4, marginBottom: 4 },
-    attThumbImg: { width: 200, height: 140 },
+    attThumbImg: { width: 90, height: 90 },
     attThumbOverlay: {
       position: 'absolute', bottom: 0, left: 0, right: 0,
       backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 8, paddingVertical: 4,
@@ -1595,8 +1650,13 @@ function makeCommentsStyles(c: ThemeColors) {
     mentionOrderCustomer: { fontSize: 11, color: c.textMuted },
 
     inputBar: {
-      flexDirection: 'row', alignItems: 'flex-end', gap: 10,
+      flexDirection: 'row', alignItems: 'flex-end', gap: 8,
       padding: 12, borderTopWidth: 1, borderTopColor: c.surface2,
+    },
+    uploadBtn: {
+      width: 40, height: 40, borderRadius: 20,
+      backgroundColor: c.surface, borderWidth: 1, borderColor: c.border2,
+      alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     },
     input: {
       flex: 1, backgroundColor: c.surface, borderRadius: 12, borderWidth: 1,
@@ -1878,6 +1938,7 @@ export default function ProductDetailScreen() {
             canComment={canComment()}
             userId={user?.id ?? 0}
             attachments={attachments}
+            onAttachmentUploaded={loadAttachments}
           />
         )}
       </View>
