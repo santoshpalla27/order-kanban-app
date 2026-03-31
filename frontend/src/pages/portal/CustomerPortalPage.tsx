@@ -368,48 +368,48 @@ export default function CustomerPortalPage() {
   return (
     <div className="h-[100dvh] flex flex-col max-w-2xl mx-auto" style={{ background: '#efeae2' }}>
       {/* ── Header ── */}
-      <div className="sticky top-0 z-10" style={{ background: '#075e54' }}>
+      <div className="sticky top-0 z-10 shadow-sm bg-white border-b border-gray-200">
         <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-[#25d366] flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
               {product.customer_name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <p className="text-sm font-semibold text-white leading-tight">{product.product_id}</p>
-              <p className="text-xs text-white/70">{product.customer_name}</p>
+              <p className="text-sm font-semibold text-gray-900 leading-tight">{product.product_id}</p>
+              <p className="text-xs text-gray-500">{product.customer_name}</p>
             </div>
           </div>
           <button
             onClick={() => setDetailsOpen(o => !o)}
-            className="flex items-center gap-1.5 text-xs text-white/70 hover:text-white transition-colors px-2 py-1.5 rounded-lg hover:bg-white/10"
+            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-100"
           >
             {detailsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             Details
           </button>
         </div>
         {detailsOpen && (
-          <div className="px-4 pb-4 pt-1 border-t border-white/10 space-y-2" style={{ background: '#128c7e' }}>
+          <div className="px-4 pb-4 pt-1 border-t border-gray-200 space-y-2 shadow-inner bg-gray-50">
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <div>
-                <p className="text-[10px] text-white/50 uppercase tracking-wider">Order ID</p>
-                <p className="text-sm text-white font-medium">{product.product_id}</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wider">Order ID</p>
+                <p className="text-sm text-gray-900 font-medium">{product.product_id}</p>
               </div>
               <div>
-                <p className="text-[10px] text-white/50 uppercase tracking-wider">Status</p>
+                <p className="text-[10px] text-gray-400 uppercase tracking-wider">Status</p>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[product.status] || 'bg-gray-100 text-gray-600'}`}>
                   {STATUS_LABELS[product.status] || product.status}
                 </span>
               </div>
               {product.delivery_at && (
                 <div>
-                  <p className="text-[10px] text-white/50 uppercase tracking-wider">Delivery</p>
-                  <p className="text-sm text-white">{formatDateTime(product.delivery_at)}</p>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider">Delivery</p>
+                  <p className="text-sm text-gray-900">{formatDateTime(product.delivery_at)}</p>
                 </div>
               )}
               {product.description && (
                 <div className="col-span-2">
-                  <p className="text-[10px] text-white/50 uppercase tracking-wider">Description</p>
-                  <p className="text-sm text-white/90 whitespace-pre-wrap">{product.description}</p>
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider">Description</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{product.description}</p>
                 </div>
               )}
             </div>
