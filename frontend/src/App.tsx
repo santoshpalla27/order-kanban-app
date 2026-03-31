@@ -8,6 +8,7 @@ import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
 import KanbanBoard from './pages/kanban/KanbanBoard';
 import ErrorBoundary from './components/ErrorBoundary';
+import CustomerPortalPage from './pages/portal/CustomerPortalPage';
 
 // Lazy-load non-critical routes — each becomes a separate JS chunk
 const ListView = lazy(() => import('./pages/boards/ListView'));
@@ -130,6 +131,8 @@ export default function App() {
                 }
               />
             </Route>
+            {/* Public customer portal — no auth required */}
+            <Route path="/portal/:token" element={<CustomerPortalPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
           </AuthValidator>

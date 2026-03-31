@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { productsApi, usersApi } from '../api/client';
+import { productsApi, usersApi, customerLinkApi } from '../api/client';
 import { User } from '../types';
-import { X, Package } from 'lucide-react';
+import { X, Package, Link2, Copy, Check } from 'lucide-react';
 
 function todayAtMidnight() {
   const d = new Date();
@@ -23,6 +23,9 @@ export default function CreateProductModal({ onClose }: Props) {
   const [description, setDescription] = useState('');
   const [deliveryAt, setDeliveryAt] = useState('');
   const [assigneeIds, setAssigneeIds] = useState<number[]>([]);
+  const [generateLink, setGenerateLink] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const queryClient = useQueryClient();
 
@@ -34,8 +37,23 @@ export default function CreateProductModal({ onClose }: Props) {
 
   const mutation = useMutation({
     mutationFn: (data: any) => productsApi.create(data),
-    onSuccess: () => {
+    onSuccess: async (res) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      if (generateLink) {
+        try {
+          const newProductId: number = res.data?.id;
+          if (newProductId) {
+            const linkRes = await customerLinkApi.create(newProductId);
+            const token = linkRes.data?.link?.token;
+            if (token) {
+              setGeneratedLink(`${window.location.origin}/portal/${token}`);
+              return; // keep modal open to show the link
+            }
+          }
+        } catch {
+          // link creation failed, just close
+        }
+      }
       onClose();
     },
     onError: (err: any) => {
@@ -177,12 +195,46 @@ export default function CreateProductModal({ onClose }: Props) {
             </select>
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
-            <button type="submit" disabled={mutation.isPending} className="btn-primary flex-1">
-              {mutation.isPending ? 'Creating...' : 'Create Product'}
-            </button>
+          <div className="flex items-center gap-2 py-1">
+            <input
+              type="checkbox"
+              id="generate-link"
+              checked={generateLink}
+              onChange={(e) => setGenerateLink(e.target.checked)}
+              className="w-4 h-4 accent-brand-500 cursor-pointer"
+            />
+            <label htmlFor="generate-link" className="flex items-center gap-1.5 text-sm text-surface-300 cursor-pointer select-none">
+              <Link2 className="w-3.5 h-3.5 text-brand-400" />
+              Generate customer portal link after creation
+            </label>
           </div>
+
+          {generatedLink && (
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4 space-y-2">
+              <p className="text-xs font-medium text-emerald-400">Customer link generated!</p>
+              <div className="flex items-center gap-2 bg-surface-800/60 rounded-lg px-3 py-2 border border-surface-700/50">
+                <span className="text-xs text-surface-300 flex-1 truncate font-mono">{generatedLink}</span>
+                <button
+                  type="button"
+                  onClick={() => { navigator.clipboard.writeText(generatedLink); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+                  className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors flex-shrink-0"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copied!' : 'Copy'}
+                </button>
+              </div>
+              <button type="button" onClick={onClose} className="w-full btn-primary text-sm py-2">Done</button>
+            </div>
+          )}
+
+          {!generatedLink && (
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={onClose} className="btn-secondary flex-1">Cancel</button>
+              <button type="submit" disabled={mutation.isPending} className="btn-primary flex-1">
+                {mutation.isPending ? 'Creating...' : 'Create Product'}
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

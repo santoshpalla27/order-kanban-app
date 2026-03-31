@@ -3,13 +3,15 @@ package models
 import "time"
 
 type Comment struct {
-	ID        uint      `json:"id" gorm:"primaryKey"`
-	ProductID uint      `json:"product_id" gorm:"not null;index"`
-	UserID    uint      `json:"user_id" gorm:"not null"`
-	User      User      `json:"user" gorm:"foreignKey:UserID"`
-	Message   string    `json:"message" gorm:"not null"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID           uint      `json:"id" gorm:"primaryKey"`
+	ProductID    uint      `json:"product_id" gorm:"not null;index"`
+	UserID       uint      `json:"user_id"`
+	User         User      `json:"user" gorm:"foreignKey:UserID"`
+	Message      string    `json:"message" gorm:"not null"`
+	Source       string    `json:"source" gorm:"not null;default:'internal'"` // "internal" | "customer"
+	PortalSender string    `json:"portal_sender" gorm:"default:''"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type CreateCommentRequest struct {

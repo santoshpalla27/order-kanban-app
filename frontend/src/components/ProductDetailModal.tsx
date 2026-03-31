@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi } from '../api/client';
-import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES } from '../hooks/useProductBadges';
+import { productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi, customerLinkApi } from '../api/client';
+import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES, CUSTOMER_COMMENT_TYPES, CUSTOMER_ATTACHMENT_TYPES } from '../hooks/useProductBadges';
 import { formatDate, formatDateTime, formatTime } from '../utils/date';
 import { useAuthStore } from '../store/authStore';
-import { Product, Attachment, Comment, STATUS_LABELS, STATUS_ORDER } from '../types';
+import { Product, Attachment, Comment, CustomerLink, STATUS_LABELS, STATUS_ORDER } from '../types';
 import MentionInput, { renderWithMentions, MentionInputHandle } from './MentionInput';
 import {
   X, Paperclip, MessageSquare, Package, Upload, Download, Trash2,
   Send, Edit2, Image, FileText, File, ImagePlus, Plus, Reply, MoreVertical,
-  ExternalLink,
+  ExternalLink, Link2, Copy, Check, User,
 } from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
 
@@ -293,7 +293,7 @@ function ImageLightbox({ src, alt, attId, onClose }: { src: string; alt: string;
 
 // ── Main Modal ──
 export default function ProductDetailModal({ productId, onClose }: Props) {
-  const [activeTab, setActiveTab] = useState<'details' | 'attachments' | 'comments'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'attachments' | 'comments' | 'customer-attachments' | 'customer-comments'>('details');
   const [commentingAttachment, setCommentingAttachment] = useState<Attachment | null>(null);
   const queryClient = useQueryClient();
 
@@ -303,9 +303,12 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
   const { data: attachmentsData } = useQuery({ queryKey: ['attachments', productId], queryFn: () => attachmentsApi.getByProduct(productId) });
   const attachments: Attachment[] = attachmentsData?.data || [];
   const directAttachmentsCount = attachments.filter((a) => !a.source || a.source === 'direct').length;
+  const customerAttachments = attachments.filter((a) => a.source === 'customer');
 
   const { data: commentsData } = useQuery({ queryKey: ['comments', productId], queryFn: () => commentsApi.getByProduct(productId) });
-  const comments: Comment[] = commentsData?.data || [];
+  const allComments: Comment[] = commentsData?.data || [];
+  const comments = allComments.filter(c => !c.source || c.source === 'internal');
+  const customerComments = allComments.filter(c => c.source === 'customer');
 
   const { has } = useProductBadges();
 
@@ -322,18 +325,19 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
   };
 
   useEffect(() => {
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+    };
     if (activeTab === 'comments' && has(productId, 'comments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-        queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
-      });
+      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES).then(invalidate);
     } else if (activeTab === 'attachments' && has(productId, 'attachments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-        queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
-      });
+      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES).then(invalidate);
+    } else if (activeTab === 'customer-comments' && has(productId, 'customer_comments')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_COMMENT_TYPES).then(invalidate);
+    } else if (activeTab === 'customer-attachments' && has(productId, 'customer_attachments')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES).then(invalidate);
     }
   }, [activeTab, productId, commentsData]);
 
@@ -344,8 +348,10 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   const tabs = [
     { id: 'details' as const, label: 'Details', icon: Package, badge: has(productId, 'status_change') },
-    { id: 'attachments' as const, label: `Attachments (${directAttachmentsCount})`, icon: Paperclip, badge: has(productId, 'attachments') },
+    { id: 'attachments' as const, label: `Files (${directAttachmentsCount})`, icon: Paperclip, badge: has(productId, 'attachments') },
     { id: 'comments' as const, label: `Comments (${comments.length})`, icon: MessageSquare, badge: has(productId, 'comments') },
+    { id: 'customer-attachments' as const, label: `Customer Files (${customerAttachments.length})`, icon: User, badge: has(productId, 'customer_attachments') },
+    { id: 'customer-comments' as const, label: `Customer Messages (${customerComments.length})`, icon: User, badge: has(productId, 'customer_comments') },
   ];
 
   return (
@@ -375,10 +381,10 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
               <button onClick={handleClose} className="btn-ghost p-2 rounded-lg"><X className="w-5 h-5" /></button>
             </div>
           </div>
-          <div className="flex border-b border-surface-700/50">
+          <div className="flex-shrink-0 flex border-b border-surface-700/50 overflow-x-auto scrollbar-hide">
             {tabs.map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-all duration-200 border-b-2 ${activeTab === tab.id ? 'border-brand-500 text-brand-400' : 'border-transparent text-surface-400 hover:text-surface-200'}`}>
-                <tab.icon className="w-4 h-4" /> {tab.label}
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-shrink-0 flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-medium transition-all duration-200 border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-brand-500 text-brand-400' : 'border-transparent text-surface-400 hover:text-surface-200'}`}>
+                <tab.icon className="w-3.5 h-3.5" /> {tab.label}
                 {tab.badge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
               </button>
             ))}
@@ -387,6 +393,8 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
             {activeTab === 'details' && product && <DetailsTab product={product} productId={productId} attachments={attachments} onViewAll={() => setActiveTab('attachments')} onCommentAttachment={setCommentingAttachment} />}
             {activeTab === 'attachments' && <AttachmentsTab productId={productId} attachments={attachments} onCommentAttachment={setCommentingAttachment} />}
             {activeTab === 'comments' && <CommentsTab productId={productId} comments={comments} attachments={attachments} />}
+            {activeTab === 'customer-attachments' && <CustomerAttachmentsTab productId={productId} attachments={customerAttachments} />}
+            {activeTab === 'customer-comments' && <CustomerCommentsTab comments={customerComments} attachments={customerAttachments} />}
           </div>
         </div>
       </div>
@@ -589,6 +597,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
         <DetailRow label="Created By" value={product.creator?.name || '—'} />
         <DetailRow label="Created At" value={formatDateTime(product.created_at)} />
       </div>
+      <CustomerLinkSection productId={productId} />
       <div className="border-t border-surface-700/50 pt-4">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
@@ -1159,5 +1168,257 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
       {lightbox && <ImageLightbox src={lightbox.src} alt={lightbox.filename} attId={lightbox.attId} onClose={() => setLightbox(null)} />}
     </div>
     </>
+  );
+}
+
+// ── Customer Link Section (inside DetailsTab view mode) ──
+function CustomerLinkSection({ productId }: { productId: number }) {
+  const queryClient = useQueryClient();
+  const { canCreateProduct } = useAuthStore();
+  const [copied, setCopied] = useState(false);
+
+  const { data: linkData, isLoading } = useQuery({
+    queryKey: ['customer-link', productId],
+    queryFn: () => customerLinkApi.get(productId).then(r => r.data.link as CustomerLink | null),
+  });
+  const customerLink: CustomerLink | null = linkData ?? null;
+
+  const createMutation = useMutation({
+    mutationFn: () => customerLinkApi.create(productId).then(r => r.data.link),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customer-link', productId] }),
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: (linkId: number) => customerLinkApi.deactivate(productId, linkId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['customer-link', productId] }),
+  });
+
+  if (!canCreateProduct()) return null;
+
+  const portalUrl = customerLink
+    ? `${window.location.origin}/portal/${customerLink.token}`
+    : '';
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(portalUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="border-t border-surface-700/50 pt-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Link2 className="w-4 h-4 text-surface-400" />
+        <span className="text-xs font-medium text-surface-500 uppercase tracking-wider">Customer Portal Link</span>
+      </div>
+
+      {isLoading ? (
+        <div className="h-9 bg-surface-800/50 rounded-lg animate-pulse" />
+      ) : customerLink ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 bg-surface-800/50 rounded-lg px-3 py-2 border border-surface-700/50">
+            <span className="text-xs text-surface-300 flex-1 truncate font-mono">{portalUrl}</span>
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1 text-xs text-brand-400 hover:text-brand-300 transition-colors flex-shrink-0"
+            >
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+          <div className="flex justify-end">
+            <button
+              onClick={() => revokeMutation.mutate(customerLink.id)}
+              disabled={revokeMutation.isPending}
+              className="text-xs text-red-400 hover:text-red-300 transition-colors"
+            >
+              {revokeMutation.isPending ? 'Revoking...' : 'Revoke Link'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => createMutation.mutate()}
+          disabled={createMutation.isPending}
+          className="w-full flex items-center justify-center gap-2 text-xs text-brand-400 hover:text-brand-300 bg-brand-500/10 hover:bg-brand-500/20 px-3 py-2.5 rounded-lg transition-colors border border-brand-500/20 hover:border-brand-500/30"
+        >
+          <Link2 className="w-3.5 h-3.5" />
+          {createMutation.isPending ? 'Generating...' : 'Generate Customer Link'}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Customer Attachments Tab (read-only view of customer-submitted files) ──
+function CustomerAttachmentsTab({ productId, attachments }: { productId: number; attachments: Attachment[] }) {
+  const [lightbox, setLightbox] = useState<{ src: string; filename: string } | null>(null);
+  const images = attachments.filter(a => isImageType(a.file_type));
+  const files = attachments.filter(a => !isImageType(a.file_type));
+
+  if (attachments.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-12 border-2 border-dashed border-surface-700/50 rounded-xl">
+        <User className="w-6 h-6 opacity-40" />
+        <span>No customer files yet</span>
+        <span className="text-xs text-surface-600">Files uploaded via the customer portal will appear here</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button
+          onClick={async () => {
+            for (const att of attachments) {
+              try {
+                await downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true);
+                await new Promise(resolve => setTimeout(resolve, 300));
+              } catch (err) { console.error(`Failed to download ${att.file_name}:`, err); }
+            }
+          }}
+          className="btn-ghost border border-surface-700/50 hover:bg-surface-700/50 flex items-center gap-2 px-4 py-2 text-sm justify-center"
+          title="Download All"
+        >
+          <Download className="w-4 h-4" /> Download All ({attachments.length})
+        </button>
+      </div>
+      {images.length > 0 && (
+        <div className="grid grid-cols-2 gap-3">
+          {images.map((att) => (
+            <div key={att.id} className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-teal-500/50 transition-all">
+              <img
+                src={getAttachmentUrl(att)}
+                alt={att.file_name}
+                className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300"
+                onClick={() => setLightbox({ src: getAttachmentUrl(att), filename: att.file_name })}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
+                <p className="text-xs text-white font-medium truncate mb-1">{att.file_name}</p>
+                <p className="text-[10px] text-white/60">{att.portal_sender || 'Customer'}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {files.length > 0 && (
+        <div className="space-y-1.5">
+          {images.length > 0 && <p className="text-xs font-medium text-surface-500 uppercase tracking-wider mt-2">Other Files</p>}
+          {files.map((att) => {
+            const Icon = getFileIcon(att.file_type);
+            return (
+              <div key={att.id} className="flex items-center gap-3 p-3 bg-surface-800/50 rounded-lg hover:bg-surface-800 transition-colors">
+                <div className="w-10 h-10 rounded-lg bg-surface-700 flex items-center justify-center flex-shrink-0">
+                  <Icon className="w-5 h-5 text-surface-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm truncate">{att.file_name}</p>
+                  <p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.portal_sender || 'Customer'} · {formatDate(att.uploaded_at)}</p>
+                </div>
+                <button
+                  onClick={() => downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true)}
+                  className="btn-ghost p-1.5 rounded-lg"
+                  title="Download"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {lightbox && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>
+          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <img src={lightbox.src} alt={lightbox.filename} className="max-w-full max-h-[85vh] object-contain rounded-xl" />
+            <button onClick={() => setLightbox(null)} className="absolute top-3 right-3 bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Customer Comments Tab (read-only view of customer-submitted messages) ──
+function CustomerCommentsTab({ comments, attachments }: { comments: Comment[]; attachments: Attachment[] }) {
+  const [lightbox, setLightbox] = useState<{ src: string; filename: string } | null>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { endRef.current?.scrollIntoView(); }, []);
+
+  if (comments.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-12 border-2 border-dashed border-surface-700/50 rounded-xl">
+        <User className="w-6 h-6 opacity-40" />
+        <span>No customer messages yet</span>
+        <span className="text-xs text-surface-600">Messages sent via the customer portal will appear here</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex-1 space-y-3">
+        {comments.map((c) => {
+          const parsed = parseCommentMessage(c.message);
+          const resolvedAtt = parsed.attachmentId ? attachments.find(a => a.id === parsed.attachmentId) : null;
+          const attachmentDisplayUrl = resolvedAtt ? getAttachmentUrl(resolvedAtt) : parsed.attachmentUrl;
+          const attachmentIsImage = resolvedAtt ? isImageType(resolvedAtt.file_type) : (parsed.attachmentUrl ? isImageUrl(parsed.attachmentUrl) : false);
+          const senderName = c.portal_sender || 'Customer';
+
+          return (
+            <div key={c.id} className="flex gap-3 justify-start">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0 mt-auto mb-1 shadow-sm">
+                {senderName.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex flex-col max-w-[92%] items-start">
+                <div className="flex items-baseline gap-2 mb-1 px-1">
+                  <span className="text-xs font-medium text-teal-400">{senderName}</span>
+                  <span className="text-[11px] text-surface-500">{formatTime(c.created_at)}</span>
+                </div>
+                <div className="relative px-5 py-3 bg-teal-900/30 border border-teal-700/30 text-surface-200 rounded-2xl rounded-tl-sm shadow-sm">
+                  {parsed.text && (
+                    <p className="text-base whitespace-pre-wrap text-surface-200">{parsed.text}</p>
+                  )}
+                  {attachmentDisplayUrl && attachmentIsImage && (
+                    <div className="mt-2 aspect-square w-[200px] rounded-xl overflow-hidden">
+                      <img
+                        src={attachmentDisplayUrl}
+                        alt={parsed.attachmentName || 'attachment'}
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setLightbox({ src: attachmentDisplayUrl, filename: parsed.attachmentName || 'attachment' })}
+                      />
+                    </div>
+                  )}
+                  {attachmentDisplayUrl && !attachmentIsImage && (
+                    <div className="mt-2 flex items-center gap-2 p-3 bg-teal-900/20 rounded-lg border border-teal-700/20 w-[260px]">
+                      <FileText className="w-5 h-5 text-teal-400 flex-shrink-0" />
+                      <span className="text-sm truncate text-surface-300">{parsed.attachmentName || 'File'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+
+      {lightbox && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>
+          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <img src={lightbox.src} alt={lightbox.filename} className="max-w-full max-h-[85vh] object-contain rounded-xl" />
+            <button onClick={() => setLightbox(null)} className="absolute top-3 right-3 bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

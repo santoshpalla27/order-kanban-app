@@ -218,3 +218,39 @@ export const purgeApi = {
     }),
   runJob: (job: string, force = false) => api.post(`/purge-status/run/${job}${force ? '?force=true' : ''}`),
 };
+
+// Customer link management (internal users — authenticated)
+export const customerLinkApi = {
+  get: (productId: number) =>
+    api.get<{ link: any }>(`/products/${productId}/customer-link`),
+  create: (productId: number) =>
+    api.post<{ link: any }>(`/products/${productId}/customer-link`),
+  deactivate: (productId: number, linkId: number) =>
+    api.delete(`/products/${productId}/customer-link/${linkId}`),
+};
+
+// Customer portal (public — no auth headers)
+const PORTAL_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/api$/, '');
+
+export const portalApi = {
+  getProduct: (token: string) =>
+    fetch(`${PORTAL_BASE}/portal/${token}`).then(r => r.json()),
+  getMessages: (token: string) =>
+    fetch(`${PORTAL_BASE}/portal/${token}/messages`).then(r => r.json()),
+  postMessage: (token: string, message: string) =>
+    fetch(`${PORTAL_BASE}/portal/${token}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message }),
+    }).then(r => r.json()),
+  getAttachments: (token: string) =>
+    fetch(`${PORTAL_BASE}/portal/${token}/attachments`).then(r => r.json()),
+  getPresignedUrl: (token: string, filename: string) =>
+    fetch(`${PORTAL_BASE}/portal/${token}/attachments/presign?filename=${encodeURIComponent(filename)}`).then(r => r.json()),
+  confirmUpload: (token: string, data: { s3_key: string; file_name: string; file_size: number; file_type: string }) =>
+    fetch(`${PORTAL_BASE}/portal/${token}/attachments/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    }).then(r => r.json()),
+};

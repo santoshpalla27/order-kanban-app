@@ -46,6 +46,19 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	userHandler := handlers.NewUserHandler()
 	statsHandler := handlers.NewStatsHandler()
 	purgeHandler := handlers.NewPurgeHandler()
+	customerLinkHandler := handlers.NewCustomerLinkHandler()
+	customerPortalHandler := handlers.NewCustomerPortalHandler()
+
+	// Public customer portal routes (no authentication)
+	portal := r.Group("/portal")
+	{
+		portal.GET("/:token", customerPortalHandler.GetProductInfo)
+		portal.GET("/:token/messages", customerPortalHandler.GetMessages)
+		portal.POST("/:token/messages", customerPortalHandler.PostMessage)
+		portal.GET("/:token/attachments", customerPortalHandler.GetAttachments)
+		portal.GET("/:token/attachments/presign", customerPortalHandler.GetPresignedUploadURL)
+		portal.POST("/:token/attachments/confirm", customerPortalHandler.ConfirmUpload)
+	}
 
 	api := r.Group("/api")
 	{
@@ -97,6 +110,11 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 				// Comments (nested under products/:id)
 				products.GET("/:id/comments", commentHandler.GetByProduct)
 				products.POST("/:id/comments", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Create)
+
+				// Customer link management (nested under products/:id)
+				products.GET("/:id/customer-link", customerLinkHandler.Get)
+				products.POST("/:id/customer-link", middleware.RBACMiddleware("admin", "manager", "organiser"), customerLinkHandler.Create)
+				products.DELETE("/:id/customer-link/:linkId", middleware.RBACMiddleware("admin", "manager", "organiser"), customerLinkHandler.Deactivate)
 			}
 
 			// Standalone attachment/comment routes

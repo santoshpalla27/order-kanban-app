@@ -9,8 +9,9 @@ type Attachment struct {
 	FileName   string    `json:"file_name" gorm:"not null"`
 	FileType   string    `json:"file_type"`
 	FileSize   int64     `json:"file_size"`
-	Source     string    `json:"source" gorm:"default:'direct'"` // "direct" | "comment"
-	UploadedBy uint      `json:"uploaded_by" gorm:"not null"`
+	Source       string `json:"source" gorm:"default:'direct'"`  // "direct" | "comment" | "customer"
+	PortalSender string `json:"portal_sender" gorm:"default:''"` // set when source = "customer"
+	UploadedBy   uint   `json:"uploaded_by"`
 	Uploader   User      `json:"uploader" gorm:"foreignKey:UploadedBy"`
 	UploadedAt time.Time `json:"uploaded_at"`
 }

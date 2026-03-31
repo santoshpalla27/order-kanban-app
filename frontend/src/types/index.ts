@@ -40,9 +40,10 @@ export interface Attachment {
   file_type: string;
   file_size: number;
   uploaded_by: number;
-  uploader: User;
+  uploader?: User;
   uploaded_at: string;
-  source?: string; // "direct" | "comment"
+  source?: string; // "direct" | "comment" | "customer"
+  portal_sender?: string;
   view_url?: string; // S3 presigned view URL (when S3 enabled)
 }
 
@@ -50,10 +51,28 @@ export interface Comment {
   id: number;
   product_id: number;
   user_id: number;
-  user: User;
+  user?: User;
   message: string;
+  source?: string; // "internal" | "customer"
+  portal_sender?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface CustomerLink {
+  id: number;
+  product_id: number;
+  token: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CustomerPortalProduct {
+  product_id: string;
+  customer_name: string;
+  status: ProductStatus;
+  description: string;
+  delivery_at?: string | null;
 }
 
 export interface ChatMessage {
