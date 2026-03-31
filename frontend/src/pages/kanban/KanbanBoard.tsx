@@ -14,6 +14,7 @@ import {
 } from '@dnd-kit/core';
 import { Plus, GripVertical, Package, Loader2, User, CalendarDays } from 'lucide-react';
 import { useProductBadges } from '../../hooks/useProductBadges';
+import { useCustomerMessageStore } from '../../store/customerMessageStore';
 import { formatDate } from '../../utils/date';
 
 const PAGE_SIZE = 20;          // cards per page per column
@@ -216,6 +217,7 @@ function KanbanColumn({
   const parentRef = useRef<HTMLDivElement>(null);
   const { setNodeRef: setDropRef, isOver } = useDroppable({ id: status });
   const { hasAny } = useProductBadges();
+  const customerHasUnread = useCustomerMessageStore((s) => s.hasUnread);
 
   const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: colKey(status, baseFilters),
@@ -287,7 +289,7 @@ function KanbanColumn({
                 <KanbanCard
                   product={items[vItem.index]}
                   status={status}
-                  hasBadge={hasAny(items[vItem.index].id)}
+                  hasBadge={hasAny(items[vItem.index].id) || customerHasUnread(items[vItem.index].id)}
                   onClick={() => onCardClick(items[vItem.index].id)}
                 />
               </div>
@@ -301,7 +303,7 @@ function KanbanColumn({
                 key={product.id}
                 product={product}
                 status={status}
-                hasBadge={hasAny(product.id)}
+                hasBadge={hasAny(product.id) || customerHasUnread(product.id)}
                 onClick={() => onCardClick(product.id)}
               />
             ))}

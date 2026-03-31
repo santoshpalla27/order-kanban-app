@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../store/toastStore';
 import { useChatStore } from '../store/chatStore';
+import { useCustomerMessageStore } from '../store/customerMessageStore';
 import { playNotificationSound, playChatSound } from '../utils/sound';
 
 export function useWebSocket() {
@@ -60,6 +61,9 @@ export function useWebSocket() {
             break;
           case 'customer_message':
             queryClient.invalidateQueries({ queryKey: ['customer-messages'] });
+            if (data.payload?.product_id) {
+              useCustomerMessageStore.getState().increment(Number(data.payload.product_id));
+            }
             break;
           case 'chat_message':
             queryClient.invalidateQueries({ queryKey: ['chat'] });

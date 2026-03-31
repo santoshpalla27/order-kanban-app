@@ -292,7 +292,8 @@ function DateSeparator({ label }: { label: string }) {
 export default function CustomerPortalPage() {
   const { token } = useParams<{ token: string }>();
   const queryClient = useQueryClient();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDone = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
 
@@ -331,9 +332,20 @@ export default function CustomerPortalPage() {
   });
   const attachments: (Attachment & { view_url?: string })[] = attsData?.data || [];
 
+  const lastMsgId = messages[messages.length - 1]?.id;
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    if (!lastMsgId) return;
+    requestAnimationFrame(() => {
+      const el = messagesContainerRef.current;
+      if (!el) return;
+      if (!initialScrollDone.current) {
+        initialScrollDone.current = true;
+        el.scrollTop = el.scrollHeight;
+      } else {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }
+    });
+  }, [lastMsgId]);
 
   // ── Send message ──
 
@@ -504,7 +516,7 @@ export default function CustomerPortalPage() {
       </div>
 
       {/* ── Messages ── */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden px-2 sm:px-4 py-3 sm:py-4">
+      <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-2 sm:px-4 py-3 sm:py-4">
         {grouped.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center py-12">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-emerald-100 flex items-center justify-center mb-3">
@@ -529,7 +541,6 @@ export default function CustomerPortalPage() {
             </div>
           ))
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* ── Input ── */}

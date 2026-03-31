@@ -8,6 +8,7 @@ import ProductDetailModal from '../../components/ProductDetailModal';
 import SearchFilters from '../../components/SearchFilters';
 import { Eye, Loader2, ChevronDown } from 'lucide-react';
 import { useProductBadges } from '../../hooks/useProductBadges';
+import { useCustomerMessageStore } from '../../store/customerMessageStore';
 import { formatDate } from '../../utils/date';
 
 const PAGE_SIZE = 50;
@@ -58,6 +59,7 @@ function useTabCounts(baseFilters: Record<string, string>) {
 export default function MyOrdersPage() {
   const { user } = useAuthStore();
   const { hasAny } = useProductBadges();
+  const customerHasUnread = useCustomerMessageStore((s) => s.hasUnread);
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -236,8 +238,8 @@ export default function MyOrdersPage() {
                   >
                     <div className="px-4 py-4 flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
-                      {hasAny(product.id) && (
-                        <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New comment" />
+                      {(hasAny(product.id) || customerHasUnread(product.id)) && (
+                        <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New activity" />
                       )}
                     </div>
                     <div className="px-4 py-4 text-sm text-surface-200 truncate">{product.customer_name}</div>

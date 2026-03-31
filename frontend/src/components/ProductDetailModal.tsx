@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi, customerApi } from '../api/client';
 import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES } from '../hooks/useProductBadges';
+import { useCustomerMessageStore } from '../store/customerMessageStore';
 import { formatDate, formatDateTime, formatTime } from '../utils/date';
 import { useAuthStore } from '../store/authStore';
 import { Product, Attachment, Comment, CustomerLink, CustomerMessage, STATUS_LABELS, STATUS_ORDER } from '../types';
@@ -311,6 +312,8 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
   const comments: Comment[] = commentsData?.data || [];
 
   const { has } = useProductBadges();
+  const customerUnread = useCustomerMessageStore((s) => s.hasUnread(productId));
+  const customerUnreadCount = useCustomerMessageStore((s) => s.getCount(productId));
 
   // Wrap onClose: clear status_change badge when modal is dismissed (status is visible just by opening)
   const handleClose = () => {
@@ -337,6 +340,8 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
         queryClient.invalidateQueries({ queryKey: ['unread-count'] });
         queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
       });
+    } else if (activeTab === 'customer') {
+      useCustomerMessageStore.getState().clear(productId);
     }
   }, [activeTab, productId, commentsData]);
 
@@ -346,10 +351,10 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
   });
 
   const tabs = [
-    { id: 'details' as const,     label: 'Details',                           icon: Package,      badge: has(productId, 'status_change') },
-    { id: 'attachments' as const, label: `Attachments (${attachments.length})`, icon: Paperclip,  badge: has(productId, 'attachments') },
-    { id: 'comments' as const,    label: `Comments (${comments.length})`,     icon: MessageSquare, badge: has(productId, 'comments') },
-    { id: 'customer' as const,    label: 'Customer',                          icon: UserCircle2,  badge: false },
+    { id: 'details' as const,     label: 'Details',                                 icon: Package,       badge: has(productId, 'status_change'),    badgeCount: 0 },
+    { id: 'attachments' as const, label: `Attachments (${attachments.length})`,     icon: Paperclip,     badge: has(productId, 'attachments'),       badgeCount: 0 },
+    { id: 'comments' as const,    label: `Comments (${comments.length})`,           icon: MessageSquare, badge: has(productId, 'comments'),          badgeCount: 0 },
+    { id: 'customer' as const,    label: 'Customer',                                icon: UserCircle2,   badge: customerUnread, badgeCount: customerUnreadCount },
   ];
 
   return (
@@ -383,7 +388,11 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
             {tabs.map((tab) => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-all duration-200 border-b-2 ${activeTab === tab.id ? 'border-brand-500 text-brand-400' : 'border-transparent text-surface-400 hover:text-surface-200'}`}>
                 <tab.icon className="w-4 h-4" /> {tab.label}
-                {tab.badge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
+                {tab.badge && (
+                  tab.badgeCount > 0
+                    ? <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center animate-scale-in flex-shrink-0">{tab.badgeCount > 9 ? '9+' : tab.badgeCount}</span>
+                    : <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                )}
               </button>
             ))}
           </div>
@@ -654,12 +663,14 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 // ── Attachments Tab ──
 function AttachmentsTab({ productId, attachments, onCommentAttachment }: { productId: number; attachments: Attachment[]; onCommentAttachment: (att: Attachment) => void }) {
+  const customerUnreadCount = useCustomerMessageStore((s) => s.getCount(productId));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
   const [lightbox, setLightbox] = useState<{ src: string; attId: number; filename: string } | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [activeSection, setActiveSection] = useState<'direct' | 'customer'>('direct');
 
   const deleteMutation = useMutation({ 
     mutationFn: (id: number) => attachmentsApi.delete(id), 
@@ -693,14 +704,14 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
     return (
       <div className="grid grid-cols-2 gap-3">
         {imgs.map((att) => (
-          <div key={att.id} className="group relative aspect-[4/3] rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
+          <div key={att.id} className="group relative aspect-square rounded-xl overflow-hidden bg-surface-800 border border-surface-700/50 hover:border-brand-500/50 transition-all">
             <img src={getAttachmentUrl(att)} alt={att.file_name} className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300" onClick={() => setLightbox({ src: getAttachmentUrl(att), attId: att.id, filename: att.file_name })} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
               <p className="text-xs text-white font-medium truncate mb-2">{att.file_name}</p>
-              <div className="flex items-center gap-1.5 pointer-events-auto hover-icon-white">
-                <button onClick={(e) => { e.stopPropagation(); downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><Download className="w-3 h-3" /> Download</button>
-                <button onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }} className="flex items-center gap-1 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors"><MessageSquare className="w-3 h-3" /> Comment</button>
-                <button onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }} className="flex items-center gap-1 bg-red-500/40 hover:bg-red-500/60 backdrop-blur-sm text-white hover:text-white text-[10px] px-2 py-1 rounded-md transition-colors ml-auto"><Trash2 className="w-3 h-3" /></button>
+              <div className="flex items-center gap-2 pointer-events-auto">
+                <button onClick={(e) => { e.stopPropagation(); downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true); }} className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[11px] px-2.5 py-1.5 rounded-lg transition-colors"><Download className="w-3.5 h-3.5" /> Download</button>
+                <button onClick={(e) => { e.stopPropagation(); onCommentAttachment(att); }} className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-[11px] px-2.5 py-1.5 rounded-lg transition-colors"><MessageSquare className="w-3.5 h-3.5" /> Comment</button>
+                <button onClick={(e) => { e.stopPropagation(); handleDelete(att.id); }} className="flex items-center gap-1.5 bg-red-500/60 hover:bg-red-500/80 backdrop-blur-sm text-white text-[11px] px-2.5 py-1.5 rounded-lg transition-colors ml-auto"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
               </div>
             </div>
           </div>
@@ -748,78 +759,93 @@ function AttachmentsTab({ productId, attachments, onCommentAttachment }: { produ
     <div className="space-y-4">
       <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleUpload} />
 
-      {/* Two-column section layout */}
-      <div className="grid grid-cols-2 gap-3 min-h-0">
+      {/* ── Section Tabs ── */}
+      <div className="flex gap-1 p-1 bg-surface-800/50 rounded-xl">
+        <button
+          onClick={() => setActiveSection('direct')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+            activeSection === 'direct'
+              ? 'bg-brand-500/20 text-brand-300 border border-brand-500/40 shadow-sm'
+              : 'text-surface-400 hover:text-surface-200'
+          }`}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          Direct Uploads
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeSection === 'direct' ? 'bg-brand-500/30 text-brand-200' : 'bg-surface-700 text-surface-400'}`}>
+            {directUploads.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setActiveSection('customer')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-semibold transition-all ${
+            activeSection === 'customer'
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
+              : 'text-surface-400 hover:text-surface-200'
+          }`}
+        >
+          <UserCircle2 className="w-3.5 h-3.5" />
+          Customer Uploads
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeSection === 'customer' ? 'bg-emerald-500/30 text-emerald-200' : 'bg-surface-700 text-surface-400'}`}>
+            {customerUploads.length}
+          </span>
+          {customerUnreadCount > 0 && (
+            <span className="min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+              {customerUnreadCount > 9 ? '9+' : customerUnreadCount}
+            </span>
+          )}
+        </button>
+      </div>
 
-        {/* ── Column 1: Direct Uploads ── */}
-        <div className="flex flex-col gap-3 bg-brand-500/10 rounded-xl p-3 border border-brand-500/30">
-          <div className="flex items-center gap-2">
-            <Upload className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />
-            <p className="text-xs font-bold text-brand-300 uppercase tracking-wider">Direct</p>
-            <span className="ml-auto text-xs font-semibold bg-brand-500/20 text-brand-300 px-1.5 py-0.5 rounded-full">{directUploads.length}</span>
-          </div>
-
-          <div className="flex-1 space-y-3 min-h-[80px]">
-            {directUploads.length === 0 ? (
-              <div className="flex flex-col items-center gap-1.5 text-brand-400/60 text-xs py-6 border border-dashed border-brand-500/30 rounded-lg cursor-pointer hover:border-brand-400/60 hover:text-brand-300 transition-colors" onClick={() => fileInputRef.current?.click()}>
-                <Upload className="w-4 h-4" />
-                <span>No uploads yet</span>
-              </div>
-            ) : (
-              <>
-                {renderImages(directUploads)}
-                {renderFiles(directUploads, directUploads.some(a => isImageType(a.file_type)))}
-              </>
-            )}
-          </div>
-
-          <div className="flex gap-1.5 mt-auto">
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-1.5 flex-1 justify-center text-xs py-1.5 px-2">
-              <Upload className="w-3.5 h-3.5" /> Upload
+      {/* ── Active Section Content ── */}
+      {activeSection === 'direct' ? (
+        <div className="space-y-3">
+          {directUploads.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 text-brand-400/60 text-sm py-10 border border-dashed border-brand-500/30 rounded-xl cursor-pointer hover:border-brand-400/60 hover:text-brand-300 transition-colors" onClick={() => fileInputRef.current?.click()}>
+              <Upload className="w-6 h-6" />
+              <span>No direct uploads yet — click to upload</span>
+            </div>
+          ) : (
+            <>
+              {renderImages(directUploads)}
+              {renderFiles(directUploads, directUploads.some(a => isImageType(a.file_type)))}
+            </>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-2 flex-1 justify-center">
+              <Upload className="w-4 h-4" /> Upload Files
             </button>
             {directUploads.length > 0 && (
-              <button onClick={() => downloadAll(directUploads)} className="btn-ghost border border-brand-500/40 hover:bg-brand-500/10 text-brand-300 flex items-center gap-1.5 px-2 py-1.5 text-xs justify-center">
-                <Download className="w-3.5 h-3.5" /> All
+              <button onClick={() => downloadAll(directUploads)} className="btn-ghost border border-brand-500/40 hover:bg-brand-500/10 text-brand-300 flex items-center gap-2 px-4 justify-center">
+                <Download className="w-4 h-4" /> Download All
               </button>
             )}
           </div>
         </div>
-
-        {/* ── Column 2: Customer Uploads ── */}
-        <div className="flex flex-col gap-3 bg-emerald-500/10 rounded-xl p-3 border border-emerald-500/30">
-          <div className="flex items-center gap-2">
-            <UserCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-            <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Customer</p>
-            <span className="ml-auto text-xs font-semibold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full">{customerUploads.length}</span>
-          </div>
-
-          <div className="flex-1 space-y-3 min-h-[80px]">
-            {customerUploads.length === 0 ? (
-              <div className="flex flex-col items-center gap-1.5 text-emerald-500/60 text-xs py-6 border border-dashed border-emerald-500/30 rounded-lg">
-                <UserCircle2 className="w-4 h-4" />
-                <span>No uploads yet</span>
-              </div>
-            ) : (
-              <>
-                {renderImages(customerUploads)}
-                {renderFiles(customerUploads, customerUploads.some(a => isImageType(a.file_type)))}
-              </>
-            )}
-          </div>
-
-          <div className="flex gap-1.5 mt-auto">
-            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-1.5 flex-1 justify-center text-xs py-1.5 px-2">
-              <Upload className="w-3.5 h-3.5" /> Upload
+      ) : (
+        <div className="space-y-3">
+          {customerUploads.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 text-emerald-500/60 text-sm py-10 border border-dashed border-emerald-500/30 rounded-xl">
+              <UserCircle2 className="w-6 h-6" />
+              <span>No customer uploads yet</span>
+            </div>
+          ) : (
+            <>
+              {renderImages(customerUploads)}
+              {renderFiles(customerUploads, customerUploads.some(a => isImageType(a.file_type)))}
+            </>
+          )}
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="btn-secondary flex items-center gap-2 flex-1 justify-center">
+              <Upload className="w-4 h-4" /> Upload Files
             </button>
             {customerUploads.length > 0 && (
-              <button onClick={() => downloadAll(customerUploads)} className="btn-ghost border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 flex items-center gap-1.5 px-2 py-1.5 text-xs justify-center">
-                <Download className="w-3.5 h-3.5" /> All
+              <button onClick={() => downloadAll(customerUploads)} className="btn-ghost border border-emerald-500/40 hover:bg-emerald-500/10 text-emerald-400 flex items-center gap-2 px-4 justify-center">
+                <Download className="w-4 h-4" /> Download All
               </button>
             )}
           </div>
         </div>
-
-      </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
@@ -1236,7 +1262,8 @@ const EXPIRY_OPTIONS = [
 
 function CustomerTab({ productId, allAttachments }: { productId: number; allAttachments: Attachment[] }) {
   const queryClient = useQueryClient();
-  const endRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const initialScrollDone = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [message, setMessage] = useState('');
@@ -1263,9 +1290,27 @@ function CustomerTab({ productId, allAttachments }: { productId: number; allAtta
   });
   const messages: CustomerMessage[] = msgsData?.data || [];
 
-  // Scroll to bottom when new messages arrive
   const lastMsgId = messages[messages.length - 1]?.id;
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [lastMsgId]);
+
+  // Scroll to bottom whenever messages change (new arrival or initial load)
+  useEffect(() => {
+    if (!lastMsgId) return;
+    requestAnimationFrame(() => {
+      const el = scrollContainerRef.current;
+      if (!el) return;
+      if (!initialScrollDone.current) {
+        initialScrollDone.current = true;
+        el.scrollTop = el.scrollHeight;
+      } else {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      }
+    });
+  }, [lastMsgId]);
+
+  // Clear unread badge while this tab is mounted (covers arriving messages while already open)
+  useEffect(() => {
+    useCustomerMessageStore.getState().clear(productId);
+  }, [lastMsgId, productId]);
 
   // ── Link actions ──
   const createLinkMutation = useMutation({
@@ -1466,7 +1511,7 @@ function CustomerTab({ productId, allAttachments }: { productId: number; allAtta
       {link && (
         <>
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto space-y-2 min-h-0" style={{ maxHeight: '360px' }}>
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto space-y-2 min-h-0" style={{ maxHeight: '360px' }}>
             {messages.length === 0 ? (
               <div className="flex flex-col items-center gap-2 text-surface-500 text-sm py-10">
                 <UserCircle2 className="w-8 h-8 opacity-30" />
@@ -1538,7 +1583,6 @@ function CustomerTab({ productId, allAttachments }: { productId: number; allAtta
                 );
               })
             )}
-            <div ref={endRef} />
           </div>
 
           {/* Reply bar */}
