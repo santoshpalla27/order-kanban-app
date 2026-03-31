@@ -459,11 +459,11 @@ export default function CustomerPortalPage() {
                 onDragStart={(e) => e.preventDefault()}
                 style={{ touchAction: 'pan-y' }}
               >
-                {/* Reply arrow — visible on hover */}
+                {/* Reply arrow — always visible */}
                 <button
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={() => handleSelectReply(msg)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full flex-shrink-0 hover:bg-black/10"
+                  className="opacity-100 transition-opacity p-1.5 rounded-full flex-shrink-0 hover:bg-black/10"
                   title="Reply"
                 >
                   <ReplyIcon className="w-4 h-4 text-[#667781]" />
