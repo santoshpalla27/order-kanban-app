@@ -53,10 +53,17 @@ export function useWebSocket() {
             queryClient.invalidateQueries({ queryKey: ['unread-count'] });
             queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
             break;
+          case 'comment_deleted':
+            queryClient.invalidateQueries({ queryKey: ['comments'] });
+            queryClient.invalidateQueries({ queryKey: ['attachments'] });
+            break;
           case 'attachment_uploaded':
             queryClient.invalidateQueries({ queryKey: ['attachments'] });
             queryClient.invalidateQueries({ queryKey: ['products'] });
             queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+            break;
+          case 'attachment_deleted':
+            queryClient.invalidateQueries({ queryKey: ['attachments'] });
             break;
           case 'chat_message':
             queryClient.invalidateQueries({ queryKey: ['chat'] });

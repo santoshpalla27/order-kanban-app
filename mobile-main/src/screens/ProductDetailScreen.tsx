@@ -592,14 +592,14 @@ function ImageLightbox({
           resizeMode="contain"
         />
         <View style={lb.toolbar}>
-          <TouchableOpacity style={lb.toolBtn} onPress={onDownload}>
-            <Text style={lb.toolIcon}>⬇</Text>
+          <TouchableOpacity style={lb.toolBtn} onPress={onDownload} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="download" size={20} color="#1f2937" />
           </TouchableOpacity>
-          <TouchableOpacity style={lb.toolBtn} onPress={() => Linking.openURL(url)}>
-            <Text style={lb.toolIcon}>↗</Text>
+          <TouchableOpacity style={lb.toolBtn} onPress={() => Linking.openURL(url)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="external-link" size={20} color="#1f2937" />
           </TouchableOpacity>
-          <TouchableOpacity style={lb.toolBtn} onPress={onClose}>
-            <Text style={lb.toolIcon}>✕</Text>
+          <TouchableOpacity style={lb.toolBtn} onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="x" size={20} color="#1f2937" />
           </TouchableOpacity>
         </View>
         <Text style={lb.name} numberOfLines={1}>{name}</Text>
@@ -612,10 +612,15 @@ function ImageLightbox({
 const lb = StyleSheet.create({
   backdrop: { backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
   img:      { width: '100%', height: '80%' },
-  toolbar:  { position: 'absolute', top: 52, right: 16, flexDirection: 'row', gap: 8 },
-  toolBtn:  { width: 40, height: 40, borderRadius: 10, backgroundColor: 'rgba(30,37,53,0.9)', alignItems: 'center', justifyContent: 'center' },
-  toolIcon: { color: '#F1F5F9', fontSize: 18 },
-  name:     { position: 'absolute', bottom: 40, left: 16, right: 16, textAlign: 'center', fontSize: 13, color: '#94A3B8' },
+  toolbar:  { position: 'absolute', top: 52, right: 16, flexDirection: 'row', gap: 10 },
+  toolBtn:  {
+    width: 44, height: 44, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 6, shadowOffset: { width: 0, height: 2 },
+    elevation: 4,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  name: { position: 'absolute', bottom: 40, left: 16, right: 16, textAlign: 'center', fontSize: 13, color: '#94A3B8' },
 });
 
 // ── Comment on Attachment Modal ────────────────────────────────────────────────
@@ -2058,7 +2063,13 @@ function CustomerMessagesTab({
     <View style={{ flex: 1 }}>
       <FlatList
         ref={listRef}
-        data={messages}
+        data={messages.filter((msg) => {
+          const p = parseCommentMessage(msg.message);
+          const hasAtt = p.attachmentId
+            ? customerAttachments.some((a) => a.id === p.attachmentId)
+            : !!p.attachmentUrl;
+          return p.text || hasAtt;
+        })}
         keyExtractor={(m) => String(m.id)}
         contentContainerStyle={styles.list}
         onScrollToIndexFailed={({ index }) => {
@@ -2154,9 +2165,25 @@ function CustomerMessagesTab({
                       <Text style={styles.attFileIcon}>
                         {fileEmoji(parsed.attachmentName?.match(/\.\w+$/)?.[0] || '')}
                       </Text>
-                      <Text style={styles.attFileName} numberOfLines={1}>
+                      <Text style={[styles.attFileName, { flex: 1 }]} numberOfLines={1}>
                         {parsed.attachmentName || 'File'}
                       </Text>
+                      <TouchableOpacity
+                        onPress={async () => {
+                          try {
+                            if (resolvedAtt) {
+                              const res = await attachmentsApi.getDownloadUrl(resolvedAtt.id);
+                              const url = res.data?.url || res.data;
+                              if (url) Linking.openURL(url);
+                            } else if (attUrl) {
+                              Linking.openURL(attUrl);
+                            }
+                          } catch { Alert.alert('Error', 'Could not get download link'); }
+                        }}
+                        style={{ padding: 4 }}
+                      >
+                        <Text style={{ fontSize: 16 }}>⬇</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
                   <Text style={styles.timestamp}>{formatRelative(msg.created_at)}</Text>

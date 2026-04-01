@@ -55,6 +55,13 @@ export function useWsEvents(callbacks?: WsCallbacks) {
           cb?.onProductsChanged?.();
           cb?.onBadgesChanged?.();
           break;
+        case 'attachment_deleted':
+          cb?.onAttachmentsChanged?.();
+          break;
+        case 'comment_deleted':
+          cb?.onCommentsChanged?.();
+          cb?.onAttachmentsChanged?.();
+          break;
         case 'activity_updated':
           cb?.onActivityChanged?.();
           if (data.payload?.actor_id !== currentUserId &&

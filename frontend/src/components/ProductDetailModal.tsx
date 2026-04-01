@@ -276,14 +276,14 @@ function ImageLightbox({ src, alt, attId, onClose }: { src: string; alt: string;
       <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         <img src={src} alt={alt} className="max-w-full max-h-[85vh] object-contain rounded-xl" />
         <div className="absolute top-3 right-3 flex gap-2">
-          <button onClick={handleDownload} className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
-            <Download className="w-5 h-5" />
+          <button onClick={handleDownload} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Download">
+            <Download className="w-5 h-5 text-gray-800" />
           </button>
-          <a href={src} target="_blank" rel="noreferrer" className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
-            <ExternalLink className="w-5 h-5" />
+          <a href={src} target="_blank" rel="noreferrer" className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Open in new tab">
+            <ExternalLink className="w-5 h-5 text-gray-800" />
           </a>
-          <button onClick={onClose} className="bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
-            <X className="w-5 h-5" />
+          <button onClick={onClose} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Close">
+            <X className="w-5 h-5 text-gray-800" />
           </button>
         </div>
       </div>
@@ -309,6 +309,12 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
   const allComments: Comment[] = commentsData?.data || [];
   const comments = allComments.filter(c => !c.source || c.source === 'internal');
   const customerComments = allComments.filter(c => c.source === 'customer');
+  // Visible count: exclude attachment-only messages whose attachment was deleted
+  const visibleCustomerCommentsCount = customerComments.filter(c => {
+    const p = parseCommentMessage(c.message);
+    const hasAtt = p.attachmentId ? customerAttachments.some(a => a.id === p.attachmentId) : !!p.attachmentUrl;
+    return p.text || hasAtt;
+  }).length;
 
   const { has } = useProductBadges();
 
@@ -351,7 +357,7 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
     { id: 'attachments' as const, label: `Files (${directAttachmentsCount})`, icon: Paperclip, badge: has(productId, 'attachments') },
     { id: 'comments' as const, label: `Comments (${comments.length})`, icon: MessageSquare, badge: has(productId, 'comments') },
     { id: 'customer-attachments' as const, label: `Customer Files (${customerAttachments.length})`, icon: User, badge: has(productId, 'customer_attachments') },
-    { id: 'customer-comments' as const, label: `Customer Messages (${customerComments.length})`, icon: User, badge: has(productId, 'customer_comments') },
+    { id: 'customer-comments' as const, label: `Customer Messages (${visibleCustomerCommentsCount})`, icon: User, badge: has(productId, 'customer_comments') },
   ];
 
   return (
@@ -1311,7 +1317,7 @@ function CustomerLinkSection({ productId }: { productId: number }) {
 
 // ── Customer Attachments Tab (read-only view of customer-submitted files) ──
 function CustomerAttachmentsTab({ productId, attachments }: { productId: number; attachments: Attachment[] }) {
-  const [lightbox, setLightbox] = useState<{ src: string; filename: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; filename: string; attId: number } | null>(null);
   const images = attachments.filter(a => isImageType(a.file_type));
   const files = attachments.filter(a => !isImageType(a.file_type));
 
@@ -1351,11 +1357,28 @@ function CustomerAttachmentsTab({ productId, attachments }: { productId: number;
                 src={getAttachmentUrl(att)}
                 alt={att.file_name}
                 className="w-full h-full object-cover cursor-pointer group-hover:scale-105 transition-transform duration-300"
-                onClick={() => setLightbox({ src: getAttachmentUrl(att), filename: att.file_name })}
+                onClick={() => setLightbox({ src: getAttachmentUrl(att), filename: att.file_name, attId: att.id })}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 pointer-events-none">
                 <p className="text-xs text-white font-medium truncate mb-1">{att.file_name}</p>
                 <p className="text-[10px] text-white/60">{att.portal_sender || 'Customer'}</p>
+              </div>
+              <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true); }}
+                  className="bg-surface-900/80 p-1.5 rounded-lg hover:bg-surface-800"
+                  title="Download"
+                >
+                  <Download className="w-3.5 h-3.5 text-white" />
+                </button>
+                <a
+                  href={getAttachmentUrl(att)} target="_blank" rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="bg-surface-900/80 p-1.5 rounded-lg hover:bg-surface-800 flex items-center"
+                  title="Open in new tab"
+                >
+                  <ExternalLink className="w-3.5 h-3.5 text-white" />
+                </a>
               </div>
             </div>
           ))}
@@ -1376,13 +1399,22 @@ function CustomerAttachmentsTab({ productId, attachments }: { productId: number;
                   <p className="text-sm truncate">{att.file_name}</p>
                   <p className="text-xs text-surface-500">{formatSize(att.file_size)} · {att.portal_sender || 'Customer'} · {formatDate(att.uploaded_at)}</p>
                 </div>
-                <button
-                  onClick={() => downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true)}
-                  className="btn-ghost p-1.5 rounded-lg"
-                  title="Download"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => downloadViaFetch(attachmentsApi.download(att.id), att.file_name, true)}
+                    className="btn-ghost p-1.5 rounded-lg"
+                    title="Download"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                  <a
+                    href={getAttachmentUrl(att)} target="_blank" rel="noreferrer"
+                    className="btn-ghost p-1.5 rounded-lg flex items-center"
+                    title="Open in new tab"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
+                </div>
               </div>
             );
           })}
@@ -1393,9 +1425,17 @@ function CustomerAttachmentsTab({ productId, attachments }: { productId: number;
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>
           <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <img src={lightbox.src} alt={lightbox.filename} className="max-w-full max-h-[85vh] object-contain rounded-xl" />
-            <button onClick={() => setLightbox(null)} className="absolute top-3 right-3 bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+            <div className="absolute top-3 right-3 flex gap-2">
+              <button onClick={() => downloadViaFetch(attachmentsApi.download(lightbox.attId), lightbox.filename, true)} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Download">
+                <Download className="w-5 h-5 text-gray-800" />
+              </button>
+              <a href={lightbox.src} target="_blank" rel="noreferrer" className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Open in new tab">
+                <ExternalLink className="w-5 h-5 text-gray-800" />
+              </a>
+              <button onClick={() => setLightbox(null)} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Close">
+                <X className="w-5 h-5 text-gray-800" />
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1405,7 +1445,7 @@ function CustomerAttachmentsTab({ productId, attachments }: { productId: number;
 
 // ── Customer Comments Tab (read-only view of customer-submitted messages) ──
 function CustomerCommentsTab({ comments, attachments }: { comments: Comment[]; attachments: Attachment[] }) {
-  const [lightbox, setLightbox] = useState<{ src: string; filename: string } | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; filename: string; attId?: number } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const [highlightedId, setHighlightedId] = useState<number | null>(null);
   const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1451,6 +1491,10 @@ function CustomerCommentsTab({ comments, attachments }: { comments: Comment[]; a
 
           const isHighlighted = highlightedId === c.id;
 
+          // Skip empty bubbles: no text and attachment is deleted/missing
+          const hasVisibleContent = parsed.text || attachmentDisplayUrl;
+          if (!hasVisibleContent) return null;
+
           return (
             <div
               key={c.id}
@@ -1488,19 +1532,52 @@ function CustomerCommentsTab({ comments, attachments }: { comments: Comment[]; a
                     <p className="text-base whitespace-pre-wrap text-surface-200">{parsed.text}</p>
                   )}
                   {attachmentDisplayUrl && attachmentIsImage && (
-                    <div className="mt-2 aspect-square w-[200px] rounded-xl overflow-hidden">
+                    <div className="mt-2 group relative aspect-square w-[200px] rounded-xl overflow-hidden">
                       <img
                         src={attachmentDisplayUrl}
                         alt={parsed.attachmentName || 'attachment'}
                         className="w-full h-full object-cover cursor-pointer"
-                        onClick={() => setLightbox({ src: attachmentDisplayUrl, filename: parsed.attachmentName || 'attachment' })}
+                        onClick={() => setLightbox({ src: attachmentDisplayUrl, filename: parsed.attachmentName || 'attachment', attId: resolvedAtt?.id })}
                       />
+                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); resolvedAtt ? downloadViaFetch(attachmentsApi.download(resolvedAtt.id), resolvedAtt.file_name, true) : downloadViaFetch(attachmentDisplayUrl, parsed.attachmentName || 'image'); }}
+                          className="bg-surface-900/80 p-1.5 rounded-lg hover:bg-surface-800"
+                          title="Download"
+                        >
+                          <Download className="w-3.5 h-3.5 text-white" />
+                        </button>
+                        <a
+                          href={attachmentDisplayUrl} target="_blank" rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="bg-surface-900/80 p-1.5 rounded-lg hover:bg-surface-800 flex items-center"
+                          title="Open in new tab"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-white" />
+                        </a>
+                      </div>
                     </div>
                   )}
                   {attachmentDisplayUrl && !attachmentIsImage && (
                     <div className="mt-2 flex items-center gap-2 p-3 bg-teal-900/20 rounded-lg border border-teal-700/20 w-[260px]">
                       <FileText className="w-5 h-5 text-teal-400 flex-shrink-0" />
-                      <span className="text-sm truncate text-surface-300">{parsed.attachmentName || 'File'}</span>
+                      <span className="text-sm truncate text-surface-300 flex-1">{parsed.attachmentName || 'File'}</span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => resolvedAtt ? downloadViaFetch(attachmentsApi.download(resolvedAtt.id), resolvedAtt.file_name, true) : downloadViaFetch(attachmentDisplayUrl, parsed.attachmentName || 'file')}
+                          className="btn-ghost p-1 rounded-lg"
+                          title="Download"
+                        >
+                          <Download className="w-3.5 h-3.5 text-teal-400" />
+                        </button>
+                        <a
+                          href={attachmentDisplayUrl} target="_blank" rel="noreferrer"
+                          className="btn-ghost p-1 rounded-lg flex items-center"
+                          title="Open in new tab"
+                        >
+                          <ExternalLink className="w-3.5 h-3.5 text-teal-400" />
+                        </a>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1515,9 +1592,17 @@ function CustomerCommentsTab({ comments, attachments }: { comments: Comment[]; a
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onMouseDown={(e) => { if (e.target === e.currentTarget) setLightbox(null); }}>
           <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             <img src={lightbox.src} alt={lightbox.filename} className="max-w-full max-h-[85vh] object-contain rounded-xl" />
-            <button onClick={() => setLightbox(null)} className="absolute top-3 right-3 bg-surface-800/90 p-2 rounded-lg hover:bg-surface-700 transition-colors">
-              <X className="w-5 h-5" />
-            </button>
+            <div className="absolute top-3 right-3 flex gap-2">
+              <button onClick={() => lightbox.attId ? downloadViaFetch(attachmentsApi.download(lightbox.attId), lightbox.filename, true) : downloadViaFetch(lightbox.src, lightbox.filename)} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Download">
+                <Download className="w-5 h-5 text-gray-800" />
+              </button>
+              <a href={lightbox.src} target="_blank" rel="noreferrer" className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Open in new tab">
+                <ExternalLink className="w-5 h-5 text-gray-800" />
+              </a>
+              <button onClick={() => setLightbox(null)} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Close">
+                <X className="w-5 h-5 text-gray-800" />
+              </button>
+            </div>
           </div>
         </div>
       )}

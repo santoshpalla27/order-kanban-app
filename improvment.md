@@ -50,7 +50,7 @@ cd app/build/outputs/apk/release/
 
 python3 -m http.server 8000 --bind 0.0.0.0
 
-=============
+==============================================================
 
 # ── System updates & basic tools ─────────────────────────────────────────────
 
@@ -105,7 +105,7 @@ free -h
 # ── Clone project & install dependencies ─────────────────────────────────────
 
 cd /root
-git clone https://github.com/santoshpalla27/order-kanban-app.git
+git clone -b customer https://github.com/santoshpalla27/order-kanban-app.git
 cd order-kanban-app/mobile-main
 npm install
 

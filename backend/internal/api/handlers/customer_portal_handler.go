@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -282,4 +283,48 @@ func (h *CustomerPortalHandler) ConfirmUpload(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusCreated, r)
+}
+
+// DELETE /portal/:token/attachments/:id
+// Allows a customer to delete one of their own uploaded attachments.
+func (h *CustomerPortalHandler) DeleteAttachment(c *gin.Context) {
+	link, ok := resolveLink(c)
+	if !ok {
+		return
+	}
+
+	idStr := c.Param("id")
+	attID, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid attachment ID"})
+		return
+	}
+
+	var att models.Attachment
+	if err := database.DB.First(&att, attID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Attachment not found"})
+		return
+	}
+
+	// Only allow deletion of attachments belonging to this product and uploaded via portal
+	if att.ProductID != link.ProductID || att.Source != "customer" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Not allowed"})
+		return
+	}
+
+	// Delete from R2 if available
+	if services.R2 != nil && att.FilePath != "" {
+		_ = services.R2.DeleteObject(att.FilePath)
+	}
+
+	if err := database.DB.Delete(&att).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete attachment"})
+		return
+	}
+
+	// Broadcast UI refresh
+	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_deleted", Payload: gin.H{"attachment_id": attID, "product_id": link.ProductID}})
+	database.EmitBroadcast(wsMsg)
+
+	c.JSON(http.StatusOK, gin.H{"deleted": true})
 }

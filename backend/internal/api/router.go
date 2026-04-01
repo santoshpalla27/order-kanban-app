@@ -58,6 +58,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		portal.GET("/:token/attachments", customerPortalHandler.GetAttachments)
 		portal.GET("/:token/attachments/presign", customerPortalHandler.GetPresignedUploadURL)
 		portal.POST("/:token/attachments/confirm", customerPortalHandler.ConfirmUpload)
+		portal.DELETE("/:token/attachments/:id", customerPortalHandler.DeleteAttachment)
 	}
 
 	api := r.Group("/api")

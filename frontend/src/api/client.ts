@@ -253,4 +253,6 @@ export const portalApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     }).then(r => r.json()),
+  deleteAttachment: (token: string, attId: number) =>
+    fetch(`${PORTAL_BASE}/${token}/attachments/${attId}`, { method: 'DELETE' }).then(r => r.json()),
 };

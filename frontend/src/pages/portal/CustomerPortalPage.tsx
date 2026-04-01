@@ -107,6 +107,9 @@ function XIcon({ className }: { className?: string }) {
 function ReplyIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>;
 }
+function InfoIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4m0-4h.01" /></svg>;
+}
 
 // ── Main Page ──
 export default function CustomerPortalPage() {
@@ -117,11 +120,14 @@ export default function CustomerPortalPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [textInput, setTextInput] = useState('');
   const [sending, setSending] = useState(false);
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<{ src: string; filename: string; attId: number } | null>(null);
+  const [deletingAttId, setDeletingAttId] = useState<number | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Reply / mention
   const [replyTo, setReplyTo] = useState<PortalMessage | null>(null);
@@ -228,12 +234,15 @@ export default function CustomerPortalPage() {
   };
 
   // ── Message swipe-to-reply (pointer events — works on touch + mouse) ──
+  const swipeCapturedRef = useRef(false);
   const handleMsgPointerDown = (e: React.PointerEvent, msg: PortalMessage) => {
     // Only track horizontal-intent gestures; ignore if on a button
     if ((e.target as HTMLElement).closest('button')) return;
     wasSwipedRef.current = false;
+    swipeCapturedRef.current = false;
     msgSwipeRef.current = { id: msg.id, startX: e.clientX, startY: e.clientY };
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    // NOTE: don't setPointerCapture here — we delay it until horizontal intent
+    // is confirmed, so that taps on child elements (images) still fire clicks.
   };
   const handleMsgPointerMove = (e: React.PointerEvent, msg: PortalMessage) => {
     if (!msgSwipeRef.current || msgSwipeRef.current.id !== msg.id) return;
@@ -241,7 +250,12 @@ export default function CustomerPortalPage() {
     const dy = e.clientY - msgSwipeRef.current.startY;
     // Cancel if mostly vertical (user is scrolling)
     if (Math.abs(dy) > Math.abs(dx) + 10) { msgSwipeRef.current = null; setSwipeState(null); return; }
-    if (Math.abs(dx) > 5) {
+    if (Math.abs(dx) > 8) {
+      // Confirm horizontal intent — now safe to capture pointer
+      if (!swipeCapturedRef.current) {
+        swipeCapturedRef.current = true;
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      }
       e.preventDefault();
       setSwipeState({ id: msg.id, offset: Math.max(-80, Math.min(80, dx)) });
     }
@@ -379,13 +393,22 @@ export default function CustomerPortalPage() {
               <p className="text-xs text-gray-500">{product.customer_name}</p>
             </div>
           </div>
-          <button
-            onClick={() => setDetailsOpen(o => !o)}
-            className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-100"
-          >
-            {detailsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            Details
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setInfoOpen(true)}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              title="How to use"
+            >
+              <InfoIcon className="w-5 h-5" />
+            </button>
+            <button
+              onClick={() => setDetailsOpen(o => !o)}
+              className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-900 transition-colors px-2 py-1.5 rounded-lg hover:bg-gray-100"
+            >
+              {detailsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              Details
+            </button>
+          </div>
         </div>
         {detailsOpen && (
           <div className="px-4 pb-4 pt-1 border-t border-gray-200 space-y-2 shadow-inner bg-gray-50">
@@ -442,6 +465,11 @@ export default function CustomerPortalPage() {
           const quotedMsg = parsed.replyToId ? messages.find(m => m.id === parsed.replyToId) : null;
           const swipeOffset = swipeState?.id === msg.id ? swipeState.offset : 0;
           const isHighlighted = highlightedMsgId === msg.id;
+
+          // Skip empty bubbles: no text and all attachment tokens are missing/deleted
+          const hasVisibleContent = parsed.text ||
+            parsed.attachmentTokens.some(tok => attachments.find(a => a.id === tok.id));
+          if (!hasVisibleContent) return null;
 
           return (
             <div
@@ -500,7 +528,7 @@ export default function CustomerPortalPage() {
                           {att && attIsImage && attUrl && (
                             <div
                               className="mt-2 rounded-xl overflow-hidden cursor-pointer w-full max-w-[180px] aspect-square"
-                              onClick={() => { if (!wasSwipedRef.current) setLightbox(attUrl); wasSwipedRef.current = false; }}
+                              onClick={() => !wasSwipedRef.current && setLightbox({ src: attUrl, filename: att.file_name, attId: att.id })}
                             >
                               <img src={attUrl} alt={att.file_name} className="w-full h-full object-cover" />
                             </div>
@@ -514,14 +542,7 @@ export default function CustomerPortalPage() {
                               <span className="text-[10px] flex-shrink-0" style={{ color: '#667781' }}>{formatSize(att.file_size)}</span>
                             </div>
                           )}
-                          {!att && (
-                            <div className="mt-2 flex items-center gap-2 rounded-lg p-2" style={{ background: 'rgba(0,0,0,0.06)' }}>
-                              <svg className="w-5 h-5 flex-shrink-0" style={{ color: '#667781' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              <span className="text-xs truncate" style={{ color: '#111b21' }}>{tok.name}</span>
-                            </div>
-                          )}
+                          {/* Deleted/missing attachments render nothing */}
                         </div>
                       );
                     })}
@@ -649,24 +670,124 @@ export default function CustomerPortalPage() {
         </button>
       </div>
 
+      {/* ── Info popup ── */}
+      {infoOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          onClick={() => setInfoOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-[#25d366]/10 flex items-center justify-center">
+                  <InfoIcon className="w-4 h-4 text-[#25d366]" />
+                </div>
+                <h3 className="text-sm font-semibold text-gray-900">How to use this chat</h3>
+              </div>
+              <button onClick={() => setInfoOpen(false)} className="p-1 rounded-full hover:bg-gray-100 transition-colors">
+                <XIcon className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="px-5 py-4 space-y-3.5">
+              {[
+                { icon: '💬', title: 'Send messages', desc: 'Type in the box at the bottom and press Send or hit Enter.' },
+                { icon: '📎', title: 'Attach files', desc: 'Tap the paperclip icon to attach images, PDFs, or documents. You can also drag & drop files.' },
+                { icon: '↩️', title: 'Reply to a message', desc: 'Swipe a message left or right, or tap the reply arrow, to quote it in your response.' },
+                { icon: '🖼️', title: 'View images', desc: 'Tap any image thumbnail to open a full-screen viewer with download and delete options.' },
+                { icon: '🗑️', title: 'Delete a file', desc: 'Open an image in full-screen and tap the trash icon to remove it.' },
+              ].map(({ icon, title, desc }) => (
+                <div key={title} className="flex items-start gap-3">
+                  <span className="text-lg leading-none mt-0.5 flex-shrink-0">{icon}</span>
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 pb-5">
+              <button
+                onClick={() => setInfoOpen(false)}
+                className="w-full py-2.5 rounded-xl text-sm font-medium text-white transition-colors"
+                style={{ background: '#25d366' }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Lightbox ── */}
       {lightbox && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
-          onClick={() => setLightbox(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) { setLightbox(null); setConfirmingDelete(false); } }}
         >
-          <img
-            src={lightbox}
-            alt="attachment"
-            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            onClick={() => setLightbox(null)}
-            className="absolute top-4 right-4 bg-white/20 hover:bg-white/30 p-2 rounded-full transition-colors"
-          >
-            <XIcon className="w-6 h-6 text-white" />
-          </button>
+          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={lightbox.src}
+              alt={lightbox.filename}
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl"
+            />
+            <div className="absolute top-3 right-3 flex gap-2">
+              <a href={lightbox.src} download={lightbox.filename} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Download" onClick={(e) => e.stopPropagation()}>
+                <svg className="w-5 h-5 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              </a>
+              <a href={lightbox.src} target="_blank" rel="noreferrer" className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Open in new tab" onClick={(e) => e.stopPropagation()}>
+                <svg className="w-5 h-5 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+              </a>
+              <button onClick={(e) => { e.stopPropagation(); setConfirmingDelete(true); }} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-red-100 transition-colors shadow-lg" title="Delete">
+                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+              <button onClick={() => { setLightbox(null); setConfirmingDelete(false); }} className="bg-white/90 backdrop-blur-sm p-2 rounded-lg hover:bg-white transition-colors shadow-lg" title="Close">
+                <XIcon className="w-5 h-5 text-gray-800" />
+              </button>
+            </div>
+          </div>
+
+          {/* Delete confirmation modal */}
+          {confirmingDelete && (
+            <div className="absolute inset-0 flex items-center justify-center p-6" onClick={(e) => e.stopPropagation()}>
+              <div className="bg-white rounded-2xl p-6 text-center shadow-2xl w-full max-w-xs">
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-3">
+                  <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </div>
+                <h3 className="text-base font-semibold text-gray-900 mb-1">Delete this file?</h3>
+                <p className="text-sm text-gray-500 mb-5">This can't be undone.</p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setConfirmingDelete(false)}
+                    className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={!!deletingAttId}
+                    onClick={async () => {
+                      if (!token || !lightbox) return;
+                      setDeletingAttId(lightbox.attId);
+                      try {
+                        await portalApi.deleteAttachment(token, lightbox.attId);
+                        setAttachments(prev => prev.filter(a => a.id !== lightbox.attId));
+                        setLightbox(null);
+                        setConfirmingDelete(false);
+                      } finally {
+                        setDeletingAttId(null);
+                      }
+                    }}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-sm font-medium text-white disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    {deletingAttId ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : null}
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
