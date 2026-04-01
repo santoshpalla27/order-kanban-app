@@ -230,25 +230,25 @@ export const customerLinkApi = {
 };
 
 // Customer portal (public — no auth headers)
-const PORTAL_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/api$/, '');
+const PORTAL_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/api$/, '/api/portal');
 
 export const portalApi = {
   getProduct: (token: string) =>
-    fetch(`${PORTAL_BASE}/portal/${token}`).then(r => r.json()),
+    fetch(`${PORTAL_BASE}/${token}`).then(r => r.json()),
   getMessages: (token: string) =>
-    fetch(`${PORTAL_BASE}/portal/${token}/messages`).then(r => r.json()),
+    fetch(`${PORTAL_BASE}/${token}/messages`).then(r => r.json()),
   postMessage: (token: string, message: string) =>
-    fetch(`${PORTAL_BASE}/portal/${token}/messages`, {
+    fetch(`${PORTAL_BASE}/${token}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message }),
     }).then(r => r.json()),
   getAttachments: (token: string) =>
-    fetch(`${PORTAL_BASE}/portal/${token}/attachments`).then(r => r.json()),
+    fetch(`${PORTAL_BASE}/${token}/attachments`).then(r => r.json()),
   getPresignedUrl: (token: string, filename: string) =>
-    fetch(`${PORTAL_BASE}/portal/${token}/attachments/presign?filename=${encodeURIComponent(filename)}`).then(r => r.json()),
+    fetch(`${PORTAL_BASE}/${token}/attachments/presign?filename=${encodeURIComponent(filename)}`).then(r => r.json()),
   confirmUpload: (token: string, data: { s3_key: string; file_name: string; file_size: number; file_type: string }) =>
-    fetch(`${PORTAL_BASE}/portal/${token}/attachments/confirm`, {
+    fetch(`${PORTAL_BASE}/${token}/attachments/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),

@@ -50,7 +50,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	customerPortalHandler := handlers.NewCustomerPortalHandler()
 
 	// Public customer portal routes (no authentication)
-	portal := r.Group("/portal")
+	portal := r.Group("/api/portal")
 	{
 		portal.GET("/:token", customerPortalHandler.GetProductInfo)
 		portal.GET("/:token/messages", customerPortalHandler.GetMessages)
