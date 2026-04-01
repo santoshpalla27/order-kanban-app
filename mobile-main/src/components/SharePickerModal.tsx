@@ -152,10 +152,9 @@ export default function SharePickerModal({ visible, files, onDone }: Props) {
       animationType="slide"
       transparent
       onRequestClose={onDone}
-      statusBarTranslucent
     >
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <SafeAreaView edges={['bottom']} style={styles.sheet}>
 
           {/* ── Header ── */}
           <View style={styles.header}>
@@ -318,8 +317,7 @@ export default function SharePickerModal({ visible, files, onDone }: Props) {
               )}
             </View>
           )}
-          <SafeAreaView edges={['bottom']} style={{ backgroundColor: c.card }} />
-        </View>
+        </SafeAreaView>
       </View>
     </Modal>
   );
