@@ -8,8 +8,8 @@ import { useThemeStore } from './src/store/themeStore';
 import { useShareStore } from './src/store/shareStore';
 import Navigation from './src/navigation';
 
-// Listens for incoming share intents and stores files in shareStore.
-// Must be inside ShareIntentProvider.
+// Listens for incoming share intents (both foreground and cold-start).
+// Must stay mounted inside ShareIntentProvider at all times.
 function ShareIntentListener() {
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent();
   const setPendingFiles = useShareStore((s) => s.setPendingFiles);
@@ -31,7 +31,7 @@ function ShareIntentListener() {
   return null;
 }
 
-export default function App() {
+function AppContent() {
   const { hydrated: authHydrated, hydrate: hydrateAuth } = useAuthStore();
   const { hydrated: themeHydrated, hydrate: hydrateTheme, isDark } = useThemeStore();
 
@@ -43,25 +43,30 @@ export default function App() {
   const hydrated = authHydrated && themeHydrated;
   const bg = isDark ? '#0A0D14' : '#F1F5F9';
 
-  if (!hydrated) {
-    return (
-      <ShareIntentProvider>
-        <SafeAreaProvider>
-          <View style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
-            <ActivityIndicator color="#6366F1" size="large" />
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
-          </View>
-        </SafeAreaProvider>
-      </ShareIntentProvider>
-    );
-  }
-
   return (
+    <>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
+      {!hydrated ? (
+        <View style={{ flex: 1, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#6366F1" size="large" />
+        </View>
+      ) : (
+        <Navigation />
+      )}
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    // ShareIntentProvider must be the outermost wrapper and must never
+    // unmount — otherwise cold-start intent data is lost when we switch
+    // from the loading view to the main navigation tree.
     <ShareIntentProvider>
       <SafeAreaProvider>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
+        {/* Always mounted so it captures intent even during hydration */}
         <ShareIntentListener />
-        <Navigation />
+        <AppContent />
       </SafeAreaProvider>
     </ShareIntentProvider>
   );
