@@ -3,7 +3,7 @@ import {
   Modal, View, Text, TextInput, FlatList, TouchableOpacity,
   StyleSheet, ActivityIndicator, Platform,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
@@ -32,7 +32,6 @@ export default function SharePickerModal({ visible, files, onDone }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const c = isDark ? darkColors : lightColors;
   const styles = useMemo(() => makeStyles(c), [c]);
-  const insets = useSafeAreaInsets();
 
   const [step, setStep] = useState<Step>('pick-order');
   const [search, setSearch] = useState('');
@@ -156,7 +155,7 @@ export default function SharePickerModal({ visible, files, onDone }: Props) {
       statusBarTranslucent
     >
       <View style={styles.overlay}>
-        <View style={[styles.sheet, { paddingBottom: insets.bottom + 36 }]}>
+        <View style={styles.sheet}>
 
           {/* ── Header ── */}
           <View style={styles.header}>
@@ -319,6 +318,7 @@ export default function SharePickerModal({ visible, files, onDone }: Props) {
               )}
             </View>
           )}
+          <SafeAreaView edges={['bottom']} style={{ backgroundColor: c.card }} />
         </View>
       </View>
     </Modal>
