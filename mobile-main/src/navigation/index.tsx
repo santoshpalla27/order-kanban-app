@@ -28,6 +28,8 @@ import ActivityScreen       from '../screens/ActivityScreen';
 import TeamChatScreen       from '../screens/TeamChatScreen';
 import ProfileScreen        from '../screens/ProfileScreen';
 import { useProductBadges, useMyOrdersBadges } from '../hooks/useProductBadges';
+import SharePickerModal from '../components/SharePickerModal';
+import { useShareStore } from '../store/shareStore';
 
 export type RootStackParamList = {
   Login:         undefined;
@@ -182,6 +184,8 @@ function AppNavigator() {
   const isDark  = useThemeStore((s) => s.isDark);
   const c       = isDark ? darkColors : lightColors;
   const { refreshUnreadCount } = useNotificationStore();
+  const pendingFiles    = useShareStore((s) => s.pendingFiles);
+  const clearPendingFiles = useShareStore((s) => s.clearPendingFiles);
 
   useWsEvents();
   usePushToken();
@@ -194,6 +198,11 @@ function AppNavigator() {
   return (
     <>
       {Platform.OS !== 'web' && token ? <PushTapHandler token={token} /> : null}
+      <SharePickerModal
+        visible={!!token && pendingFiles.length > 0}
+        files={pendingFiles}
+        onDone={clearPendingFiles}
+      />
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
