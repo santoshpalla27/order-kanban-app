@@ -189,3 +189,14 @@ export const activityApi = {
 export const statsApi = {
   getStats: () => api.get('/stats'),
 };
+
+// ─── Customer Link ─────────────────────────────────────────────────────────────
+
+export const customerLinkApi = {
+  get: (productId: number) =>
+    api.get<{ link: any }>(`/products/${productId}/customer-link`),
+  create: (productId: number) =>
+    api.post<{ link: any }>(`/products/${productId}/customer-link`),
+  deactivate: (productId: number, linkId: number) =>
+    api.delete(`/products/${productId}/customer-link/${linkId}`),
+};

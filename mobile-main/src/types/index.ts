@@ -26,6 +26,16 @@ export interface Attachment {
   uploader: User;
   uploaded_at: string;
   view_url?: string;
+  source?: string;
+}
+
+export interface CustomerLink {
+  id: number;
+  product_id: number;
+  token: string;
+  is_active: boolean;
+  expires_at: string;
+  created_at: string;
 }
 
 export interface Comment {
@@ -36,6 +46,8 @@ export interface Comment {
   message: string;
   created_at: string;
   updated_at: string;
+  source?: string;
+  portal_sender?: string;
 }
 
 export interface Product {

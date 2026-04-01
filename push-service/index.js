@@ -255,6 +255,19 @@ async function startListener() {
             break;
           }
 
+          case 'customer_comment_added': {
+            const ref = orderRef(message);
+            title = ref ? `💬 Customer Message on ${ref}` : '💬 New Customer Message';
+            body  = content ? trunc(content) : trunc(message || 'Customer sent a message');
+            break;
+          }
+
+          case 'customer_attachment_uploaded': {
+            title = '📎 Customer File';
+            body  = trunc(message || 'Customer uploaded a file');
+            break;
+          }
+
           case 'chat_message': {
             title = '💬 Team Chat';
             body  = sender && content ? trunc(`${sender}: ${content}`) : trunc(message);

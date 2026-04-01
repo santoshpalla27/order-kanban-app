@@ -130,7 +130,7 @@ func (h *CustomerPortalHandler) PostMessage(c *gin.Context) {
 
 	// Notify all team members
 	message := fmt.Sprintf("%s commented on %s via customer portal", senderName, productLabel)
-	services.CreateNotificationForAllExcept(0, nil, message, "comment_added", "product", link.ProductID, req.Message, senderName)
+	services.CreateNotificationForAllExcept(0, nil, message, "customer_comment_added", "product", link.ProductID, req.Message, senderName)
 
 	// Broadcast UI refresh
 	wsMsg, _ := json.Marshal(WSMessage{
@@ -264,7 +264,7 @@ func (h *CustomerPortalHandler) ConfirmUpload(c *gin.Context) {
 
 	// Notify all team members
 	message := fmt.Sprintf("%s uploaded '%s' to %s via customer portal", senderName, req.FileName, productLabel)
-	services.CreateNotificationForAllExcept(0, nil, message, "attachment_uploaded", "product", link.ProductID, "", senderName)
+	services.CreateNotificationForAllExcept(0, nil, message, "customer_attachment_uploaded", "product", link.ProductID, "", senderName)
 
 	// Broadcast UI refresh
 	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_uploaded", Payload: attachment})

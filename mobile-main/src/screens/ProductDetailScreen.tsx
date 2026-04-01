@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Alert, Modal, FlatList,
+  ActivityIndicator, Alert, Modal, FlatList, Platform,
   KeyboardAvoidingView, Linking, Image, useWindowDimensions, Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,17 +10,18 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
-  productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi,
+  productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi, customerLinkApi,
 } from '../api/services';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
-import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES } from '../hooks/useProductBadges';
+import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES, CUSTOMER_COMMENT_TYPES, CUSTOMER_ATTACHMENT_TYPES } from '../hooks/useProductBadges';
 import { useNotificationStore } from '../store/notificationStore';
 import {
   Product, Attachment, Comment, User,
   STATUS_LABELS, STATUS_ORDER, STATUS_COLORS, ProductStatus,
 } from '../types';
 import { formatDateTime, formatRelative, formatFileSize, stripMentions } from '../utils/helpers';
+import { PORTAL_BASE_URL } from '../utils/config';
 import Avatar from '../components/Avatar';
 import StatusChip from '../components/StatusChip';
 import { RootStackParamList } from '../navigation';
@@ -30,7 +31,7 @@ import { Feather } from '@expo/vector-icons';
 
 type RouteT = RouteProp<RootStackParamList, 'ProductDetail'>;
 
-type TabId = 'details' | 'attachments' | 'comments';
+type TabId = 'details' | 'attachments' | 'comments' | 'customer-files' | 'customer-messages';
 
 // ─── Status picker modal ────────────────────────────────────────────────────
 
@@ -81,11 +82,160 @@ function makeModalStyles(c: ThemeColors) {
   });
 }
 
+// ─── Customer Link Section ────────────────────────────────────────────────────
+
+function CustomerLinkSection({ productId }: { productId: number }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const { canCreateProduct } = useAuthStore();
+  const [link, setLink] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [revoking, setRevoking] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const portalBase = PORTAL_BASE_URL;
+
+  const load = async () => {
+    try {
+      const res = await customerLinkApi.get(productId);
+      setLink(res.data?.link ?? null);
+    } catch { setLink(null); }
+    setLoading(false);
+  };
+
+  useEffect(() => { load(); }, [productId]);
+
+  if (!canCreateProduct()) return null;
+
+  const isExpired = link ? new Date(link.expires_at).getTime() < Date.now() : false;
+  const portalUrl = link ? `${portalBase}/portal/${link.token}` : '';
+
+  const handleCreate = async () => {
+    setCreating(true);
+    try {
+      const res = await customerLinkApi.create(productId);
+      setLink(res.data?.link ?? null);
+    } catch { Alert.alert('Error', 'Failed to create customer link'); }
+    setCreating(false);
+  };
+
+  const handleRevoke = async () => {
+    if (!link || revoking) return;
+    setRevoking(true);
+    try {
+      await customerLinkApi.deactivate(productId, link.id);
+      setLink(null);
+    } catch { Alert.alert('Error', 'Failed to revoke link'); }
+    setRevoking(false);
+  };
+
+  const handleCopy = async () => {
+    if (Platform.OS === 'web') {
+      (navigator as any).clipboard?.writeText(portalUrl);
+    } else {
+      try {
+        const Clipboard = await import('expo-clipboard');
+        await Clipboard.setStringAsync(portalUrl);
+      } catch {
+        // fallback: open the URL if clipboard unavailable
+        Linking.openURL(portalUrl);
+      }
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <View style={clsStyles(c).linkSection}>
+      <View style={clsStyles(c).linkHeader}>
+        <Feather name="link-2" size={14} color={c.textMuted} />
+        <Text style={clsStyles(c).linkLabel}>CUSTOMER PORTAL LINK</Text>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator color={c.brand} size="small" style={{ marginVertical: 8 }} />
+      ) : link ? (
+        <View style={{ gap: 8 }}>
+          {isExpired && (
+            <View style={clsStyles(c).expiredBanner}>
+              <Text style={clsStyles(c).expiredText}>Link Expired — generate a new one</Text>
+            </View>
+          )}
+          <View style={[clsStyles(c).urlRow, isExpired && { opacity: 0.5 }]}>
+            <Text style={[clsStyles(c).urlText, isExpired && { textDecorationLine: 'line-through' }]} numberOfLines={1}>
+              {portalUrl}
+            </Text>
+            <TouchableOpacity onPress={handleCopy} disabled={isExpired} style={clsStyles(c).copyBtn}>
+              <Feather name={copied ? 'check' : 'copy'} size={14} color={copied ? '#34D399' : c.brandLight} />
+              <Text style={[clsStyles(c).copyText, copied && { color: '#34D399' }]}>
+                {copied ? 'Copied!' : 'Copy'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={clsStyles(c).expiryText}>
+              {isExpired ? 'Expired' : 'Expires'} {new Date(link.expires_at).toLocaleDateString()}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {isExpired && (
+                <TouchableOpacity onPress={handleCreate} disabled={creating}>
+                  <Text style={clsStyles(c).generateText}>{creating ? 'Generating…' : 'New Link'}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={handleRevoke} disabled={revoking}>
+                <Text style={clsStyles(c).revokeText}>{revoking ? 'Removing…' : isExpired ? 'Remove' : 'Revoke'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={[clsStyles(c).generateBtn, creating && { opacity: 0.6 }]}
+          onPress={handleCreate}
+          disabled={creating}
+        >
+          {creating
+            ? <ActivityIndicator color={c.brandLight} size="small" />
+            : <>
+                <Feather name="link" size={14} color={c.brandLight} />
+                <Text style={clsStyles(c).generateBtnText}>Generate Customer Link</Text>
+              </>
+          }
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+function clsStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    linkSection: { borderTopWidth: 1, borderTopColor: c.surface2, paddingTop: 16, gap: 8 },
+    linkHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    linkLabel: { fontSize: 10, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },
+    expiredBanner: { backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.25)', borderRadius: 8, padding: 8 },
+    expiredText: { fontSize: 12, color: '#FCA5A5' },
+    urlRow: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border2, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+    urlText: { flex: 1, fontSize: 12, color: c.textSec, fontFamily: 'monospace' },
+    copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
+    copyText: { fontSize: 12, color: c.brandLight, fontWeight: '600' },
+    expiryText: { fontSize: 11, color: c.textMuted },
+    generateText: { fontSize: 12, color: c.brandLight, fontWeight: '600' },
+    revokeText: { fontSize: 12, color: '#EF4444', fontWeight: '600' },
+    generateBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+      backgroundColor: 'rgba(99,102,241,0.1)', borderWidth: 1, borderColor: c.brand,
+      borderRadius: 10, paddingVertical: 11,
+    },
+    generateBtnText: { color: c.brandLight, fontSize: 14, fontWeight: '600' },
+  });
+}
+
 // ─── Details tab ────────────────────────────────────────────────────────────
 
 function DetailsTab({
-  product, users, canEdit, onProductUpdated,
-}: { product: Product; users: User[]; canEdit: boolean; onProductUpdated: (p: Product) => void }) {
+  product, users, canEdit, onProductUpdated, productId,
+}: { product: Product; users: User[]; canEdit: boolean; onProductUpdated: (p: Product) => void; productId: number }) {
   const isDark = useThemeStore((s) => s.isDark);
   const c = isDark ? darkColors : lightColors;
   const styles = useMemo(() => makeDetailsStyles(c), [c]);
@@ -283,6 +433,8 @@ function DetailsTab({
           }
         </View>
       </View>
+
+      <CustomerLinkSection productId={productId} />
     </ScrollView>
   );
 }
@@ -930,10 +1082,10 @@ function parseCommentMessage(raw: string): ParsedComment {
       result.attachmentName = attMatch[2];
       continue;
     }
-    const replyMatch = line.match(/^\[reply:(\d+):(.+?)\]$/);
+    const replyMatch = line.match(/^\[reply:(\d+)(?::(.+?))?\]$/);
     if (replyMatch) {
       result.replyId = Number(replyMatch[1]);
-      result.replyPreview = replyMatch[2];
+      if (replyMatch[2]) result.replyPreview = replyMatch[2];
       continue;
     }
     textLines.push(line);
@@ -962,6 +1114,10 @@ function CommentsTab({
 
   // Reply
   const [replyTo, setReplyTo]     = useState<{ id: number; name: string; text: string } | null>(null);
+
+  // Highlight on reply-click
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Long-press context menu
   const [menu, setMenu]           = useState<MenuState | null>(null);
@@ -1101,10 +1257,19 @@ function CommentsTab({
   const load = useCallback(async () => {
     try {
       const res = await commentsApi.getByProduct(productId);
-      setComments(res.data || []);
+      const all: Comment[] = res.data || [];
+      setComments(all.filter((c) => !c.source || c.source === 'internal'));
     } catch {}
     setLoading(false);
   }, [productId]);
+
+  const highlightComment = useCallback((commentId: number) => {
+    const idx = comments.findIndex((c) => c.id === commentId);
+    if (idx >= 0) listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    setHighlightedId(commentId);
+    highlightTimer.current = setTimeout(() => setHighlightedId(null), 5000);
+  }, [comments]);
 
   useEffect(() => { load(); }, [load]);
   useWsEvents({ onCommentsChanged: load });
@@ -1137,7 +1302,7 @@ function CommentsTab({
     setSending(true);
     try {
       const text = replyTo
-        ? `↩ ${replyTo.name}: "${stripMentions(replyTo.text).slice(0, 60)}"\n${message.trim()}`
+        ? `[reply:${replyTo.id}:${stripMentions(replyTo.text).slice(0, 60)}]\n${message.trim()}`
         : message.trim();
       await commentsApi.create(productId, text);
       setMessage('');
@@ -1186,6 +1351,9 @@ function CommentsTab({
         keyExtractor={(c) => String(c.id)}
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
+        onScrollToIndexFailed={({ index }) => {
+          setTimeout(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }), 200);
+        }}
         onLayout={() => {
           if (keyboardOpen.current && !userScrolled.current) {
             listRef.current?.scrollToEnd({ animated: false });
@@ -1232,8 +1400,10 @@ function CommentsTab({
             );
           }
 
+          const isHighlighted = highlightedId === c.id;
+
           return (
-            <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther]}>
+            <View style={[styles.row, isOwn ? styles.rowOwn : styles.rowOther, isHighlighted && styles.rowHighlighted]}>
               {/* Avatar — others only */}
               {!isOwn && (
                 <View style={styles.avatarWrap}>
@@ -1260,13 +1430,30 @@ function CommentsTab({
                       ? isImage(resolvedAtt.file_type)
                       : /\.(jpg|jpeg|png|gif|webp|heic|bmp)(\?|$)/i.test(attUrl);
 
+                    // Resolve quoted comment thumbnail
+                    const quotedComment = parsed.replyId ? comments.find((q) => q.id === parsed.replyId) : null;
+                    const quotedParsed = quotedComment ? parseCommentMessage(quotedComment.message) : null;
+                    const quotedThumbAtt = quotedParsed?.attachmentId ? attachments.find((a) => a.id === quotedParsed.attachmentId) : null;
+                    const quotedThumbUrl = quotedThumbAtt && isImage(quotedThumbAtt.file_type) ? quotedThumbAtt.view_url || null : null;
+
                     return (
                       <View style={[styles.bubble, isOwn ? styles.bubbleOwn : styles.bubbleOther]}>
                         {/* Reply quote */}
-                        {parsed.replyPreview && (
-                          <View style={[styles.replyQuote, isOwn ? styles.replyQuoteOwn : styles.replyQuoteOther]}>
-                            <Text style={styles.replyQuoteText} numberOfLines={1}>{parsed.replyPreview}</Text>
-                          </View>
+                        {(parsed.replyPreview || quotedThumbUrl) && (
+                          <TouchableOpacity
+                            style={[styles.replyQuote, isOwn ? styles.replyQuoteOwn : styles.replyQuoteOther, { flexDirection: 'row', alignItems: 'center', overflow: 'hidden', padding: 0 }]}
+                            onPress={parsed.replyId ? () => highlightComment(parsed.replyId!) : undefined}
+                            activeOpacity={parsed.replyId ? 0.7 : 1}
+                          >
+                            <View style={{ flex: 1, paddingHorizontal: 8, paddingVertical: 4 }}>
+                              {parsed.replyPreview && (
+                                <Text style={styles.replyQuoteText} numberOfLines={1}>{parsed.replyPreview}</Text>
+                              )}
+                            </View>
+                            {quotedThumbUrl && (
+                              <Image source={{ uri: quotedThumbUrl }} style={styles.replyQuoteThumb} resizeMode="cover" />
+                            )}
+                          </TouchableOpacity>
                         )}
 
                         {/* Main text */}
@@ -1535,9 +1722,10 @@ function makeCommentsStyles(c: ThemeColors) {
     empty: { fontSize: 14, color: c.textMuted },
 
     // Row layout
-    row: { flexDirection: 'row', marginBottom: 6, alignItems: 'flex-end' },
+    row: { flexDirection: 'row', marginBottom: 6, alignItems: 'flex-end', borderRadius: 8, padding: 4, marginHorizontal: -4 },
     rowOwn:   { justifyContent: 'flex-end' },
     rowOther: { justifyContent: 'flex-start' },
+    rowHighlighted: { backgroundColor: 'rgba(99,102,241,0.18)' },
 
     // Avatar
     avatarWrap: { marginRight: 6, marginBottom: 2 },
@@ -1586,10 +1774,11 @@ function makeCommentsStyles(c: ThemeColors) {
     editSave: { color: c.brandLight, fontSize: 13, fontWeight: '700' },
 
     // Reply quote inside bubble
-    replyQuote: { borderLeftWidth: 3, paddingLeft: 8, marginBottom: 6, borderRadius: 4, paddingVertical: 3 },
+    replyQuote: { borderLeftWidth: 3, marginBottom: 6, borderRadius: 4 },
     replyQuoteOwn:   { borderLeftColor: 'rgba(255,255,255,0.4)', backgroundColor: 'rgba(255,255,255,0.08)' },
     replyQuoteOther: { borderLeftColor: c.brand, backgroundColor: 'rgba(99,102,241,0.08)' },
     replyQuoteText:  { fontSize: 11, color: c.textSec, fontStyle: 'italic' },
+    replyQuoteThumb: { width: 36, height: 36, borderRadius: 0 },
 
     // Attachment image thumbnail inside bubble
     attThumb: { borderRadius: 10, overflow: 'hidden', marginTop: 4, marginBottom: 4 },
@@ -1715,6 +1904,314 @@ function makeCommentsStyles(c: ThemeColors) {
   });
 }
 
+// ─── Customer Files Tab (read-only — customer-uploaded attachments) ───────────
+
+function CustomerFilesTab({
+  attachments,
+}: { attachments: Attachment[] }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeAttachmentsStyles(c), [c]);
+
+  const [lightbox, setLightbox] = useState<{ url: string; name: string; id: number } | null>(null);
+
+  const handleDownload = async (att: Attachment) => {
+    try {
+      const res = await attachmentsApi.getDownloadUrl(att.id);
+      const url = res.data?.url || res.data;
+      if (url) Linking.openURL(url);
+    } catch {
+      Alert.alert('Error', 'Could not get download link');
+    }
+  };
+
+  const images = attachments.filter((a) => isImage(a.file_type));
+  const files  = attachments.filter((a) => !isImage(a.file_type));
+
+  if (attachments.length === 0) {
+    return (
+      <View style={styles.emptyBox}>
+        <Text style={{ fontSize: 32 }}>📎</Text>
+        <Text style={styles.empty}>No customer files yet</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {images.length > 0 && (
+          <View style={styles.grid}>
+            {images.map((att) => (
+              <View key={att.id} style={styles.gridCell}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => att.view_url && setLightbox({ url: att.view_url, name: att.file_name, id: att.id })}
+                  style={styles.thumb}
+                >
+                  {att.view_url ? (
+                    <Image source={{ uri: att.view_url }} style={styles.thumbImg} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.thumbImg, styles.thumbPlaceholder]}>
+                      <Text style={{ fontSize: 28 }}>🖼</Text>
+                    </View>
+                  )}
+                  <View style={styles.thumbOverlay}>
+                    <Text style={styles.thumbName} numberOfLines={1}>{att.file_name}</Text>
+                    <View style={styles.thumbActions}>
+                      <TouchableOpacity style={styles.thumbBtn} onPress={() => handleDownload(att)}>
+                        <Text style={styles.thumbBtnTxt}>⬇</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+        {files.length > 0 && (
+          <View style={styles.fileList}>
+            {images.length > 0 && <Text style={styles.sectionLabel}>Other Files</Text>}
+            {files.map((att) => (
+              <View key={att.id} style={styles.card}>
+                <Text style={styles.cardIcon}>{fileEmoji(att.file_type)}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.name} numberOfLines={1}>{att.file_name}</Text>
+                  <Text style={styles.meta}>{formatFileSize(att.file_size)} · {formatRelative(att.uploaded_at)}</Text>
+                </View>
+                <TouchableOpacity style={styles.action} onPress={() => handleDownload(att)}>
+                  <Text style={styles.actionText}>⬇</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+
+      {lightbox && (
+        <ImageLightbox
+          url={lightbox.url}
+          name={lightbox.name}
+          attId={lightbox.id}
+          onClose={() => setLightbox(null)}
+          onDownload={() => {
+            const att = attachments.find((a) => a.id === lightbox.id);
+            if (att) handleDownload(att);
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+// ─── Customer Messages Tab (read-only — messages from customer portal) ─────────
+
+function CustomerMessagesTab({
+  productId,
+  customerName,
+  customerAttachments,
+}: { productId: number; customerName: string; customerAttachments: Attachment[] }) {
+  const isDark = useThemeStore((s) => s.isDark);
+  const c = isDark ? darkColors : lightColors;
+  const styles = useMemo(() => makeCustMsgStyles(c), [c]);
+
+  const [messages, setMessages] = useState<Comment[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [lightbox, setLightbox] = useState<{ url: string; name: string } | null>(null);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<FlatList<Comment>>(null);
+  const didScroll = useRef(false);
+
+  const highlightMessage = useCallback((msgId: number) => {
+    const idx = messages.findIndex((m) => m.id === msgId);
+    if (idx >= 0) listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    setHighlightedId(msgId);
+    highlightTimer.current = setTimeout(() => setHighlightedId(null), 5000);
+  }, [messages]);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await commentsApi.getByProduct(productId);
+      const all: Comment[] = res.data || [];
+      setMessages(all.filter((c) => c.source === 'customer'));
+    } catch {}
+    setLoading(false);
+  }, [productId]);
+
+  useEffect(() => { load(); }, [load]);
+  useWsEvents({ onCommentsChanged: load });
+
+  useEffect(() => {
+    if (!loading && messages.length > 0 && !didScroll.current) {
+      didScroll.current = true;
+      setTimeout(() => listRef.current?.scrollToEnd({ animated: false }), 150);
+    }
+  }, [loading, messages.length]);
+
+  if (loading) {
+    return <View style={styles.center}><ActivityIndicator color={c.brand} /></View>;
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <FlatList
+        ref={listRef}
+        data={messages}
+        keyExtractor={(m) => String(m.id)}
+        contentContainerStyle={styles.list}
+        onScrollToIndexFailed={({ index }) => {
+          setTimeout(() => listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 }), 200);
+        }}
+        ListEmptyComponent={
+          <View style={styles.center}>
+            <Text style={{ fontSize: 32 }}>💬</Text>
+            <Text style={styles.empty}>No customer messages yet</Text>
+          </View>
+        }
+        renderItem={({ item: msg }) => {
+          const senderName = msg.portal_sender || customerName || 'Customer';
+          const parsed = parseCommentMessage(msg.message);
+          const resolvedAtt = parsed.attachmentId
+            ? customerAttachments.find((a) => a.id === parsed.attachmentId)
+            : null;
+          const attUrl = resolvedAtt?.view_url || parsed.attachmentUrl || '';
+          const attIsImage = resolvedAtt
+            ? isImage(resolvedAtt.file_type)
+            : /\.(jpg|jpeg|png|gif|webp|heic|bmp)(\?|$)/i.test(attUrl);
+
+          // Resolve quoted message (portal uses [reply:ID], internal uses [reply:ID:preview])
+          const quotedMsg = parsed.replyId ? messages.find((m) => m.id === parsed.replyId) : null;
+          const quotedPreview = quotedMsg
+            ? (() => {
+                const qp = parseCommentMessage(quotedMsg.message);
+                if (qp.text) return qp.text.slice(0, 80);
+                if (qp.attachmentName) return `📎 ${qp.attachmentName}`;
+                return quotedMsg.message.slice(0, 80);
+              })()
+            : parsed.replyPreview || null;
+          const quotedSender = quotedMsg?.portal_sender || null;
+          const quotedThumb = quotedMsg
+            ? (() => {
+                const qp = parseCommentMessage(quotedMsg.message);
+                if (!qp.attachmentId) return null;
+                const qa = customerAttachments.find((a) => a.id === qp.attachmentId);
+                return qa && isImage(qa.file_type) ? qa.view_url || null : null;
+              })()
+            : null;
+
+          const isHighlighted = highlightedId === msg.id;
+
+          return (
+            <View style={[styles.row, isHighlighted && styles.rowHighlighted]}>
+              <View style={styles.avatarWrap}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{senderName.charAt(0).toUpperCase()}</Text>
+                </View>
+              </View>
+              <View style={styles.bubbleWrap}>
+                <Text style={styles.senderName}>{senderName}</Text>
+                <View style={styles.bubble}>
+                  {(quotedPreview || quotedThumb) && (
+                    <TouchableOpacity
+                      style={styles.replyQuote}
+                      onPress={quotedMsg ? () => highlightMessage(quotedMsg.id) : undefined}
+                      activeOpacity={quotedMsg ? 0.7 : 1}
+                    >
+                      {quotedSender && (
+                        <Text style={styles.replyQuoteSender} numberOfLines={1}>{quotedSender}</Text>
+                      )}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {quotedPreview && (
+                          <Text style={[styles.replyQuoteText, { flex: 1 }]} numberOfLines={1}>{quotedPreview}</Text>
+                        )}
+                        {quotedThumb && (
+                          <Image source={{ uri: quotedThumb }} style={styles.replyQuoteThumb} resizeMode="cover" />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  {!!parsed.text && (
+                    <Text style={styles.msgText}>{parsed.text}</Text>
+                  )}
+                  {attUrl && attIsImage && (
+                    <TouchableOpacity
+                      style={styles.attThumb}
+                      onPress={() => setLightbox({ url: attUrl, name: parsed.attachmentName || 'image' })}
+                      activeOpacity={0.85}
+                    >
+                      <Image source={{ uri: attUrl }} style={styles.attThumbImg} resizeMode="cover" />
+                      {parsed.attachmentName && (
+                        <View style={styles.attThumbOverlay}>
+                          <Text style={styles.attThumbName} numberOfLines={1}>{parsed.attachmentName}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  {attUrl && !attIsImage && (
+                    <View style={styles.attFile}>
+                      <Text style={styles.attFileIcon}>
+                        {fileEmoji(parsed.attachmentName?.match(/\.\w+$/)?.[0] || '')}
+                      </Text>
+                      <Text style={styles.attFileName} numberOfLines={1}>
+                        {parsed.attachmentName || 'File'}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={styles.timestamp}>{formatRelative(msg.created_at)}</Text>
+                </View>
+              </View>
+            </View>
+          );
+        }}
+      />
+      {lightbox && (
+        <ImageLightbox
+          url={lightbox.url}
+          name={lightbox.name}
+          attId={0}
+          onClose={() => setLightbox(null)}
+          onDownload={() => Linking.openURL(lightbox.url)}
+        />
+      )}
+    </View>
+  );
+}
+
+function makeCustMsgStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    list:   { padding: 12, paddingBottom: 20 },
+    center: { alignItems: 'center', padding: 32, gap: 8 },
+    empty:  { fontSize: 14, color: c.textMuted },
+    row:    { flexDirection: 'row', marginBottom: 8, alignItems: 'flex-end', borderRadius: 8, padding: 4, marginHorizontal: -4 },
+    rowHighlighted: { backgroundColor: 'rgba(37,211,102,0.18)' },
+    avatarWrap: { marginRight: 8, marginBottom: 2 },
+    avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center' },
+    avatarText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+    bubbleWrap: { maxWidth: '78%', gap: 3 },
+    senderName: { fontSize: 11, fontWeight: '700', color: '#25D366', marginLeft: 4, marginBottom: 1 },
+    bubble: {
+      backgroundColor: c.surface2, borderWidth: 1, borderColor: c.border2,
+      borderRadius: 18, borderBottomLeftRadius: 4,
+      paddingHorizontal: 13, paddingVertical: 8, paddingBottom: 6,
+    },
+    replyQuote: { borderLeftWidth: 3, borderLeftColor: '#25D366', paddingLeft: 8, marginBottom: 6, borderRadius: 4, paddingVertical: 3, backgroundColor: 'rgba(37,211,102,0.06)' },
+    replyQuoteSender: { fontSize: 10, fontWeight: '700', color: '#25D366', marginBottom: 1 },
+    replyQuoteText: { fontSize: 11, color: c.textSec, fontStyle: 'italic' },
+    replyQuoteThumb: { width: 36, height: 36, borderRadius: 4 },
+    msgText: { fontSize: 14, lineHeight: 20, color: c.text },
+    timestamp: { fontSize: 10, marginTop: 3, color: c.textMuted, textAlign: 'right' },
+    attThumb: { borderRadius: 10, overflow: 'hidden', marginTop: 4, marginBottom: 4 },
+    attThumbImg: { width: 140, height: 140 },
+    attThumbOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 8, paddingVertical: 4 },
+    attThumbName: { fontSize: 10, color: '#fff' },
+    attFile: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 10, padding: 8, marginTop: 4, backgroundColor: 'rgba(37,211,102,0.08)' },
+    attFileIcon: { fontSize: 20 },
+    attFileName: { fontSize: 12, color: c.textSec, flex: 1 },
+  });
+}
+
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductDetailScreen() {
@@ -1808,6 +2305,14 @@ export default function ProductDetailScreen() {
       notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES)
         .then(() => { refreshBadges(); refreshUnreadCount(); })
         .catch(() => {});
+    } else if (activeTab === 'customer-messages' && has(productId, 'customer_comments')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_COMMENT_TYPES)
+        .then(() => { refreshBadges(); refreshUnreadCount(); })
+        .catch(() => {});
+    } else if (activeTab === 'customer-files' && has(productId, 'customer_attachments')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES)
+        .then(() => { refreshBadges(); refreshUnreadCount(); })
+        .catch(() => {});
     }
   }, [activeTab, productId]);
 
@@ -1853,10 +2358,14 @@ export default function ProductDetailScreen() {
 
   if (!product) return null;
 
+  const customerAttachments = attachments.filter((a) => a.source === 'customer');
+
   const TABS: Array<{ id: TabId; label: string; badge: boolean }> = [
-    { id: 'details',     label: 'Details',     badge: has(productId, 'status_change') },
-    { id: 'attachments', label: 'Attachments', badge: has(productId, 'attachments') },
-    { id: 'comments',    label: 'Comments',    badge: has(productId, 'comments') },
+    { id: 'details',           label: 'Details',          badge: has(productId, 'status_change') },
+    { id: 'attachments',       label: 'Files',            badge: has(productId, 'attachments') },
+    { id: 'comments',          label: 'Comments',         badge: has(productId, 'comments') },
+    { id: 'customer-files',    label: 'Cust. Files',      badge: has(productId, 'customer_attachments') },
+    { id: 'customer-messages', label: 'Cust. Messages',   badge: has(productId, 'customer_comments') },
   ];
 
   return (
@@ -1896,20 +2405,22 @@ export default function ProductDetailScreen() {
 
       {/* Tabs */}
       <View style={styles.tabs}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.tabActive]}
-            onPress={() => setActiveTab(tab.id)}
-          >
-            <View style={styles.tabInner}>
-              <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
-                {tab.label}
-              </Text>
-              {tab.badge && <View style={styles.tabBadge} />}
-            </View>
-          </TouchableOpacity>
-        ))}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row' }}>
+          {TABS.map((tab) => (
+            <TouchableOpacity
+              key={tab.id}
+              style={[styles.tab, activeTab === tab.id && styles.tabActive]}
+              onPress={() => setActiveTab(tab.id)}
+            >
+              <View style={styles.tabInner}>
+                <Text style={[styles.tabText, activeTab === tab.id && styles.tabTextActive]}>
+                  {tab.label}
+                </Text>
+                {tab.badge && <View style={styles.tabBadge} />}
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Tab content */}
@@ -1920,6 +2431,7 @@ export default function ProductDetailScreen() {
             users={users}
             canEdit={canCreateProduct()}
             onProductUpdated={setProduct}
+            productId={productId}
           />
         )}
         {activeTab === 'attachments' && (
@@ -1939,6 +2451,16 @@ export default function ProductDetailScreen() {
             userId={user?.id ?? 0}
             attachments={attachments}
             onAttachmentUploaded={loadAttachments}
+          />
+        )}
+        {activeTab === 'customer-files' && (
+          <CustomerFilesTab attachments={customerAttachments} />
+        )}
+        {activeTab === 'customer-messages' && (
+          <CustomerMessagesTab
+            productId={productId}
+            customerName={product.customer_name}
+            customerAttachments={customerAttachments}
           />
         )}
       </View>
@@ -1973,9 +2495,9 @@ function makeScreenStyles(c: ThemeColors) {
       width: 34, height: 34, borderRadius: 10,
       backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center',
     },
-    tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: c.surface2 },
+    tabs: { borderBottomWidth: 1, borderBottomColor: c.surface2, flexShrink: 0 },
     tab: {
-      flex: 1, paddingVertical: 13, alignItems: 'center',
+      paddingHorizontal: 14, paddingVertical: 12, alignItems: 'center',
       borderBottomWidth: 2, borderBottomColor: 'transparent',
     },
     tabActive: { borderBottomColor: c.brand },

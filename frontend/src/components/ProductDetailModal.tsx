@@ -848,11 +848,11 @@ function parseCommentMessage(raw: string): ParsedComment {
       result.attachmentName = attMatch[2];
       continue;
     }
-    // Parse reply reference: [reply:123:preview text]
-    const replyMatch = line.match(/^\[reply:(\d+):(.+?)\]$/);
+    // Parse reply reference: [reply:123:preview text] or [reply:123]
+    const replyMatch = line.match(/^\[reply:(\d+)(?::(.+?))?\]$/);
     if (replyMatch) {
       result.replyToId = parseInt(replyMatch[1]);
-      result.replyPreview = replyMatch[2];
+      if (replyMatch[2]) result.replyPreview = replyMatch[2];
       continue;
     }
     // Skip old-style 💬 [Re:...] lines
@@ -875,9 +875,20 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [menuOpenId, setMenuOpenId] = useState<number | null>(null);
   const [lightbox, setLightbox] = useState<{ src: string; attId?: number; filename: string } | null>(null);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const commentRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<MentionInputHandle>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  const highlightComment = (id: number) => {
+    const el = commentRefs.current[id];
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    setHighlightedId(id);
+    highlightTimer.current = setTimeout(() => setHighlightedId(null), 5000);
+  };
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId, 'comment');
@@ -954,6 +965,12 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
             const parsed = parseCommentMessage(c.message);
             const isOwn = c.user_id === user?.id;
             const resolvedAtt = parsed.attachmentId ? attachments.find(a => a.id === parsed.attachmentId) : null;
+
+            // Resolve quoted comment's attachment thumbnail
+            const quotedComment = parsed.replyToId ? comments.find(m => m.id === parsed.replyToId) : null;
+            const quotedParsed = quotedComment ? parseCommentMessage(quotedComment.message) : null;
+            const quotedThumbAtt = quotedParsed?.attachmentId ? attachments.find(a => a.id === quotedParsed.attachmentId) : null;
+            const quotedThumbUrl = quotedThumbAtt && isImageType(quotedThumbAtt.file_type) ? getAttachmentUrl(quotedThumbAtt) : null;
             const attachmentDisplayUrl = resolvedAtt ? getAttachmentUrl(resolvedAtt) : parsed.attachmentUrl;
             const attachmentIsImage = resolvedAtt ? isImageType(resolvedAtt.file_type) : (parsed.attachmentUrl ? isImageUrl(parsed.attachmentUrl) : false);
             const handleAttachmentDownload = (e: React.MouseEvent) => {
@@ -965,8 +982,15 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
               }
             };
 
+            const isHighlighted = highlightedId === c.id;
+
             return (
-              <div key={c.id} className={`group flex gap-2 w-full ${isOwn ? 'justify-end' : 'justify-start'}`}>
+              <div
+                key={c.id}
+                ref={(el) => { commentRefs.current[c.id] = el; }}
+                className={`group flex gap-2 w-full rounded-lg transition-colors duration-500 ${isOwn ? 'justify-end' : 'justify-start'}`}
+                style={{ background: isHighlighted ? 'rgba(99,102,241,0.15)' : 'transparent', padding: '2px 0' }}
+              >
                 {/* Avatar (only for others) */}
                 {!isOwn && (
                   <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-400 to-purple-500 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0 mt-auto mb-1 shadow-sm">
@@ -1028,14 +1052,24 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
                       : 'text-surface-200 rounded-2xl rounded-tl-sm border border-surface-700/50 shadow-sm'
                   }`}>
                     {/* Reply reference */}
-                    {parsed.replyToId && parsed.replyPreview && (
-                      <div className={`mb-1.5 flex items-start gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border-l-2 ${
-                        isOwn 
-                          ? 'bg-black/10 border-white/40 text-white/90' 
-                          : 'bg-surface-900/60 border-brand-500/50 text-surface-300'
-                      }`}>
-                        <Reply className="w-3 h-3 mt-0.5 flex-shrink-0 rotate-180" />
-                        <span className="truncate">{parsed.replyPreview}</span>
+                    {parsed.replyToId && (parsed.replyPreview || quotedThumbUrl) && (
+                      <div
+                        className={`mb-1.5 flex items-stretch gap-0 rounded-lg overflow-hidden border-l-2 cursor-pointer hover:brightness-95 ${
+                          isOwn
+                            ? 'bg-black/10 border-white/40 text-white/90'
+                            : 'bg-surface-900/60 border-brand-500/50 text-surface-300'
+                        }`}
+                        onClick={() => highlightComment(parsed.replyToId!)}
+                      >
+                        <div className="flex flex-1 min-w-0 items-center gap-1.5 px-2.5 py-1.5 text-xs">
+                          <Reply className="w-3 h-3 flex-shrink-0 rotate-180" />
+                          {parsed.replyPreview && <span className="truncate">{parsed.replyPreview}</span>}
+                        </div>
+                        {quotedThumbUrl && (
+                          <div className="w-10 h-10 flex-shrink-0 overflow-hidden">
+                            <img src={quotedThumbUrl} alt="preview" className="w-full h-full object-cover" />
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -1373,8 +1407,19 @@ function CustomerAttachmentsTab({ productId, attachments }: { productId: number;
 function CustomerCommentsTab({ comments, attachments }: { comments: Comment[]; attachments: Attachment[] }) {
   const [lightbox, setLightbox] = useState<{ src: string; filename: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const [highlightedId, setHighlightedId] = useState<number | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const msgRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   useEffect(() => { endRef.current?.scrollIntoView(); }, []);
+
+  const highlightMessage = (id: number) => {
+    const el = msgRefs.current[id];
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    setHighlightedId(id);
+    highlightTimer.current = setTimeout(() => setHighlightedId(null), 5000);
+  };
 
   if (comments.length === 0) {
     return (
@@ -1396,8 +1441,23 @@ function CustomerCommentsTab({ comments, attachments }: { comments: Comment[]; a
           const attachmentIsImage = resolvedAtt ? isImageType(resolvedAtt.file_type) : (parsed.attachmentUrl ? isImageUrl(parsed.attachmentUrl) : false);
           const senderName = c.portal_sender || 'Customer';
 
+          const quotedComment = parsed.replyToId ? comments.find(m => m.id === parsed.replyToId) : null;
+          const quotedPreview = quotedComment
+            ? (() => { const qp = parseCommentMessage(quotedComment.message); return qp.text?.slice(0, 80) || (qp.attachmentName ? `📎 ${qp.attachmentName}` : quotedComment.message.slice(0, 80)); })()
+            : parsed.replyPreview || null;
+          const quotedSender = quotedComment?.portal_sender || null;
+          const quotedThumbAtt = quotedComment ? (() => { const qp = parseCommentMessage(quotedComment.message); return qp.attachmentId ? attachments.find(a => a.id === qp.attachmentId) : null; })() : null;
+          const quotedThumbUrl = quotedThumbAtt && isImageType(quotedThumbAtt.file_type) ? getAttachmentUrl(quotedThumbAtt) : null;
+
+          const isHighlighted = highlightedId === c.id;
+
           return (
-            <div key={c.id} className="flex gap-3 justify-start">
+            <div
+              key={c.id}
+              ref={(el) => { msgRefs.current[c.id] = el; }}
+              className="flex gap-3 justify-start rounded-lg transition-colors duration-500"
+              style={{ background: isHighlighted ? 'rgba(37,211,102,0.15)' : 'transparent', padding: '4px 0' }}
+            >
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-sm font-bold text-white flex-shrink-0 mt-auto mb-1 shadow-sm">
                 {senderName.charAt(0).toUpperCase()}
               </div>
@@ -1407,6 +1467,23 @@ function CustomerCommentsTab({ comments, attachments }: { comments: Comment[]; a
                   <span className="text-[11px] text-surface-500">{formatTime(c.created_at)}</span>
                 </div>
                 <div className="relative px-5 py-3 bg-teal-900/30 border border-teal-700/30 text-surface-200 rounded-2xl rounded-tl-sm shadow-sm">
+                  {(quotedPreview || quotedThumbUrl) && (
+                    <div
+                      className={`mb-2 flex items-stretch gap-0 rounded-lg overflow-hidden border-l-4 border-teal-500 ${quotedComment ? 'cursor-pointer hover:brightness-95' : ''}`}
+                      style={{ background: 'rgba(0,0,0,0.15)' }}
+                      onClick={quotedComment ? () => highlightMessage(quotedComment.id) : undefined}
+                    >
+                      <div className="flex-1 min-w-0 px-2.5 py-1.5">
+                        {quotedSender && <p className="text-[10px] font-semibold text-teal-400 truncate">{quotedSender}</p>}
+                        {quotedPreview && <p className="text-xs text-surface-400 truncate">{quotedPreview}</p>}
+                      </div>
+                      {quotedThumbUrl && (
+                        <div className="w-12 h-12 flex-shrink-0 overflow-hidden">
+                          <img src={quotedThumbUrl} alt="preview" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {parsed.text && (
                     <p className="text-base whitespace-pre-wrap text-surface-200">{parsed.text}</p>
                   )}

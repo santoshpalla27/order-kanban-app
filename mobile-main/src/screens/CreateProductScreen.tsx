@@ -6,7 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useNavigation } from '@react-navigation/native';
-import { productsApi, usersApi } from '../api/services';
+import { productsApi, usersApi, customerLinkApi } from '../api/services';
 import { User } from '../types';
 import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
@@ -36,6 +36,8 @@ export default function CreateProductScreen() {
   const [tempDate, setTempDate] = useState<Date | null>(null);
   const [assigneeIds, setAssigneeIds]   = useState<number[]>([]);
   const [users, setUsers]               = useState<User[]>([]);
+  const [generateLink, setGenerateLink] = useState(false);
+  const [generatedLink, setGeneratedLink] = useState('');
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState('');
 
@@ -56,7 +58,7 @@ export default function CreateProductScreen() {
     setError('');
     setLoading(true);
     try {
-      await productsApi.create({
+      const res = await productsApi.create({
         product_id: productId.trim(),
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
@@ -64,6 +66,19 @@ export default function CreateProductScreen() {
         delivery_at: deliveryAt ? deliveryAt.toISOString() : null,
         assignee_ids: assigneeIds,
       });
+      const newProductId: number = res.data?.id ?? res.data?.product?.id;
+      if (generateLink && newProductId) {
+        try {
+          const linkRes = await customerLinkApi.create(newProductId);
+          const token = linkRes.data?.link?.token;
+          if (token) {
+            const { PORTAL_BASE_URL } = await import('../utils/config');
+            const portalUrl = `${PORTAL_BASE_URL}/portal/${token}`;
+            setGeneratedLink(portalUrl);
+            return; // stay on screen to show link
+          }
+        } catch {}
+      }
       navigation.goBack();
     } catch (err: any) {
       setError(err?.response?.data?.error || 'Failed to create product');
@@ -304,7 +319,46 @@ export default function CreateProductScreen() {
             )}
           </View>
 
+          {/* Generate Customer Link toggle */}
+          <View style={s.field}>
+            <TouchableOpacity
+              style={s.toggleRow}
+              onPress={() => setGenerateLink((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={s.toggleLabel}>Generate Customer Link</Text>
+                <Text style={s.toggleSub}>Create a portal link so the customer can track their order</Text>
+              </View>
+              <View style={[s.toggleTrack, generateLink && s.toggleTrackOn]}>
+                <View style={[s.toggleThumb, generateLink && s.toggleThumbOn]} />
+              </View>
+            </TouchableOpacity>
+          </View>
+
         </ScrollView>
+
+        {/* Generated link modal */}
+        {!!generatedLink && (
+          <View style={s.linkModalBackdrop}>
+            <View style={s.linkModal}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <Feather name="link-2" size={18} color={c.brandLight} />
+                <Text style={s.linkModalTitle}>Customer Link Created!</Text>
+              </View>
+              <Text style={s.linkModalSub}>Share this link with the customer so they can track their order:</Text>
+              <View style={s.linkBox}>
+                <Text style={s.linkText} selectable numberOfLines={2}>{generatedLink}</Text>
+              </View>
+              <TouchableOpacity
+                style={s.createBtn}
+                onPress={() => navigation.goBack()}
+              >
+                <Text style={s.createBtnText}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -384,5 +438,22 @@ function makeStyles(c: ThemeColors) {
     availableChipText: { fontSize: 13, color: c.textMuted },
 
     noUsers: { fontSize: 13, color: c.textDim, fontStyle: 'italic' },
+
+    // Toggle
+    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: c.surface, borderRadius: 14, borderWidth: 1, borderColor: c.border2, paddingHorizontal: 16, paddingVertical: 14 },
+    toggleLabel: { fontSize: 14, fontWeight: '600', color: c.text },
+    toggleSub: { fontSize: 12, color: c.textDim },
+    toggleTrack: { width: 44, height: 26, borderRadius: 13, backgroundColor: c.surface2, justifyContent: 'center', paddingHorizontal: 3 },
+    toggleTrackOn: { backgroundColor: c.brand },
+    toggleThumb: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff', alignSelf: 'flex-start' },
+    toggleThumbOn: { alignSelf: 'flex-end' },
+
+    // Generated link modal
+    linkModalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+    linkModal: { width: '100%', backgroundColor: c.card, borderRadius: 20, padding: 24, gap: 12, borderWidth: 1, borderColor: c.border2 },
+    linkModalTitle: { fontSize: 16, fontWeight: '700', color: c.text },
+    linkModalSub: { fontSize: 13, color: c.textSec },
+    linkBox: { backgroundColor: c.surface, borderRadius: 12, borderWidth: 1, borderColor: c.border2, padding: 12 },
+    linkText: { fontSize: 13, color: c.brandLight, fontFamily: 'monospace' },
   });
 }
