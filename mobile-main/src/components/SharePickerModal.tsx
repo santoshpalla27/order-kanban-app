@@ -156,7 +156,7 @@ export default function SharePickerModal({ visible, files, onDone }: Props) {
       statusBarTranslucent
     >
       <View style={styles.overlay}>
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+        <View style={[styles.sheet, { paddingBottom: insets.bottom + 36 }]}>
 
           {/* ── Header ── */}
           <View style={styles.header}>
