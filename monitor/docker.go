@@ -79,6 +79,45 @@ type ContainerStat struct {
 	Created    int64   `json:"created"`
 }
 
+type VolumeStat struct {
+	Name  string `json:"name"`
+	Links int    `json:"links"`
+	Size  int64  `json:"size"`
+}
+
+func collectVolumes() ([]VolumeStat, error) {
+	cli := dockerClient()
+
+	resp, err := cli.Get(dockerAPI + "/system/df")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var state struct {
+		Volumes []struct {
+			Name      string `json:"Name"`
+			UsageData struct {
+				RefCount int   `json:"RefCount"`
+				Size     int64 `json:"Size"`
+			} `json:"UsageData"`
+		} `json:"Volumes"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&state); err != nil {
+		return nil, err
+	}
+
+	out := make([]VolumeStat, 0, len(state.Volumes))
+	for _, v := range state.Volumes {
+		out = append(out, VolumeStat{
+			Name:  v.Name,
+			Links: v.UsageData.RefCount,
+			Size:  v.UsageData.Size,
+		})
+	}
+	return out, nil
+}
+
 func collectContainers() ([]ContainerStat, error) {
 	cli := dockerClient()
 

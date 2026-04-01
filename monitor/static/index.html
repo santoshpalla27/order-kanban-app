@@ -179,6 +179,26 @@ tbody tr:hover td { background: rgba(255,255,255,.025); }
     </table>
   </div>
 
+  <!-- Volumes -->
+  <div class="section-head" style="margin-top:28px">
+    <span class="section-title">Volumes</span>
+    <span class="container-count" id="volume-count"></span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Links</th>
+          <th>Size</th>
+        </tr>
+      </thead>
+      <tbody id="vbody">
+        <tr><td colspan="3" class="empty">Connecting…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
 </div>
 
 <!-- Log modal -->
@@ -301,11 +321,35 @@ async function fetchContainers() {
   }).join('');
 }
 
+// ── Volume stats ───────────────────────────────────────────────────────────
+async function fetchVolumes() {
+  const list = await fetch('/api/volumes').then(r => r.json());
+  
+  if (!list || !list.length) {
+    document.getElementById('vbody').innerHTML = '<tr><td colspan="3" class="empty">No volumes found</td></tr>';
+    document.getElementById('volume-count').textContent = '0 volumes';
+    return;
+  }
+
+  list.sort((a, b) => a.name.localeCompare(b.name));
+
+  document.getElementById('volume-count').textContent = list.length + (list.length === 1 ? ' volume' : ' volumes');
+
+  document.getElementById('vbody').innerHTML = list.map(v => {
+    const sizeStr = (v.size === undefined || v.size < 0) ? 'Unknown' : B(v.size);
+    return `<tr>
+      <td class="name-cell"><strong>${v.name}</strong></td>
+      <td style="color:var(--muted)">${v.links}</td>
+      <td><strong>${sizeStr}</strong></td>
+    </tr>`;
+  }).join('');
+}
+
 // ── Refresh loop ───────────────────────────────────────────────────────────
 async function refresh() {
   document.getElementById('dot').classList.add('loading');
   try {
-    await Promise.all([fetchSystem(), fetchContainers()]);
+    await Promise.all([fetchSystem(), fetchContainers(), fetchVolumes()]);
     document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
   } catch (e) {
     document.getElementById('updated').textContent = 'Error — retrying…';

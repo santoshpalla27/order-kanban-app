@@ -28,6 +28,7 @@ func main() {
 	mux.Handle("/", http.FileServer(http.FS(sub)))
 	mux.HandleFunc("/api/system", handleSystem)
 	mux.HandleFunc("/api/containers", handleContainers)
+	mux.HandleFunc("/api/volumes", handleVolumes)
 	mux.HandleFunc("/api/logs/", handleLogs)
 
 	log.Printf("monitor listening on :%s", port)
@@ -47,6 +48,15 @@ func handleSystem(w http.ResponseWriter, r *http.Request) {
 
 func handleContainers(w http.ResponseWriter, r *http.Request) {
 	list, err := collectContainers()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respond(w, list)
+}
+
+func handleVolumes(w http.ResponseWriter, r *http.Request) {
+	list, err := collectVolumes()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
