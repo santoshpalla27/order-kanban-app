@@ -117,8 +117,6 @@ npx expo prebuild --clean --platform android
 cd android
 ./gradlew assembleRelease --max-workers=2
 
-# ── Serve APK for download ───────────────────────────────────────────────────
-
 cd app/build/outputs/apk/release/
 python3 -m http.server 8000 --bind 0.0.0.0
 

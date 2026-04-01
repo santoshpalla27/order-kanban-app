@@ -110,7 +110,7 @@ export default function SharePickerModal({ visible, files, onDone }: Props) {
           const att = res.data;
           await commentsApi.create(
             selectedProduct.id,
-            `[attachment:${att.id}:${att.file_name}]`,
+            `📎 Uploaded: ${att.file_name}\n[attachment:${att.id}:${att.file_name}]`,
           );
         }
       } catch (err: any) {

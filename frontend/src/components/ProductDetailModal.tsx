@@ -1182,7 +1182,7 @@ function CommentsTab({ productId, comments, attachments }: { productId: number; 
           <Reply className="w-3.5 h-3.5 text-brand-400 flex-shrink-0 rotate-180" />
           <div className="flex-1 min-w-0">
             <p className="text-xs text-brand-400 font-medium">{replyTo.user?.name}</p>
-            <p className="text-xs text-surface-400 truncate">{parseCommentMessage(replyTo.message).text.slice(0, 60)}</p>
+            {(() => { const p = parseCommentMessage(replyTo.message); const preview = p.text.slice(0, 60) || (p.attachmentName ? `📎 ${p.attachmentName}` : ''); return <p className="text-xs text-surface-400 truncate">{preview}</p>; })()}
           </div>
           <button onClick={() => setReplyTo(null)} className="btn-ghost p-1 rounded"><X className="w-3 h-3" /></button>
         </div>
