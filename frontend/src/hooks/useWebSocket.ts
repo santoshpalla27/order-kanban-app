@@ -79,8 +79,7 @@ export function useWebSocket() {
           case 'activity_updated':
             queryClient.invalidateQueries({ queryKey: ['activity-full'] });
             if (data.payload?.actor_name && data.payload?.actor_id !== currentUserId &&
-                data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment' &&
-                data.payload?.entity !== 'product') {
+                data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment') {
               const actorName = (data.payload.actor_name as string) || '';
               const actMsg = (data.payload.message as string) || 'Activity updated';
               const actEntityId = (data.payload.entity_id as number) || 0;
@@ -106,8 +105,8 @@ export function useWebSocket() {
             // Suppress toast and sound when user is already on the chat page
             if (isChatNotif && window.location.pathname.includes('/chat')) break;
             const ntype = data.payload?.notif_type || 'notification';
-            // Suppress toast for status_change — bell badge already increments above
-            if (ntype === 'status_change') break;
+            // Suppress toast for status_change and product_created — activity toast handles those
+            if (ntype === 'status_change' || ntype === 'product_created') break;
             const msg = data.payload?.message || 'New notification';
             const entityId = (data.payload?.entity_id as number) || 0;
             const content = (data.payload?.content as string) || '';

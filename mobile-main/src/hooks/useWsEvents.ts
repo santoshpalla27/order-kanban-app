@@ -65,8 +65,7 @@ export function useWsEvents(callbacks?: WsCallbacks) {
         case 'activity_updated':
           cb?.onActivityChanged?.();
           if (data.payload?.actor_id !== currentUserId &&
-              data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment' &&
-              data.payload?.entity !== 'product') {
+              data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment') {
             addToast({
               message: data.payload?.message || 'Activity updated',
               content: '', type: 'activity', entityType: 'activity',
@@ -82,8 +81,9 @@ export function useWsEvents(callbacks?: WsCallbacks) {
           // Suppress chat notification toasts when the user is already on the chat screen
           const isChatNotif = entityType === 'chat';
           const isStatusChange = (data.payload?.notif_type || '') === 'status_change';
-          // Suppress toast for status_change — bell badge already increments via refreshUnreadCount
-          if (!isStatusChange && (!isChatNotif || !useNotificationStore.getState().chatScreenActive)) {
+          const isProductCreated = (data.payload?.notif_type || '') === 'product_created';
+          // Suppress toast for status_change and product_created — activity toast handles those
+          if (!isStatusChange && !isProductCreated && (!isChatNotif || !useNotificationStore.getState().chatScreenActive)) {
             addToast({
               message: data.payload?.message || 'New notification',
               content: data.payload?.content || '',
