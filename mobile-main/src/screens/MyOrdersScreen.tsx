@@ -151,7 +151,7 @@ export default function MyOrdersScreen() {
 
   useWsEvents({ onProductsChanged: () => handleRefresh() });
 
-  const { hasAny } = useProductBadges();
+  const { badges, hasAny } = useProductBadges();
 
   const handleStatusChange = async (product: Product, newStatus: string) => {
     setProducts((prev) =>
@@ -221,6 +221,9 @@ export default function MyOrdersScreen() {
             const active = filters.status === tab.key;
             const count  = counts[tab.key];
             const color  = TAB_COLORS[tab.key];
+            const notifCount = tab.key === ''
+              ? Object.keys(badges).length
+              : products.filter((p) => p.status === tab.key && badges[p.id]?.size > 0).length;
             return (
               <TouchableOpacity
                 style={[
@@ -240,6 +243,7 @@ export default function MyOrdersScreen() {
                     <Text style={[styles.countText, active && { color }]}>{count}</Text>
                   </View>
                 )}
+                {notifCount > 0 && <View style={styles.notifDot} />}
               </TouchableOpacity>
             );
           }}
@@ -386,6 +390,12 @@ function makeStyles(c: ThemeColors) {
       paddingVertical: 1,
     },
     countText: { fontSize: 11, fontWeight: '700', color: c.textMuted },
+    notifDot: {
+      position: 'absolute', top: -4, right: -4,
+      width: 10, height: 10, borderRadius: 5,
+      backgroundColor: '#EF4444',
+      borderWidth: 2, borderColor: c.bg,
+    },
     listContent: { padding: 16, paddingBottom: 100 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     empty: { alignItems: 'center', paddingTop: 80, gap: 8 },

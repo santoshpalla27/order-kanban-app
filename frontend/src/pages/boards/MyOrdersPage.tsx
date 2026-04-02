@@ -57,7 +57,7 @@ function useTabCounts(baseFilters: Record<string, string>) {
 
 export default function MyOrdersPage() {
   const { user } = useAuthStore();
-  const { hasAny } = useProductBadges();
+  const { hasAny, badges } = useProductBadges();
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -179,11 +179,14 @@ export default function MyOrdersPage() {
         {TABS.map(({ key, label }) => {
           const count    = counts[key];
           const isActive = filters.status === key;
+          const notifCount = key === ''
+            ? Object.keys(badges).length
+            : items.filter((p) => p.status === key && (badges as any)[p.id]?.size > 0).length;
           return (
             <button
               key={key}
               onClick={() => setFilters({ ...filters, status: key })}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all duration-150 whitespace-nowrap flex-shrink-0 ${
+              className={`relative flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all duration-150 whitespace-nowrap flex-shrink-0 ${
                 isActive ? TAB_ACTIVE[key] : TAB_IDLE
               }`}
             >
@@ -195,6 +198,9 @@ export default function MyOrdersPage() {
                 }`}>
                   {count}
                 </span>
+              )}
+              {notifCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-surface-950" />
               )}
             </button>
           );
