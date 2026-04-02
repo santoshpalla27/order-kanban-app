@@ -7,12 +7,16 @@ import { useAuthStore } from '../../store/authStore';
 import { Users, UserPlus, Trash2, Shield, X, AlertTriangle, Check } from 'lucide-react';
 
 const ROLES = [
-  { id: 1, name: 'admin', label: 'Admin', color: 'text-red-400 bg-red-500/10' },
-  { id: 2, name: 'manager', label: 'Manager', color: 'text-amber-400 bg-amber-500/10' },
-  { id: 3, name: 'organiser', label: 'Organiser', color: 'text-violet-400 bg-violet-500/10' },
+  { id: 1, name: 'admin',    label: 'Admin',    color: 'text-red-400 bg-red-500/10' },
+  { id: 2, name: 'manager',  label: 'Manager',  color: 'text-amber-400 bg-amber-500/10' },
+  { id: 3, name: 'organiser',label: 'Organiser',color: 'text-violet-400 bg-violet-500/10' },
   { id: 4, name: 'employee', label: 'Employee', color: 'text-blue-400 bg-blue-500/10' },
-  { id: 5, name: 'view_only', label: 'View Only', color: 'text-surface-400 bg-surface-500/10' },
+  { id: 5, name: 'view_only',label: 'View Only',color: 'text-surface-400 bg-surface-500/10' },
+  { id: 6, name: 'pending',  label: 'Pending',  color: 'text-yellow-400 bg-yellow-500/10' },
 ];
+
+// Roles the admin can assign — "pending" is not a target role, only a source state
+const ASSIGNABLE_ROLES = ROLES.filter((r) => r.id !== 6);
 
 function ConfirmDeleteModal({ userName, onConfirm, onCancel, isPending }: {
   userName: string;
@@ -122,14 +126,22 @@ export default function AdminPanel() {
             <tbody>
               {users.map((u) => {
                 const roleStyle = ROLES.find((r) => r.id === u.role_id);
+                const isPendingUser = u.role_id === 6;
                 return (
-                  <tr key={u.id} className="border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors">
+                  <tr key={u.id} className={`border-b border-surface-700/20 hover:bg-surface-700/20 transition-colors ${isPendingUser ? 'bg-yellow-500/5' : ''}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-purple-500 flex items-center justify-center text-sm font-bold text-white">
                           {u.name.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-medium text-sm">{u.name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{u.name}</span>
+                          {isPendingUser && (
+                            <span className="text-[10px] font-semibold text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-full border border-yellow-500/20">
+                              Awaiting Approval
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-surface-400">{u.email}</td>
@@ -140,7 +152,9 @@ export default function AdminPanel() {
                         disabled={u.id === currentUser?.id}
                         className={`text-xs px-3 py-1.5 rounded-full ${roleStyle?.color || ''} border-0`}
                       >
-                        {ROLES.map((r) => (
+                        {/* Show "Pending" as current value, but only offer real roles for reassignment */}
+                        {isPendingUser && <option value={6}>Pending</option>}
+                        {ASSIGNABLE_ROLES.map((r) => (
                           <option key={r.id} value={r.id}>{r.label}</option>
                         ))}
                       </select>
@@ -236,7 +250,7 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
           <div>
             <label className="block text-sm font-medium text-surface-300 mb-1.5">Role</label>
             <select value={roleId} onChange={(e) => setRoleId(Number(e.target.value))} className="w-full">
-              {ROLES.map((r) => (
+              {ASSIGNABLE_ROLES.map((r) => (
                 <option key={r.id} value={r.id}>{r.label}</option>
               ))}
             </select>

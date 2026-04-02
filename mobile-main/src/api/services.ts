@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
-import api from './client';
+import api, { doTokenRefresh } from './client';
 import { API_BASE_URL } from '../utils/config';
 import { tokenManager } from '../utils/tokenManager';
 
@@ -13,6 +13,7 @@ export const authApi = {
   register: (name: string, email: string, password: string) =>
     api.post('/auth/register', { name, email, password }),
   getMe: () => api.get('/auth/me'),
+  refreshTokens: () => doTokenRefresh(),
   logout: async () => {
     const refreshToken = await tokenManager.getRefreshToken();
     if (refreshToken) {

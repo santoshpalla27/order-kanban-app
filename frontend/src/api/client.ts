@@ -69,6 +69,10 @@ export const authApi = {
   register: (name: string, email: string, password: string) =>
     api.post('/auth/register', { name, email, password }),
   getMe: () => api.get('/auth/me'),
+  /** Rotates the access + refresh token pair. Used after role change (e.g. pending → approved). */
+  refreshTokens: () => doTokenRefresh(),
+  logout: (refreshToken?: string) =>
+    api.post('/auth/logout', refreshToken ? { refresh_token: refreshToken } : {}),
 };
 
 // Products

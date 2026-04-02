@@ -103,6 +103,7 @@ func seedRoles() {
 		{ID: 3, Name: "organiser"},
 		{ID: 4, Name: "employee"},
 		{ID: 5, Name: "view_only"},
+		{ID: 6, Name: "pending"},
 	}
 	for _, role := range roles {
 		// Save upserts by primary key — renames existing roles (e.g. "worker" → "organiser")

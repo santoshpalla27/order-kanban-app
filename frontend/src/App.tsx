@@ -6,6 +6,7 @@ import { authApi } from './api/client';
 import Layout from './components/Layout';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import PendingPage from './pages/auth/PendingPage';
 import KanbanBoard from './pages/kanban/KanbanBoard';
 import ErrorBoundary from './components/ErrorBoundary';
 import CustomerPortalPage from './pages/portal/CustomerPortalPage';
@@ -48,8 +49,9 @@ const queryClient = new QueryClient({
 });
 
 function ProtectedRoute({ children, adminOnly = false, trashOnly = false, statsOnly = false }: { children: React.ReactNode; adminOnly?: boolean; trashOnly?: boolean; statsOnly?: boolean }) {
-  const { token, isAdmin, canAccessTrash, canViewStats } = useAuthStore();
+  const { token, user, isAdmin, canAccessTrash, canViewStats } = useAuthStore();
   if (!token) return <Navigate to="/login" replace />;
+  if (user?.role?.name === 'pending') return <Navigate to="/pending" replace />;
   if (adminOnly && !isAdmin()) return <Navigate to="/" replace />;
   if (trashOnly && !canAccessTrash()) return <Navigate to="/" replace />;
   if (statsOnly && !canViewStats()) return <Navigate to="/" replace />;
@@ -84,6 +86,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/pending" element={<PendingPage />} />
             <Route
               element={
                 <ProtectedRoute>

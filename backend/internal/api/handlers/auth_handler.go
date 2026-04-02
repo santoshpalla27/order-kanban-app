@@ -38,7 +38,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 	}
 
 	existingUsers, _ := services.GetUsers()
-	roleID := uint(5) // view_only — admin promotes from the admin panel after review
+	roleID := uint(6) // pending — admin approves from the admin panel
 	if len(existingUsers) == 0 {
 		roleID = 1 // first user becomes admin
 	}

@@ -80,100 +80,105 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 		// Logout — no auth middleware so expired-access-token clients can still call it
 		api.POST("/auth/logout", authHandler.Logout)
 
-		// Protected routes
+		// Protected routes — requires valid JWT
 		protected := api.Group("")
 		protected.Use(middleware.AuthMiddleware(cfg))
 		{
-			// Auth
+			// These two are accessible even while role == "pending" so the client
+			// can poll its own profile and log out without hitting the approval gate.
 			protected.GET("/auth/me", authHandler.GetMe)
 
-			// WebSocket
-			protected.GET("/ws", handlers.HandleWebSocket)
-
-			// Products
-			products := protected.Group("/products")
+			// All remaining routes require an approved (non-pending) account
+			approved := protected.Group("")
+			approved.Use(middleware.ApprovedOnly())
 			{
-				products.GET("", productHandler.GetProducts)
-				products.GET("/deleted", middleware.RBACMiddleware("admin", "manager"), productHandler.GetDeletedProducts)
-				products.POST("/:id/restore", middleware.RBACMiddleware("admin", "manager"), productHandler.RestoreProduct)
-				products.GET("/:id", productHandler.GetProduct)
-				products.POST("", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.CreateProduct)
-				products.PUT("/:id", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UpdateProduct)
-				products.PATCH("/:id/status", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UpdateStatus)
-				products.DELETE("/:id", middleware.RBACMiddleware("admin", "manager"), productHandler.DeleteProduct)
+				// WebSocket
+				approved.GET("/ws", handlers.HandleWebSocket)
 
-				// Attachments (nested under products/:id)
-				products.GET("/:id/attachments", attachmentHandler.GetByProduct)
+				// Products
+				products := approved.Group("/products")
+				{
+					products.GET("", productHandler.GetProducts)
+					products.GET("/deleted", middleware.RBACMiddleware("admin", "manager"), productHandler.GetDeletedProducts)
+					products.POST("/:id/restore", middleware.RBACMiddleware("admin", "manager"), productHandler.RestoreProduct)
+					products.GET("/:id", productHandler.GetProduct)
+					products.POST("", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.CreateProduct)
+					products.PUT("/:id", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UpdateProduct)
+					products.PATCH("/:id/status", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UpdateStatus)
+					products.DELETE("/:id", middleware.RBACMiddleware("admin", "manager"), productHandler.DeleteProduct)
 
-				products.GET("/:id/attachments/presign", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), attachmentHandler.GetPresignedUploadURL)
-				products.POST("/:id/attachments/confirm", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), attachmentHandler.ConfirmUpload)
+					// Attachments (nested under products/:id)
+					products.GET("/:id/attachments", attachmentHandler.GetByProduct)
+					products.GET("/:id/attachments/presign", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), attachmentHandler.GetPresignedUploadURL)
+					products.POST("/:id/attachments/confirm", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), attachmentHandler.ConfirmUpload)
 
-				// Comments (nested under products/:id)
-				products.GET("/:id/comments", commentHandler.GetByProduct)
-				products.POST("/:id/comments", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Create)
+					// Comments (nested under products/:id)
+					products.GET("/:id/comments", commentHandler.GetByProduct)
+					products.POST("/:id/comments", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Create)
 
-				// Customer link management (nested under products/:id)
-				products.GET("/:id/customer-link", customerLinkHandler.Get)
-				products.POST("/:id/customer-link", middleware.RBACMiddleware("admin", "manager", "organiser"), customerLinkHandler.Create)
-				products.DELETE("/:id/customer-link/:linkId", middleware.RBACMiddleware("admin", "manager", "organiser"), customerLinkHandler.Deactivate)
+					// Customer link management (nested under products/:id)
+					products.GET("/:id/customer-link", customerLinkHandler.Get)
+					products.POST("/:id/customer-link", middleware.RBACMiddleware("admin", "manager", "organiser"), customerLinkHandler.Create)
+					products.DELETE("/:id/customer-link/:linkId", middleware.RBACMiddleware("admin", "manager", "organiser"), customerLinkHandler.Deactivate)
+				}
+
+				// Standalone attachment/comment routes
+				approved.GET("/attachments/:id/download", attachmentHandler.Download)
+				approved.DELETE("/attachments/:id", attachmentHandler.Delete)
+				approved.GET("/activity", activityHandler.GetRecent)
+				approved.PUT("/comments/:id", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Update)
+				approved.DELETE("/comments/:id", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Delete)
+
+				// Chat
+				chat := approved.Group("/chat")
+				{
+					chat.GET("/messages", chatHandler.GetMessages)
+					chat.POST("/messages", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), chatHandler.SendMessage)
+				}
+
+				// Notifications
+				notifications := approved.Group("/notifications")
+				{
+					notifications.GET("", notificationHandler.GetNotifications)
+					notifications.GET("/unread-count", notificationHandler.GetUnreadCount)
+					notifications.PATCH("/:id/read", notificationHandler.MarkAsRead)
+					notifications.POST("/read-all", notificationHandler.MarkAllAsRead)
+					notifications.GET("/unread-summary", notificationHandler.GetUnreadSummary)
+					notifications.POST("/read-by-entity-type", notificationHandler.MarkReadByEntityAndTypes)
+				}
+
+				// Profile management (all approved users)
+				approved.GET("/users/me/avatar-presign", userHandler.GetAvatarUploadURL)
+				approved.PATCH("/users/me", userHandler.UpdateProfile)
+
+				// Users - admin only
+				users := approved.Group("/users")
+				users.Use(middleware.RBACMiddleware("admin"))
+				{
+					users.GET("", userHandler.GetUsers)
+					users.POST("", userHandler.CreateUser)
+					users.PATCH("/:id/role", userHandler.UpdateRole)
+					users.DELETE("/:id", userHandler.DeleteUser)
+				}
+
+				// Stats — admin and manager only
+				approved.GET("/stats", middleware.RBACMiddleware("admin", "manager"), statsHandler.GetStats)
+
+				// Purge status — admin only
+				purge := approved.Group("/purge-status")
+				purge.Use(middleware.RBACMiddleware("admin"))
+				{
+					purge.GET("", purgeHandler.GetStatus)
+					purge.GET("/preview/:job", purgeHandler.PreviewJob)
+					purge.GET("/rows/:job", purgeHandler.GetRows)
+					purge.POST("/run/:job", purgeHandler.RunJob)
+				}
+
+				// Users list for filters (all approved users)
+				approved.GET("/users/list", func(c *gin.Context) {
+					userHandler.GetUsers(c)
+				})
 			}
-
-			// Standalone attachment/comment routes
-			protected.GET("/attachments/:id/download", attachmentHandler.Download)
-			protected.DELETE("/attachments/:id", attachmentHandler.Delete)
-			protected.GET("/activity", activityHandler.GetRecent)
-			protected.PUT("/comments/:id", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Update)
-			protected.DELETE("/comments/:id", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), commentHandler.Delete)
-
-			// Chat
-			chat := protected.Group("/chat")
-			{
-				chat.GET("/messages", chatHandler.GetMessages)
-				chat.POST("/messages", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), chatHandler.SendMessage)
-			}
-
-			// Notifications
-			notifications := protected.Group("/notifications")
-			{
-				notifications.GET("", notificationHandler.GetNotifications)
-				notifications.GET("/unread-count", notificationHandler.GetUnreadCount)
-				notifications.PATCH("/:id/read", notificationHandler.MarkAsRead)
-				notifications.POST("/read-all", notificationHandler.MarkAllAsRead)
-				notifications.GET("/unread-summary", notificationHandler.GetUnreadSummary)
-				notifications.POST("/read-by-entity-type", notificationHandler.MarkReadByEntityAndTypes)
-			}
-
-			// Profile management (all authenticated users)
-			protected.GET("/users/me/avatar-presign", userHandler.GetAvatarUploadURL)
-			protected.PATCH("/users/me", userHandler.UpdateProfile)
-
-			// Users - admin only
-			users := protected.Group("/users")
-			users.Use(middleware.RBACMiddleware("admin"))
-			{
-				users.GET("", userHandler.GetUsers)
-				users.POST("", userHandler.CreateUser)
-				users.PATCH("/:id/role", userHandler.UpdateRole)
-				users.DELETE("/:id", userHandler.DeleteUser)
-			}
-
-			// Stats — admin and manager only
-			protected.GET("/stats", middleware.RBACMiddleware("admin", "manager"), statsHandler.GetStats)
-
-			// Purge status — admin only
-			purge := protected.Group("/purge-status")
-			purge.Use(middleware.RBACMiddleware("admin"))
-			{
-				purge.GET("", purgeHandler.GetStatus)
-				purge.GET("/preview/:job", purgeHandler.PreviewJob)
-				purge.GET("/rows/:job", purgeHandler.GetRows)
-				purge.POST("/run/:job", purgeHandler.RunJob)
-			}
-
-			// Users list for filters (all authenticated users)
-			protected.GET("/users/list", func(c *gin.Context) {
-				userHandler.GetUsers(c)
-			})
 		}
 	}
 

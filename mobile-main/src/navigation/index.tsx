@@ -19,6 +19,7 @@ import { usePushToken } from '../hooks/usePushToken';
 import { Feather } from '@expo/vector-icons';
 
 import LoginScreen          from '../screens/LoginScreen';
+import PendingScreen        from '../screens/PendingScreen';
 import ListScreen           from '../screens/ListScreen';
 import MyOrdersScreen       from '../screens/MyOrdersScreen';
 import ProductDetailScreen  from '../screens/ProductDetailScreen';
@@ -33,6 +34,7 @@ import { useShareStore } from '../store/shareStore';
 
 export type RootStackParamList = {
   Login:         undefined;
+  Pending:       undefined;
   MainTabs:      undefined;
   ProductDetail: { productId: number };
   CreateProduct: undefined;
@@ -181,6 +183,8 @@ function PushTapHandler({ token }: { token: string }) {
 // ── App navigator ─────────────────────────────────────────────────────────────
 function AppNavigator() {
   const token   = useAuthStore((s) => s.token);
+  const user    = useAuthStore((s) => s.user);
+  const isPending = !!token && user?.role?.name === 'pending';
   const isDark  = useThemeStore((s) => s.isDark);
   const c       = isDark ? darkColors : lightColors;
   const { refreshUnreadCount } = useNotificationStore();
@@ -212,6 +216,8 @@ function AppNavigator() {
       >
         {!token ? (
           <Stack.Screen name="Login" component={LoginScreen} />
+        ) : isPending ? (
+          <Stack.Screen name="Pending" component={PendingScreen} />
         ) : (
           <>
             <Stack.Screen name="MainTabs"      component={MainTabs} />
