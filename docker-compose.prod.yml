@@ -38,7 +38,7 @@ services:
       - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
       - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-      - --log.level=DEBUG
+      - --log.level=INFO
       - --accesslog=false
     ports:
       - "80:80"
@@ -155,6 +155,38 @@ services:
       options:
         max-size: "20m"
         max-file: "5"
+
+  push-service:
+    image: santoshpalla27/gift-highway:push-service
+    container_name: kanban-push-service
+    restart: unless-stopped
+    environment:
+      - PORT=4001
+      - DATABASE_URL=postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kanban}?sslmode=disable
+      - EXPO_ACCESS_TOKEN=${EXPO_ACCESS_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - kanban-net
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.push.rule=Host(`${DOMAIN}`) && PathPrefix(`/push-api`)
+      - traefik.http.routers.push.entrypoints=websecure
+      - traefik.http.routers.push.tls.certresolver=letsencrypt
+      - traefik.http.middlewares.push-strip.stripprefix.prefixes=/push-api
+      - traefik.http.routers.push.middlewares=push-strip
+      - traefik.http.services.push.loadbalancer.server.port=4001
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     image: santoshpalla27/gift-highway:frontend
