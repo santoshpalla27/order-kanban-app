@@ -169,12 +169,13 @@ tbody tr:hover td { background: rgba(255,255,255,.025); }
           <th>State</th>
           <th>CPU %</th>
           <th>Memory</th>
+          <th>Disk I/O</th>
           <th>Network I/O</th>
           <th>Logs</th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="7" class="empty">Connecting…</td></tr>
+        <tr><td colspan="8" class="empty">Connecting…</td></tr>
       </tbody>
     </table>
   </div>
@@ -207,6 +208,7 @@ tbody tr:hover td { background: rgba(255,255,255,.025); }
     <div class="modal-head">
       <span class="modal-title" id="modal-title">Logs</span>
       <div class="modal-actions">
+        <input type="text" id="log-search" placeholder="Filter logs..." style="background:var(--surface2); border:1px solid var(--border); color:var(--text); padding:4px 8px; border-radius:5px; font-size:12px; margin-right:8px;" oninput="filterLogs()">
         <button class="refresh-logs-btn" onclick="reloadLogs()">↺ Refresh</button>
         <button class="close-btn" onclick="closeModal()">×</button>
       </div>
@@ -219,6 +221,7 @@ tbody tr:hover td { background: rgba(255,255,255,.025); }
 'use strict';
 
 let currentLogId = null;
+let currentLogLines = [];
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
 const B = (n) => {
@@ -309,12 +312,17 @@ async function fetchContainers() {
       ? `<span style="color:var(--muted);font-size:12px">↓${B(c.net_rx)} ↑${B(c.net_tx)}</span>`
       : `<span style="color:var(--muted)">—</span>`;
 
+    const diskCell = on
+      ? `<span style="color:var(--muted);font-size:12px">R ${B(c.disk_read)}<br>W ${B(c.disk_write)}</span>`
+      : `<span style="color:var(--muted)">—</span>`;
+
     return `<tr>
       <td class="name-cell"><strong>${c.name}</strong><span>${c.id}</span></td>
       <td style="color:var(--muted);font-size:12px">${img}</td>
       <td><span class="badge ${c.state}">${c.state}</span></td>
       <td>${cpuCell}</td>
       <td>${memCell}</td>
+      <td>${diskCell}</td>
       <td>${netCell}</td>
       <td><button class="log-btn" onclick="openLogs('${c.id}','${c.name}')">Logs</button></td>
     </tr>`;
@@ -366,6 +374,7 @@ async function openLogs(id, name) {
   currentLogId = id;
   document.getElementById('modal-title').textContent = name + ' — last 300 lines';
   document.getElementById('log-pre').textContent = 'Loading…';
+  document.getElementById('log-search').value = '';
   document.getElementById('overlay').classList.add('open');
   await loadLogs(id);
 }
@@ -373,12 +382,27 @@ async function openLogs(id, name) {
 async function loadLogs(id) {
   try {
     const d = await fetch('/api/logs/' + id).then(r => r.json());
-    const pre = document.getElementById('log-pre');
-    pre.textContent = d.logs.length ? d.logs.join('\n') : '(no log output)';
-    pre.parentElement.scrollTop = pre.parentElement.scrollHeight;
+    currentLogLines = d.logs || [];
+    filterLogs();
   } catch (e) {
     document.getElementById('log-pre').textContent = 'Error fetching logs: ' + e.message;
   }
+}
+
+function filterLogs() {
+  const term = document.getElementById('log-search').value.toLowerCase();
+  const pre = document.getElementById('log-pre');
+  if (!currentLogLines.length) {
+    pre.textContent = '(no log output)';
+    return;
+  }
+  if (!term) {
+    pre.textContent = currentLogLines.join('\n');
+  } else {
+    const filtered = currentLogLines.filter(line => line.toLowerCase().includes(term));
+    pre.textContent = filtered.length ? filtered.join('\n') : '(no logs match filter)';
+  }
+  pre.parentElement.scrollTop = pre.parentElement.scrollHeight;
 }
 
 async function reloadLogs() {

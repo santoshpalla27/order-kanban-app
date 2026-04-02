@@ -60,6 +60,12 @@ type dockerStats struct {
 		RxBytes uint64 `json:"rx_bytes"`
 		TxBytes uint64 `json:"tx_bytes"`
 	} `json:"networks"`
+	BlkioStats struct {
+		IoServiceBytesRecursive []struct {
+			Op    string `json:"op"`
+			Value uint64 `json:"value"`
+		} `json:"io_service_bytes_recursive"`
+	} `json:"blkio_stats"`
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -74,6 +80,8 @@ type ContainerStat struct {
 	MemUsed    uint64  `json:"mem_used"`
 	MemLimit   uint64  `json:"mem_limit"`
 	MemPercent float64 `json:"mem_percent"`
+	DiskRead   uint64  `json:"disk_read"`
+	DiskWrite  uint64  `json:"disk_write"`
 	NetRx      uint64  `json:"net_rx"`
 	NetTx      uint64  `json:"net_tx"`
 	Created    int64   `json:"created"`
@@ -150,6 +158,8 @@ func collectContainers() ([]ContainerStat, error) {
 				cs.MemUsed = raw.memUsed
 				cs.MemLimit = raw.memLimit
 				cs.MemPercent = raw.memPct
+				cs.DiskRead = raw.diskRead
+				cs.DiskWrite = raw.diskWrite
 				cs.NetRx = raw.netRx
 				cs.NetTx = raw.netTx
 			}
@@ -178,12 +188,14 @@ func fetchLogs(id string, tail int) ([]string, error) {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 type rawStat struct {
-	cpu      float64
-	memUsed  uint64
-	memLimit uint64
-	memPct   float64
-	netRx    uint64
-	netTx    uint64
+	cpu       float64
+	memUsed   uint64
+	memLimit  uint64
+	memPct    float64
+	netRx     uint64
+	netTx     uint64
+	diskRead  uint64
+	diskWrite uint64
 }
 
 func getContainerStats(cli *http.Client, id string) (rawStat, error) {
@@ -232,13 +244,26 @@ func getContainerStats(cli *http.Client, id string) (rawStat, error) {
 		tx += n.TxBytes
 	}
 
+	// Disk I/O
+	var diskRead, diskWrite uint64
+	for _, blk := range v.BlkioStats.IoServiceBytesRecursive {
+		op := strings.ToLower(blk.Op)
+		if op == "read" {
+			diskRead += blk.Value
+		} else if op == "write" {
+			diskWrite += blk.Value
+		}
+	}
+
 	return rawStat{
-		cpu:      r2(cpuPct),
-		memUsed:  memUsed,
-		memLimit: memLimit,
-		memPct:   r2(memPct),
-		netRx:    rx,
-		netTx:    tx,
+		cpu:       r2(cpuPct),
+		memUsed:   memUsed,
+		memLimit:  memLimit,
+		memPct:    r2(memPct),
+		netRx:     rx,
+		netTx:     tx,
+		diskRead:  diskRead,
+		diskWrite: diskWrite,
 	}, nil
 }
 
