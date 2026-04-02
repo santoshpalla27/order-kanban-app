@@ -70,7 +70,7 @@ export default function NotificationsScreen() {
   const s = useMemo(() => makeStyles(c), [c]);
 
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { setUnreadCount } = useNotificationStore();
+  const { setUnreadCount, listVersion } = useNotificationStore();
   const userId = useAuthStore((s) => s.user?.id);
   const { refreshAll, refreshMyOrders } = useBadgeStore();
 
@@ -100,6 +100,7 @@ export default function NotificationsScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (listVersion > 0) load(); }, [listVersion]);
   useWsEvents({ onNotification: () => load() });
 
   const markRead = async (n: Notification) => {

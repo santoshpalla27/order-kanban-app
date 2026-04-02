@@ -6,9 +6,11 @@ interface NotificationStore {
   unreadCount: number;
   toasts: Toast[];
   chatScreenActive: boolean;
+  listVersion: number;
 
   setUnreadCount: (n: number) => void;
   refreshUnreadCount: () => Promise<void>;
+  bumpListVersion: () => void;
   setChatScreenActive: (v: boolean) => void;
 
   addToast: (toast: Omit<Toast, 'id'>) => void;
@@ -19,8 +21,10 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
   unreadCount: 0,
   toasts: [],
   chatScreenActive: false,
+  listVersion: 0,
 
   setUnreadCount: (n) => set({ unreadCount: n }),
+  bumpListVersion: () => set((s) => ({ listVersion: s.listVersion + 1 })),
   setChatScreenActive: (v) => set({ chatScreenActive: v }),
   refreshUnreadCount: async () => {
     try {

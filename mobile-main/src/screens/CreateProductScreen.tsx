@@ -115,13 +115,16 @@ export default function CreateProductScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={s.body} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        {!!error && (
+          <View style={s.errorBox}>
+            <Text style={s.errorText}>{error}</Text>
+            <TouchableOpacity onPress={() => setError('')} hitSlop={8}>
+              <Feather name="x" size={16} color="#FCA5A5" />
+            </TouchableOpacity>
+          </View>
+        )}
 
-          {!!error && (
-            <View style={s.errorBox}>
-              <Text style={s.errorText}>{error}</Text>
-            </View>
-          )}
+        <ScrollView style={s.body} contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
 
           {/* Product ID */}
           <View style={s.field}>
@@ -383,10 +386,11 @@ function makeStyles(c: ThemeColors) {
     content: { padding: 20, gap: 20, paddingBottom: 60 },
 
     errorBox: {
-      backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 10,
-      borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)', padding: 12,
+      flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10,
+      backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
+      marginHorizontal: 16, marginTop: 12, borderRadius: 10, padding: 12,
     },
-    errorText: { color: '#FCA5A5', fontSize: 13 },
+    errorText: { color: '#FCA5A5', fontSize: 13, flex: 1 },
 
     field:    { gap: 8 },
     label:    { fontSize: 12, fontWeight: '700', color: c.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 },

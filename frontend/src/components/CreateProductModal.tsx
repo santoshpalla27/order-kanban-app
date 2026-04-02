@@ -91,13 +91,16 @@ export default function CreateProductModal({ onClose }: Props) {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
-          {error && (
-            <div className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
-              {error}
-            </div>
-          )}
+        {error && (
+          <div className="mx-5 mt-4 bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm flex items-start justify-between gap-2 flex-shrink-0">
+            <span>{error}</span>
+            <button type="button" onClick={() => setError('')} className="text-red-400/60 hover:text-red-400 transition-colors flex-shrink-0 mt-0.5">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
+        <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-sm font-medium text-surface-300 mb-1.5">Product ID *</label>
             <input

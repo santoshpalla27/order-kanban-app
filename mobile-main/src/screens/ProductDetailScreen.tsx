@@ -2293,14 +2293,14 @@ export default function ProductDetailScreen() {
     onCommentsChanged: () => {
       if (activeTab === 'comments') {
         notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES)
-          .then(() => { refreshBadges(); refreshUnreadCount(); })
+          .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
           .catch(() => {});
       }
     },
   });
 
   const { has, refreshBadges } = useProductBadges();
-  const { refreshUnreadCount } = useNotificationStore();
+  const { refreshUnreadCount, bumpListVersion } = useNotificationStore();
 
   // Keep refs so the beforeRemove listener always sees the latest values
   const hasRef = useRef(has);
@@ -2326,19 +2326,19 @@ export default function ProductDetailScreen() {
   useEffect(() => {
     if (activeTab === 'comments' && has(productId, 'comments')) {
       notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES)
-        .then(() => { refreshBadges(); refreshUnreadCount(); })
+        .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
         .catch(() => {});
     } else if (activeTab === 'attachments' && has(productId, 'attachments')) {
       notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES)
-        .then(() => { refreshBadges(); refreshUnreadCount(); })
+        .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
         .catch(() => {});
     } else if (activeTab === 'customer-messages' && has(productId, 'customer_comments')) {
       notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_COMMENT_TYPES)
-        .then(() => { refreshBadges(); refreshUnreadCount(); })
+        .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
         .catch(() => {});
     } else if (activeTab === 'customer-files' && has(productId, 'customer_attachments')) {
       notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES)
-        .then(() => { refreshBadges(); refreshUnreadCount(); })
+        .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
         .catch(() => {});
     }
   }, [activeTab, productId]);
