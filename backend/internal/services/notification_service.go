@@ -193,29 +193,41 @@ func MarkAllAsRead(userID uint) error {
 		Where("user_id = ? AND is_read = ?", userID, false).Update("is_read", true).Error
 }
 
+type UnreadProductSummary struct {
+	Status string   `json:"status"`
+	Types  []string `json:"types"`
+}
+
 // GetUnreadSummary returns, for each product with unread notifications,
-// the distinct notification types that are unread.
-// Result is map[entityID][]type — only entity_type = "product" is included.
+// the product's status and the distinct notification types that are unread.
+// Result is map[entityID]UnreadProductSummary — only entity_type = "product" is included.
 // If assignedTo > 0, only products where that user is an assignee are included.
-func GetUnreadSummary(userID uint, assignedTo uint) (map[uint][]string, error) {
+func GetUnreadSummary(userID uint, assignedTo uint) (map[uint]UnreadProductSummary, error) {
 	type row struct {
 		EntityID uint
 		Type     string
+		Status   string
 	}
 	var rows []row
 	q := database.DB.Model(&models.Notification{}).
-		Select("notifications.entity_id, notifications.type").
+		Select("notifications.entity_id, notifications.type, products.status").
+		Joins("JOIN products ON products.id = notifications.entity_id").
 		Where("notifications.user_id = ? AND notifications.entity_type = 'product' AND notifications.is_read = ?", userID, false)
 	if assignedTo > 0 {
 		q = q.Joins("JOIN product_assignees ON product_assignees.product_id = notifications.entity_id AND product_assignees.user_id = ?", assignedTo)
 	}
-	err := q.Distinct("notifications.entity_id", "notifications.type").Scan(&rows).Error
+	err := q.Distinct("notifications.entity_id", "notifications.type", "products.status").Scan(&rows).Error
 	if err != nil {
 		return nil, err
 	}
-	result := map[uint][]string{}
+	result := map[uint]UnreadProductSummary{}
 	for _, r := range rows {
-		result[r.EntityID] = append(result[r.EntityID], r.Type)
+		entry, exists := result[r.EntityID]
+		if !exists {
+			entry = UnreadProductSummary{Status: r.Status, Types: []string{}}
+		}
+		entry.Types = append(entry.Types, r.Type)
+		result[r.EntityID] = entry
 	}
 	return result, nil
 }

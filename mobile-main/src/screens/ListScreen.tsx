@@ -153,7 +153,7 @@ export default function ListScreen() {
   // WS: refresh on product changes
   useWsEvents({ onProductsChanged: () => handleRefresh() });
 
-  const { badges, hasAny, refreshBadges } = useProductBadges();
+  const { badges, hasAny, refreshBadges, badgeCountsByStatus } = useProductBadges();
 
   // Also refresh badge data when products are refreshed
   useEffect(() => { refreshBadges(); }, [refreshBadges]);
@@ -241,7 +241,7 @@ export default function ListScreen() {
             const color  = TAB_COLORS[tab.key];
             const notifCount = tab.key === ''
               ? Object.keys(badges).length
-              : products.filter((p) => p.status === tab.key && badges[p.id]?.size > 0).length;
+              : badgeCountsByStatus[tab.key] || 0;
             return (
               <TouchableOpacity
                 style={[

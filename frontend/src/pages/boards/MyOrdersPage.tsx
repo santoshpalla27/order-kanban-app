@@ -7,8 +7,9 @@ import { Product, STATUS_LABELS, STATUS_ORDER, ProductStatus } from '../../types
 import ProductDetailModal from '../../components/ProductDetailModal';
 import SearchFilters from '../../components/SearchFilters';
 import { Eye, Loader2, ChevronDown } from 'lucide-react';
-import { useProductBadges } from '../../hooks/useProductBadges';
+import { useProductBadges, useMyOrdersBadges } from '../../hooks/useProductBadges';
 import { formatDate } from '../../utils/date';
+
 
 const PAGE_SIZE = 50;
 
@@ -58,6 +59,7 @@ function useTabCounts(baseFilters: Record<string, string>) {
 export default function MyOrdersPage() {
   const { user } = useAuthStore();
   const { hasAny, badges } = useProductBadges();
+  const { badgeCountsByStatus } = useMyOrdersBadges(user?.id);
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -180,8 +182,8 @@ export default function MyOrdersPage() {
           const count    = counts[key];
           const isActive = filters.status === key;
           const notifCount = key === ''
-            ? Object.keys(badges).length
-            : items.filter((p) => p.status === key && (badges as any)[p.id]?.size > 0).length;
+            ? Object.keys(badges || {}).length
+            : badgeCountsByStatus[key] || 0;
           return (
             <button
               key={key}

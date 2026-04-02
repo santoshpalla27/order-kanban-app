@@ -71,7 +71,7 @@ export default function ListView() {
     delivery_to: '',
   });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
-  const { hasAny, badges } = useProductBadges();
+  const { hasAny, badges, badgeCountsByStatus } = useProductBadges();
   const [showCreate, setShowCreate]           = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const { canCreateProduct, canDeleteProduct } = useAuthStore();
@@ -201,7 +201,7 @@ export default function ListView() {
           const isActive = filters.status === key;
           const notifCount = key === ''
             ? Object.keys(badges).length
-            : items.filter((p) => p.status === key && (badges as any)[p.id]?.size > 0).length;
+            : badgeCountsByStatus[key] || 0;
           return (
             <button
               key={key}

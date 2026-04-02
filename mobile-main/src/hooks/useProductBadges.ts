@@ -26,16 +26,23 @@ export function useProductBadges() {
   useWsEvents({ onNotification: onBadge, onBadgesChanged: onBadge });
 
   const hasAny = useCallback(
-    (productId: number) => !!allBadges[productId]?.size,
+    (productId: number) => !!allBadges[productId]?.cats.size,
     [allBadges],
   );
 
   const has = useCallback(
-    (productId: number, cat: BadgeCategory) => !!allBadges[productId]?.has(cat),
+    (productId: number, cat: BadgeCategory) => !!allBadges[productId]?.cats.has(cat),
     [allBadges],
   );
 
-  return { badges: allBadges, hasAny, has, refreshBadges: refresh };
+  const badgeCountsByStatus: Record<string, number> = { yet_to_start: 0, working: 0, review: 0, done: 0 };
+  for (const b of Object.values(allBadges)) {
+    if (b.status in badgeCountsByStatus) {
+      badgeCountsByStatus[b.status]++;
+    }
+  }
+
+  return { badges: allBadges, hasAny, has, refreshBadges: refresh, badgeCountsByStatus };
 }
 
 // ── My Orders badge hook (assigned-to-user products only) ─────────────────────
@@ -54,6 +61,13 @@ export function useMyOrdersBadges() {
   const onBadge = useCallback(() => { refresh(); }, [refresh]);
   useWsEvents({ onNotification: onBadge, onBadgesChanged: onBadge });
 
+  const badgeCountsByStatus: Record<string, number> = { yet_to_start: 0, working: 0, review: 0, done: 0 };
+  for (const b of Object.values(myOrdersBadges)) {
+    if (b.status in badgeCountsByStatus) {
+      badgeCountsByStatus[b.status]++;
+    }
+  }
+
   const productIds = new Set(Object.keys(myOrdersBadges).map(Number));
-  return { count: productIds.size, productIds };
+  return { count: productIds.size, productIds, badgeCountsByStatus };
 }

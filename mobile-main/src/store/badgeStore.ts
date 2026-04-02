@@ -8,19 +8,19 @@ export const CUSTOMER_COMMENT_TYPES = ['customer_comment_added'];
 export const CUSTOMER_ATTACHMENT_TYPES = ['customer_attachment_uploaded'];
 export type BadgeCategory = 'comments' | 'attachments' | 'status_change' | 'customer_comments' | 'customer_attachments';
 
-type RawSummary = Record<string, string[]>;
-export type Badges = Record<number, Set<BadgeCategory>>;
+type RawSummary = Record<string, { status: string; types: string[] }>;
+export type Badges = Record<number, { status: string; cats: Set<BadgeCategory> }>;
 
 export function buildBadges(raw: RawSummary): Badges {
   const badges: Badges = {};
-  for (const [entityId, types] of Object.entries(raw)) {
+  for (const [entityId, info] of Object.entries(raw)) {
     const cats = new Set<BadgeCategory>();
-    if (types.some((t) => COMMENT_TYPES.includes(t))) cats.add('comments');
-    if (types.some((t) => ATTACHMENT_TYPES.includes(t))) cats.add('attachments');
-    if (types.some((t) => STATUS_CHANGE_TYPES.includes(t))) cats.add('status_change');
-    if (types.some((t) => CUSTOMER_COMMENT_TYPES.includes(t))) cats.add('customer_comments');
-    if (types.some((t) => CUSTOMER_ATTACHMENT_TYPES.includes(t))) cats.add('customer_attachments');
-    if (cats.size) badges[Number(entityId)] = cats;
+    if (info.types.some((t) => COMMENT_TYPES.includes(t))) cats.add('comments');
+    if (info.types.some((t) => ATTACHMENT_TYPES.includes(t))) cats.add('attachments');
+    if (info.types.some((t) => STATUS_CHANGE_TYPES.includes(t))) cats.add('status_change');
+    if (info.types.some((t) => CUSTOMER_COMMENT_TYPES.includes(t))) cats.add('customer_comments');
+    if (info.types.some((t) => CUSTOMER_ATTACHMENT_TYPES.includes(t))) cats.add('customer_attachments');
+    if (cats.size) badges[Number(entityId)] = { status: info.status, cats };
   }
   return badges;
 }

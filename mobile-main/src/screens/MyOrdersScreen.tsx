@@ -10,7 +10,7 @@ import { productsApi } from '../api/services';
 import { usersApi } from '../api/services';
 import { useAuthStore } from '../store/authStore';
 import { useWsEvents } from '../hooks/useWsEvents';
-import { useProductBadges } from '../hooks/useProductBadges';
+import { useProductBadges, useMyOrdersBadges } from '../hooks/useProductBadges';
 import { Product, ProductStatus } from '../types';
 import { User } from '../types';
 import ProductCard from '../components/ProductCard';
@@ -152,6 +152,7 @@ export default function MyOrdersScreen() {
   useWsEvents({ onProductsChanged: () => handleRefresh() });
 
   const { badges, hasAny } = useProductBadges();
+  const { badgeCountsByStatus } = useMyOrdersBadges();
 
   const handleStatusChange = async (product: Product, newStatus: string) => {
     setProducts((prev) =>
@@ -222,8 +223,8 @@ export default function MyOrdersScreen() {
             const count  = counts[tab.key];
             const color  = TAB_COLORS[tab.key];
             const notifCount = tab.key === ''
-              ? Object.keys(badges).length
-              : products.filter((p) => p.status === tab.key && badges[p.id]?.size > 0).length;
+              ? Object.keys(badges || {}).length
+              : badgeCountsByStatus[tab.key] || 0;
             return (
               <TouchableOpacity
                 style={[
