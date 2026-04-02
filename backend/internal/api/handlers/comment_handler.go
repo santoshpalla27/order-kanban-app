@@ -97,7 +97,7 @@ func (h *CommentHandler) Create(c *gin.Context) {
 
 	// Attachment comments (contain "[attachment:") already triggered an attachment_uploaded
 	// notification when the file was saved — skip the comment_added one to avoid duplicates.
-	isAttachmentComment := strings.Contains(req.Message, "[attachment:")
+	isAttachmentComment := strings.HasPrefix(req.Message, "📎 Uploaded: ") && strings.Contains(req.Message, "[attachment:")
 
 	// Mention notifications first — returns IDs of users who will receive a mention toast.
 	mentionMsg := fmt.Sprintf("%s mentioned you in %s", senderName, productLabel)
