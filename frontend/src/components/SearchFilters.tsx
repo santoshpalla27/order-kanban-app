@@ -93,7 +93,7 @@ export default function SearchFilters<T extends BaseFilters>({ filters, onChange
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
           <input
             type="text"
-            placeholder="Search by ID, customer, phone or description…"
+            placeholder="Search by ID, customer or phone…"
             value={filters.search}
             onChange={(e) => onChange({ ...filters, search: e.target.value })}
             className="w-full !pl-10"
