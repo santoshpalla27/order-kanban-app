@@ -45,7 +45,7 @@ func applyProductFilters(query *gorm.DB, filter ProductFilter) *gorm.DB {
 	}
 	if filter.Search != "" {
 		search := "%" + filter.Search + "%"
-		query = query.Where("product_id ILIKE ? OR customer_name ILIKE ? OR description ILIKE ?", search, search, search)
+		query = query.Where("product_id ILIKE ? OR customer_name ILIKE ? OR customer_phone ILIKE ?", search, search, search)
 	}
 	if filter.DateFrom != "" {
 		query = query.Where("created_at >= ?", filter.DateFrom)
