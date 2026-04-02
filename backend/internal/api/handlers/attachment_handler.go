@@ -129,9 +129,14 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		Details:  fmt.Sprintf("Uploaded %s to product %s (R2)", req.FileName, productIDStr),
 	})
 
-	// Persist notification for all users + toast via LISTEN/NOTIFY
+	// Persist notification for all users + toast via LISTEN/NOTIFY.
+	// Comment-source uploads badge the Comments tab; direct uploads badge the Files tab.
 	message := fmt.Sprintf("%s uploaded '%s'", senderName, req.FileName)
-	services.CreateNotificationForAllExcept(userID, nil, message, "attachment_uploaded", "product", attachment.ProductID, "", senderName)
+	notifType := "attachment_uploaded"
+	if req.Source == "comment" {
+		notifType = "comment_added"
+	}
+	services.CreateNotificationForAllExcept(userID, nil, message, notifType, "product", attachment.ProductID, "", senderName)
 
 	// Broadcast UI update (attachment panel refresh)
 	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_uploaded", Payload: attachment})
