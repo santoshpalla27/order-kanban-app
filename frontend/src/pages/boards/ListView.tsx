@@ -195,7 +195,7 @@ export default function ListView() {
       <SearchFilters filters={filters} onChange={setFilters} showAssigneeFilter showDeliveryFilter />
 
       {/* Status chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 flex-shrink-0">
+      <div className="flex items-center gap-2 overflow-x-auto pt-1.5 pb-1 px-1 -mx-1 flex-shrink-0">
         {TABS.map(({ key, label }) => {
           const count    = counts[key];
           const isActive = filters.status === key;
