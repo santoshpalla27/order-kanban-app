@@ -160,9 +160,7 @@ export default function Layout() {
                   <span className="flex-1 whitespace-nowrap flex items-center justify-between">
                     {item.label}
                     {showChatBadge && (
-                      <span className="ml-auto min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-scale-in">
-                        {unreadChatCount > 9 ? '9+' : unreadChatCount}
-                      </span>
+                      <span className="w-2.5 h-2.5 bg-red-500 rounded-full flex-shrink-0 animate-scale-in" />
                     )}
                     {showProductBadge && (
                       <span className="ml-auto min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-scale-in">

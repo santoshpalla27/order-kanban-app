@@ -97,6 +97,10 @@ export function useWsEvents(callbacks?: WsCallbacks) {
         }
         case 'chat_message':
           cb?.onChatMessage?.(data.payload);
+          if (data.payload?.user_id !== currentUserId && !useNotificationStore.getState().chatScreenActive) {
+            const cur = useNotificationStore.getState().unreadChatCount;
+            useNotificationStore.getState().setUnreadChatCount(cur + 1);
+          }
           break;
       }
     };

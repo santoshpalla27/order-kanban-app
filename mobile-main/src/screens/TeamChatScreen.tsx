@@ -157,6 +157,7 @@ export default function TeamChatScreen() {
   // Suppress chat notification toasts while this screen is active
   useEffect(() => {
     useNotificationStore.getState().setChatScreenActive(true);
+    useNotificationStore.getState().setUnreadChatCount(0);
     return () => { useNotificationStore.getState().setChatScreenActive(false); };
   }, []);
 

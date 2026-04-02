@@ -4,11 +4,13 @@ import { notificationsApi } from '../api/services';
 
 interface NotificationStore {
   unreadCount: number;
+  unreadChatCount: number;
   toasts: Toast[];
   chatScreenActive: boolean;
   listVersion: number;
 
   setUnreadCount: (n: number) => void;
+  setUnreadChatCount: (n: number) => void;
   refreshUnreadCount: () => Promise<void>;
   bumpListVersion: () => void;
   setChatScreenActive: (v: boolean) => void;
@@ -19,11 +21,13 @@ interface NotificationStore {
 
 export const useNotificationStore = create<NotificationStore>((set, get) => ({
   unreadCount: 0,
+  unreadChatCount: 0,
   toasts: [],
   chatScreenActive: false,
   listVersion: 0,
 
   setUnreadCount: (n) => set({ unreadCount: n }),
+  setUnreadChatCount: (n) => set({ unreadChatCount: n }),
   bumpListVersion: () => set((s) => ({ listVersion: s.listVersion + 1 })),
   setChatScreenActive: (v) => set({ chatScreenActive: v }),
   refreshUnreadCount: async () => {

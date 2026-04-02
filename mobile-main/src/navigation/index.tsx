@@ -59,6 +59,7 @@ export const navigationRef = createNavigationContainerRef<RootStackParamList>();
 function HeaderIcons() {
   const navigation  = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const unreadChatCount = useNotificationStore((s) => s.unreadChatCount);
   const isDark = useThemeStore((s) => s.isDark);
   const c = isDark ? darkColors : lightColors;
 
@@ -66,6 +67,7 @@ function HeaderIcons() {
     <View style={h.row}>
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('TeamChat')}>
         <Feather name="message-square" size={20} color={c.text} />
+        {unreadChatCount > 0 && <View style={h.chatDot} />}
       </TouchableOpacity>
       <TouchableOpacity style={h.btn} onPress={() => navigation.navigate('Activity')}>
         <Feather name="zap" size={20} color={c.text} />
@@ -94,6 +96,11 @@ const h = StyleSheet.create({
     paddingHorizontal: 3,
   },
   badgeText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+  chatDot: {
+    position: 'absolute', top: 4, right: 4,
+    width: 8, height: 8, borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
 });
 
 // ── Bottom tab navigator ───────────────────────────────────────────────────────
