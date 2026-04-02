@@ -104,19 +104,10 @@ export default function NotificationsScreen() {
 
   const markRead = async (n: Notification) => {
     try {
-      if (n.entity_type === 'product' && n.entity_id) {
-        await notificationsApi.markReadByEntityAndTypes('product', n.entity_id, [n.type]);
-        setNotifications((prev) => prev.map((nn) =>
-          nn.entity_type === 'product' && nn.entity_id === n.entity_id && nn.type === n.type
-            ? { ...nn, is_read: true } : nn
-        ));
-      } else {
-        await notificationsApi.markAsRead(n.id);
-        setNotifications((prev) => prev.map((nn) => nn.id === n.id ? { ...nn, is_read: true } : nn));
-      }
+      await notificationsApi.markAsRead(n.id);
+      setNotifications((prev) => prev.map((nn) => nn.id === n.id ? { ...nn, is_read: true } : nn));
       const countRes = await notificationsApi.getUnreadCount();
       setUnreadCount(countRes.data?.count ?? 0);
-      refreshBadges();
     } catch {}
   };
 

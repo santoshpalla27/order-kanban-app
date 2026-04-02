@@ -79,7 +79,8 @@ export function useWebSocket() {
           case 'activity_updated':
             queryClient.invalidateQueries({ queryKey: ['activity-full'] });
             if (data.payload?.actor_name && data.payload?.actor_id !== currentUserId &&
-                data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment') {
+                data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment' &&
+                data.payload?.entity !== 'product') {
               const actorName = (data.payload.actor_name as string) || '';
               const actMsg = (data.payload.message as string) || 'Activity updated';
               const actEntityId = (data.payload.entity_id as number) || 0;

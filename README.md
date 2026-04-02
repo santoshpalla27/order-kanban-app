@@ -155,3 +155,8 @@ cd mobile
 npm install
 npx expo start # scan QR with Expo Go app
 npx expo run:android # build native Android APK
+
+echo $(htpasswd -nB admin) | sed -e s/\\$/\\$\\$/g
+
+ADMIN_AUTH=admin:$$2y$$05$$...yourHashedPassword
+(Note: As seen in your .env.example, ADMIN_AUTH is correctly referenced by the new docker-compose labels).

@@ -82,15 +82,11 @@ export default function NotificationsPage() {
   );
 
   const markRead = useMutation({
-    mutationFn: (n: Notification) =>
-      n.entity_type === 'product' && n.entity_id
-        ? notificationsApi.markReadByEntityAndTypes('product', n.entity_id, [n.type])
-        : notificationsApi.markAsRead(n.id),
+    mutationFn: (n: Notification) => notificationsApi.markAsRead(n.id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications-full'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
     },
   });
 

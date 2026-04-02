@@ -124,6 +124,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	}
 
 	userID := c.GetUint("user_id")
+	userName, _ := c.Get("user_name")
 
 	product := &models.Product{
 		ProductID:     req.ProductID,
@@ -152,6 +153,9 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 
 	wsMsg, _ := json.Marshal(WSMessage{Type: "product_created", Payload: product})
 	database.EmitBroadcast(wsMsg)
+
+	message := fmt.Sprintf("%s created new order %s for %s", userName.(string), product.ProductID, product.CustomerName)
+	services.CreateNotificationForAllExcept(userID, nil, message, "product_created", "product", product.ID, "", userName.(string))
 
 	c.JSON(http.StatusCreated, product)
 }

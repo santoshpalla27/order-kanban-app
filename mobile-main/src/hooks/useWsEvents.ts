@@ -65,7 +65,8 @@ export function useWsEvents(callbacks?: WsCallbacks) {
         case 'activity_updated':
           cb?.onActivityChanged?.();
           if (data.payload?.actor_id !== currentUserId &&
-              data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment') {
+              data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment' &&
+              data.payload?.entity !== 'product') {
             addToast({
               message: data.payload?.message || 'Activity updated',
               content: '', type: 'activity', entityType: 'activity',
