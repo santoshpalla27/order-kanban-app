@@ -15,6 +15,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -36,6 +37,7 @@ var (
 	nComm    = flag.Int("comments", 2, "Comments per product")
 	workers  = flag.Int("workers", 10, "Concurrent goroutines")
 	dry      = flag.Bool("dry", false, "Dry run — print without sending")
+	insecure = flag.Bool("insecure", false, "Skip TLS certificate verification")
 )
 
 // ── Sample data ───────────────────────────────────────────────────────────────
@@ -111,7 +113,14 @@ var statuses = []string{"yet_to_start", "working", "review", "done"}
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
 
-var client = &http.Client{Timeout: 15 * time.Second}
+var client *http.Client
+
+func initClient() {
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: *insecure},
+	}
+	client = &http.Client{Timeout: 15 * time.Second, Transport: tr}
+}
 
 func post(url, token string, body any) (*http.Response, error) {
 	b, _ := json.Marshal(body)
@@ -135,6 +144,7 @@ func patch(url, token string, body any) (*http.Response, error) {
 
 func main() {
 	flag.Parse()
+	initClient()
 	if *email == "" || *password == "" {
 		log.Fatal("Both -email and -password are required")
 	}
