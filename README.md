@@ -160,3 +160,30 @@ echo $(htpasswd -nB admin) | sed -e s/\\$/\\$\\$/g
 
 ADMIN_AUTH=admin:$$2y$$05$$...yourHashedPassword
 (Note: As seen in your .env.example, ADMIN_AUTH is correctly referenced by the new docker-compose labels).
+
+sudo du -sh $(docker volume inspect order-kanban-app_postgres-data --format '{{.Mountpoint}}')
+
+48M /var/lib/docker/volumes/order-kanban-app_postgres-data/\_data
+
+docker stats kanban-backend kanban-postgres kanban-push-service kanban-frontend kanban-traefik
+
+Backend — healthy ✓
+
+Time Memory
+0min 7.3 MB
+5min 10.3 MB
+10min 9.8 MB
+15min 9.7 MB
+Normal Go runtime warmup — went up then stabilized. No leak.
+
+Postgres — healthy ✓
+
+Fluctuates 49–53 MB. That's just the query cache filling up. Normal.
+
+Traefik — healthy ✓
+
+19 → 29 → 27 → 22 MB. Fluctuating is expected — it manages TLS sessions and connection pools that get GC'd.
+
+Frontend — perfect ✓
+
+Completely flat at 3.8 MB. Static file server, nothing to leak.

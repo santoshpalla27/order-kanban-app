@@ -14,9 +14,9 @@
 #   Traefik:        64 MB
 #   PostgreSQL:    512 MB
 #   Backend:       128 MB
-#   Push-service:   64 MB
+#   Push-service:  128 MB
 #   Frontend:       32 MB
-#   Buffer/cache:  ~704 MB
+#   Buffer/cache:  ~640 MB
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -179,7 +179,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 128M
           cpus: "0.25"
     logging:
       driver: json-file
