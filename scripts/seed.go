@@ -8,6 +8,7 @@
 //   -password   Admin account password
 //   -products   Number of products to create (default: 100)
 //   -comments   Comments per product (default: 2)
+//   -chat       Number of team chat messages to create (default: 20)
 //   -workers    Concurrent goroutines (default: 10)
 //   -dry        Print what would be created without sending requests
 
@@ -36,6 +37,7 @@ var (
 	nProd    = flag.Int("products", 100, "Number of products to create")
 	nComm    = flag.Int("comments", 2, "Comments per product")
 	workers  = flag.Int("workers", 10, "Concurrent goroutines")
+	nChat    = flag.Int("chat", 500, "Number of team chat messages to create")
 	dry      = flag.Bool("dry", false, "Dry run — print without sending")
 	insecure = flag.Bool("insecure", false, "Skip TLS certificate verification")
 )
@@ -107,6 +109,34 @@ var comments = []string{
 	"Heat transfer vinyl ordered, 3-day lead time.",
 	"Embroidery hoop size adjusted for design.",
 	"Dispatch confirmed — tracking number shared.",
+}
+
+var chatMessages = []string{
+	"Anyone checked the artwork files for the latest batch?",
+	"Delivery for ORD-00045 moved to Friday, heads up.",
+	"Embroidery machine 2 is back online after maintenance.",
+	"Can someone double-check the colour match on the polo shirts?",
+	"Rush order coming in this afternoon — clearing the queue now.",
+	"Screen printing ink running low, order placed.",
+	"Quality check done on the graduation hoodies — all good.",
+	"Customer called about the corporate gift set, wants a progress update.",
+	"Heat press calibrated, should be accurate now.",
+	"Going on lunch, back in 30.",
+	"Thread delivery delayed by a day, adjusting schedules.",
+	"New fabric samples arrived — leaving them in the sample room.",
+	"Who's handling the football kit order?",
+	"Packaging station is clear, ready for the next batch.",
+	"Artwork sign-off received for the festival merch.",
+	"Machine 3 needs a clean before the next run.",
+	"Customer confirmed the address change for the tote bags.",
+	"Running a test print on the new banner design.",
+	"All team orders dispatched for today.",
+	"Can we get an update on the charity run tees?",
+	"Checked the stitch count on the caps — spot on.",
+	"Supplier confirmed Pantone match, good to proceed.",
+	"Order board looking heavy this week, may need overtime Friday.",
+	"Sample sent to the client — awaiting approval.",
+	"Pre-production approved for the restaurant uniforms.",
 }
 
 var statuses = []string{"yet_to_start", "working", "review", "done"}
@@ -238,13 +268,11 @@ func main() {
 					continue
 				}
 				var prodResp struct {
-					Data struct {
-						ID uint `json:"id"`
-					} `json:"data"`
+					ID uint `json:"id"`
 				}
 				json.NewDecoder(r.Body).Decode(&prodResp)
 				r.Body.Close()
-				prodID := prodResp.Data.ID
+				prodID := prodResp.ID
 
 				// Update status (skip yet_to_start since that's the default)
 				if status != "yet_to_start" && prodID > 0 {
@@ -291,6 +319,29 @@ func main() {
 		for _, f := range failures {
 			fmt.Println(f)
 		}
+	}
+
+	// ── Seed team chat ─────────────────────────────────────────────────────────
+	if *nChat > 0 {
+		fmt.Printf("\nSeeding %d team chat messages...\n", *nChat)
+		chatOK := 0
+		for i := 0; i < *nChat; i++ {
+			msg := chatMessages[rand.Intn(len(chatMessages))]
+			cr, err := post(*base+"/api/chat/messages", token, map[string]string{"message": msg})
+			if err != nil || cr == nil || cr.StatusCode != http.StatusCreated {
+				code := 0
+				if cr != nil {
+					code = cr.StatusCode
+					cr.Body.Close()
+				}
+				fmt.Printf("  chat msg %d failed: HTTP %d err=%v\n", i+1, code, err)
+			} else {
+				cr.Body.Close()
+				chatOK++
+			}
+			time.Sleep(30 * time.Millisecond)
+		}
+		fmt.Printf("  Chat messages sent: %d/%d\n", chatOK, *nChat)
 	}
 }
 
