@@ -37,9 +37,7 @@ body { background: var(--bg); color: var(--text); font-family: -apple-system, Bl
 .wrap { max-width: 1440px; margin: 0 auto; padding: 24px; }
 
 /* ── Metric cards ── */
-.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
-@media (max-width: 960px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 520px) { .metrics { grid-template-columns: 1fr; } }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 20px; }
 .card-label { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
 .card-value { font-size: 30px; font-weight: 700; line-height: 1; margin-bottom: 4px; }
@@ -159,6 +157,12 @@ tbody tr:hover td { background: rgba(255,255,255,.025); }
         <span><span class="net-up">↑</span><span id="net-tx">—</span></span>
       </div>
     </div>
+    <div class="card">
+      <div class="card-label">Last Backup</div>
+      <div class="card-value" id="backup-val">—</div>
+      <div class="card-sub" id="backup-sub">&nbsp;</div>
+      <div class="bar"><div class="bar-fill ok" id="backup-bar" style="width:0%"></div></div>
+    </div>
   </div>
 
   <!-- Containers -->
@@ -256,6 +260,14 @@ tbody tr:hover td { background: rgba(255,255,255,.025); }
 let currentLogId = null;
 let currentLogLines = [];
 let allContainers = [];
+
+// ── Time helper ────────────────────────────────────────────────────────────
+function timeAgo(secs) {
+  if (secs < 60)    return secs + 's ago';
+  if (secs < 3600)  return Math.floor(secs / 60) + 'm ago';
+  if (secs < 86400) return Math.floor(secs / 3600) + 'h ago';
+  return Math.floor(secs / 86400) + 'd ago';
+}
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
 const B = (n) => {
@@ -452,11 +464,58 @@ async function fetchErrors() {
   renderErrors();
 }
 
+// ── Backup status ──────────────────────────────────────────────────────────
+async function fetchBackup() {
+  const d = await fetch('/api/backup').then(r => r.json());
+  const valEl = document.getElementById('backup-val');
+  const subEl = document.getElementById('backup-sub');
+  const barEl = document.getElementById('backup-bar');
+
+  if (d.status === 'never') {
+    valEl.textContent = 'Never';
+    valEl.style.color = 'var(--muted)';
+    subEl.textContent = 'No backups run yet';
+    barEl.style.width = '0%';
+    barEl.className = 'bar-fill ok';
+    return;
+  }
+
+  if (d.status === 'running') {
+    valEl.textContent = 'Running…';
+    valEl.style.color = 'var(--yellow)';
+    subEl.textContent = 'Backup in progress';
+    barEl.style.width = '50%';
+    barEl.className = 'bar-fill warn';
+    return;
+  }
+
+  if (d.status === 'failed') {
+    valEl.textContent = 'Failed';
+    valEl.style.color = 'var(--red)';
+    const ago = d.last_run ? timeAgo(Math.floor(Date.now() / 1000) - d.last_run) : '—';
+    subEl.textContent = 'Last attempt: ' + ago;
+    barEl.style.width = '100%';
+    barEl.className = 'bar-fill crit';
+    return;
+  }
+
+  // ok
+  const now = Math.floor(Date.now() / 1000);
+  const secs = now - d.last_ok;
+  const hours = secs / 3600;
+  valEl.textContent = timeAgo(secs);
+  valEl.style.color = hours < 25 ? 'var(--green)' : hours < 49 ? 'var(--yellow)' : 'var(--red)';
+  subEl.textContent = new Date(d.last_ok * 1000).toLocaleString();
+  const freshness = Math.min((secs / 86400) * 100, 100);
+  barEl.style.width = freshness + '%';
+  barEl.className = 'bar-fill ' + (hours < 25 ? 'ok' : hours < 49 ? 'warn' : 'crit');
+}
+
 // ── Refresh loop ───────────────────────────────────────────────────────────
 async function refresh() {
   document.getElementById('dot').classList.add('loading');
   try {
-    await Promise.all([fetchSystem(), fetchContainers(), fetchVolumes()]);
+    await Promise.all([fetchSystem(), fetchContainers(), fetchVolumes(), fetchBackup()]);
     await fetchErrors(); // after fetchContainers so allContainers is populated
     document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
   } catch (e) {
