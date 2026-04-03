@@ -209,7 +209,11 @@ tbody tr:hover td { background: rgba(255,255,255,.025); }
   <!-- Errors -->
   <div class="section-head" style="margin-top:28px">
     <span class="section-title">Container Errors</span>
-    <span class="container-count" id="error-count"></span>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="container-count" id="error-count"></span>
+      <button class="log-btn" id="error-refresh-btn" onclick="refreshErrors()">↺ Refresh</button>
+      <button class="log-btn" onclick="clearErrors()" style="color:var(--muted)">✕ Clear</button>
+    </div>
   </div>
   <div class="table-wrap">
     <table>
@@ -380,6 +384,20 @@ async function fetchVolumes() {
 }
 
 // ── Error logs ─────────────────────────────────────────────────────────────
+function clearErrors() {
+  document.getElementById('error-count').textContent = '';
+  document.getElementById('ebody').innerHTML = '<tr><td colspan="3" class="empty">Cleared — click Refresh to reload</td></tr>';
+}
+
+async function refreshErrors() {
+  const btn = document.getElementById('error-refresh-btn');
+  btn.textContent = '↺ Loading…';
+  btn.disabled = true;
+  await fetchErrors();
+  btn.textContent = '↺ Refresh';
+  btn.disabled = false;
+}
+
 async function fetchErrors() {
   const list = await fetch('/api/errors').then(r => r.json());
 
@@ -465,6 +483,9 @@ async function reloadLogs() {
 
 function closeModal() {
   currentLogId = null;
+  currentLogLines = [];
+  document.getElementById('log-pre').textContent = '';
+  document.getElementById('log-search').value = '';
   document.getElementById('overlay').classList.remove('open');
 }
 
