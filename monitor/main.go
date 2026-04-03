@@ -30,6 +30,7 @@ func main() {
 	mux.HandleFunc("/api/containers", handleContainers)
 	mux.HandleFunc("/api/volumes", handleVolumes)
 	mux.HandleFunc("/api/logs/", handleLogs)
+	mux.HandleFunc("/api/errors", handleErrors)
 
 	log.Printf("monitor listening on :%s", port)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
@@ -62,6 +63,15 @@ func handleVolumes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respond(w, list)
+}
+
+func handleErrors(w http.ResponseWriter, r *http.Request) {
+	lines, err := collectErrors()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	respond(w, lines)
 }
 
 func handleLogs(w http.ResponseWriter, r *http.Request) {

@@ -267,6 +267,60 @@ func getContainerStats(cli *http.Client, id string) (rawStat, error) {
 	}, nil
 }
 
+// ── Error collection ─────────────────────────────────────────────────────────
+
+type ErrorLine struct {
+	ContainerID   string `json:"container_id"`
+	ContainerName string `json:"container_name"`
+	Line          string `json:"line"`
+}
+
+var errorKeywords = []string{"error", "panic", "fatal", "exception", "traceback", "critical"}
+
+func collectErrors() ([]ErrorLine, error) {
+	cli := dockerClient()
+
+	resp, err := cli.Get(dockerAPI + "/containers/json?all=0")
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var list []dockerContainer
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+
+	var out []ErrorLine
+	for _, c := range list {
+		name := c.ID[:12]
+		if len(c.Names) > 0 {
+			name = strings.TrimPrefix(c.Names[0], "/")
+		}
+		lines, err := fetchLogs(c.ID, 500)
+		if err != nil {
+			continue
+		}
+		for _, line := range lines {
+			lower := strings.ToLower(line)
+			for _, kw := range errorKeywords {
+				if strings.Contains(lower, kw) {
+					out = append(out, ErrorLine{
+						ContainerID:   c.ID[:12],
+						ContainerName: name,
+						Line:          line,
+					})
+					break
+				}
+			}
+		}
+	}
+	if out == nil {
+		out = []ErrorLine{}
+	}
+	return out, nil
+}
+
 // parseDockerLogs strips Docker's 8-byte multiplexing frame headers from log output.
 // Frame format: [stream(1)] [0 0 0] [size(4 big-endian)] [payload...]
 func parseDockerLogs(data []byte) []string {
