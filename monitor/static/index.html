@@ -255,6 +255,7 @@ tbody tr:hover td { background: rgba(255,255,255,.025); }
 
 let currentLogId = null;
 let currentLogLines = [];
+let allContainers = [];
 
 // ── Formatting helpers ──────────────────────────────────────────────────────
 const B = (n) => {
@@ -313,6 +314,7 @@ async function fetchContainers() {
     const ra = rank[a.state] ?? 9, rb = rank[b.state] ?? 9;
     return ra !== rb ? ra - rb : a.name.localeCompare(b.name);
   });
+  allContainers = list;
 
   const running = list.filter(c => c.state === 'running').length;
   document.getElementById('container-count').textContent =
@@ -434,12 +436,18 @@ async function fetchErrors() {
   const list = await fetch('/api/errors').then(r => r.json());
   allErrors = list || [];
 
-  // Rebuild container dropdown, preserving current selection
+  // Build dropdown from ALL containers (not just those with errors)
   const sel = document.getElementById('error-filter');
   const prev = sel.value;
-  const names = [...new Set(allErrors.map(e => e.container_name))].sort();
+  const names = allContainers.length
+    ? allContainers.map(c => c.name).sort()
+    : [...new Set(allErrors.map(e => e.container_name))].sort();
   sel.innerHTML = '<option value="">All Containers</option>' +
-    names.map(n => `<option value="${n}"${n === prev ? ' selected' : ''}>${n}</option>`).join('');
+    names.map(n => {
+      const count = allErrors.filter(e => e.container_name === n).length;
+      const label = count > 0 ? `${n} (${count})` : n;
+      return `<option value="${n}"${n === prev ? ' selected' : ''}>${label}</option>`;
+    }).join('');
 
   renderErrors();
 }
@@ -448,7 +456,8 @@ async function fetchErrors() {
 async function refresh() {
   document.getElementById('dot').classList.add('loading');
   try {
-    await Promise.all([fetchSystem(), fetchContainers(), fetchVolumes(), fetchErrors()]);
+    await Promise.all([fetchSystem(), fetchContainers(), fetchVolumes()]);
+    await fetchErrors(); // after fetchContainers so allContainers is populated
     document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
   } catch (e) {
     document.getElementById('updated').textContent = 'Error — retrying…';
