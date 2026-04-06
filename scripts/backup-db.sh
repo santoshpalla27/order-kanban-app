@@ -7,7 +7,7 @@ set -euo pipefail
 # ── Config ────────────────────────────────────────────────────────────────────
 LOG=/var/log/kanban-backup.log
 BACKUP_DIR=/var/backups/kanban
-KEEP_DAYS=7
+KEEP_DAYS=1
 CONTAINER=kanban-postgres
 
 # ── Load .env (get DB creds + R2 creds) ──────────────────────────────────────
@@ -80,6 +80,6 @@ fi
 
 # ── Rotate local backups ──────────────────────────────────────────────────────
 DELETED=$(find "$BACKUP_DIR" -name "kanban_*.sql.gz" -mtime "+${KEEP_DAYS}" -print -delete | wc -l)
-[ "$DELETED" -gt 0 ] && log "Rotated $DELETED backup(s) older than ${KEEP_DAYS} days"
+[ "$DELETED" -gt 0 ] && log "Rotated $DELETED local backup(s) older than ${KEEP_DAYS} day(s)"
 
 log "Done."

@@ -32,13 +32,46 @@ POSTGRES_DB="${POSTGRES_DB:-kanban}"
 log() { echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
+# ── R2 rclone helper ──────────────────────────────────────────────────────────
+r2_env() {
+  RCLONE_CONFIG_R2_TYPE=s3 \
+  RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
+  RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY" \
+  RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_KEY" \
+  RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT" \
+  RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true \
+  rclone "$@"
+}
+
 # ── Pick backup file ──────────────────────────────────────────────────────────
 if [ $# -ge 1 ]; then
   BACKUP_FILE="$1"
   [ -f "$BACKUP_FILE" ] || die "File not found: $BACKUP_FILE"
 else
-  BACKUP_FILE=$(find "$BACKUP_DIR" -name "kanban_*.sql.gz" | sort | tail -1)
-  [ -n "$BACKUP_FILE" ] || die "No backups found in $BACKUP_DIR — run backup-db.sh first"
+  # 1. Try local first
+  BACKUP_FILE=$(find "$BACKUP_DIR" -name "kanban_*.sql.gz" 2>/dev/null | sort | tail -1)
+
+  # 2. Fall back to latest from R2
+  if [ -z "$BACKUP_FILE" ]; then
+    log "No local backup found — fetching latest from R2..."
+
+    command -v rclone &>/dev/null        || die "rclone not installed (apt install rclone)"
+    [ -n "${R2_ACCESS_KEY:-}" ]          || die "R2_ACCESS_KEY not set in .env"
+    [ -n "${R2_SECRET_KEY:-}" ]          || die "R2_SECRET_KEY not set in .env"
+    [ -n "${R2_ENDPOINT:-}" ]            || die "R2_ENDPOINT not set in .env"
+    [ -n "${R2_BUCKET:-}" ]              || die "R2_BUCKET not set in .env"
+
+    # Get the filename of the latest backup in R2
+    LATEST_R2=$(r2_env lsf "r2:${R2_BUCKET}/db-backups/" --include "kanban_*.sql.gz" \
+                  2>/dev/null | sort | tail -1)
+    [ -n "$LATEST_R2" ] || die "No backups found in R2 either (r2:${R2_BUCKET}/db-backups/)"
+
+    mkdir -p "$BACKUP_DIR"
+    log "Downloading $LATEST_R2 from R2..."
+    r2_env copy "r2:${R2_BUCKET}/db-backups/${LATEST_R2}" "$BACKUP_DIR/" \
+      --no-traverse --log-level ERROR
+    BACKUP_FILE="$BACKUP_DIR/$LATEST_R2"
+  fi
 fi
 
 log "Backup file: $BACKUP_FILE ($(du -h "$BACKUP_FILE" | cut -f1))"
