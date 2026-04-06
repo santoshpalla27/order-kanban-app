@@ -66,6 +66,7 @@ if command -v rclone &>/dev/null \
      RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY" \
      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_KEY" \
      RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT" \
+     RCLONE_CONFIG_R2_NO_CHECK_BUCKET=true \
      rclone copy "$DUMP_FILE" "r2:${R2_BUCKET}/db-backups/" \
        --no-traverse \
        --log-level ERROR 2>> "$LOG"; then

@@ -19,6 +19,7 @@ if [ ! -f "$BACKUP_SCRIPT" ]; then
   exit 1
 fi
 chmod +x "$BACKUP_SCRIPT"
+chmod +x "$SCRIPT_DIR/setup-backup-cron.sh"
 
 # Create log file
 touch "$LOG"
