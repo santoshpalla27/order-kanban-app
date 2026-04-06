@@ -3,6 +3,32 @@ export interface Role {
   name: string;
 }
 
+export type NotificationMode = 'all' | 'my_orders' | 'custom';
+
+export const ALL_NOTIF_TYPES = [
+  'status_change', 'comment', 'mention', 'assignment',
+  'attachment', 'chat', 'product_created', 'product_deleted', 'delivery_reminder',
+] as const;
+
+export type NotifType = typeof ALL_NOTIF_TYPES[number];
+
+export interface NotificationChannelPrefs {
+  enabled: boolean;
+  types: NotifType[];
+}
+
+export interface NotificationPrefs {
+  mode: NotificationMode;
+  web: NotificationChannelPrefs;
+  push: NotificationChannelPrefs;
+}
+
+export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
+  mode: 'all',
+  web:  { enabled: true, types: [...ALL_NOTIF_TYPES] },
+  push: { enabled: true, types: [...ALL_NOTIF_TYPES] },
+};
+
 export interface User {
   id: number;
   name: string;
@@ -10,6 +36,7 @@ export interface User {
   role_id: number;
   role: Role;
   avatar_url?: string;
+  notification_prefs?: NotificationPrefs;
   created_at: string;
 }
 

@@ -37,13 +37,19 @@ func DeleteUser(id uint) error {
 	return database.DB.Delete(&models.User{}, id).Error
 }
 
-func UpdateProfile(id uint, name, avatarKey string) error {
+func UpdateProfile(id uint, name, avatarKey string, prefs *models.NotificationPrefs) error {
 	updates := map[string]interface{}{}
 	if name != "" {
 		updates["name"] = name
 	}
 	if avatarKey != "" {
 		updates["avatar_key"] = avatarKey
+	}
+	if prefs != nil {
+		val, err := prefs.Value()
+		if err == nil {
+			updates["notification_prefs"] = val
+		}
 	}
 	if len(updates) == 0 {
 		return nil

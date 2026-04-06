@@ -5,11 +5,50 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useToastStore } from '../store/toastStore';
 import { useChatStore } from '../store/chatStore';
 import { playNotificationSound, playChatSound } from '../utils/sound';
+import { NotifType, NotificationPrefs, ALL_NOTIF_TYPES } from '../types';
+import type { Product } from '../types';
+
+// Map activity entity_action → notification prefs type key.
+const ACTION_TO_NOTIF_TYPE: Record<string, NotifType> = {
+  status_changed: 'status_change',
+  created:        'product_created',
+  deleted:        'product_deleted',
+  restored:       'product_deleted',
+  updated:        'status_change', // product detail updates — treat same as status_change
+};
+
+// Returns true if the user's web prefs allow showing this notification type.
+// productId is needed only for my_orders mode to check assignment.
+function webPrefsAllow(
+  prefs: NotificationPrefs | undefined,
+  notifType: NotifType,
+  productId: number,
+  currentUserId: number | undefined,
+  cachedProducts: Product[],
+): boolean {
+  if (!prefs) return true;
+  const types: NotifType[] = prefs.web?.types ?? [...ALL_NOTIF_TYPES];
+  const enabled = prefs.web?.enabled ?? true;
+  if (!enabled) return false;
+  if (!types.includes(notifType)) return false;
+
+  const mode = prefs.mode ?? 'all';
+  if (mode === 'all' || mode === 'custom') return true;
+
+  if (mode === 'my_orders') {
+    // Find the product in any cached query data to check assignees.
+    const product = cachedProducts.find((p) => p.id === productId);
+    if (!product) return true; // not in cache — allow (can't tell, don't suppress)
+    return product.assignees?.some((a) => a.id === currentUserId) ?? false;
+  }
+  return true;
+}
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const token = useAuthStore((s) => s.token);
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const notifPrefs = useAuthStore((s) => s.user?.notification_prefs);
   const logout = useAuthStore((s) => s.logout);
   const queryClient = useQueryClient();
   const addToast = useToastStore((s) => s.addToast);
@@ -84,6 +123,19 @@ export function useWebSocket() {
               const actMsg = (data.payload.message as string) || 'Activity updated';
               const actEntityId = (data.payload.entity_id as number) || 0;
               const actLink = (data.payload.entity_url as string) || null;
+              const actAction = (data.payload.entity_action as string) || '';
+              const notifType: NotifType = ACTION_TO_NOTIF_TYPE[actAction] ?? 'status_change';
+
+              // Collect all products from any matching query cache entries.
+              const cachedProducts: Product[] = [];
+              queryClient.getQueriesData<any>({ queryKey: ['products'] }).forEach(([, d]) => {
+                if (Array.isArray(d)) cachedProducts.push(...d);
+                else if (d?.data && Array.isArray(d.data)) cachedProducts.push(...d.data);
+                else if (d?.pages) d.pages.forEach((p: any) => Array.isArray(p?.data) && cachedProducts.push(...p.data));
+              });
+
+              if (!webPrefsAllow(notifPrefs, notifType, actEntityId, currentUserId, cachedProducts)) break;
+
               addToast({
                 message: actMsg,
                 content: '',
@@ -132,7 +184,7 @@ export function useWebSocket() {
     ws.onerror = () => {
       ws.close();
     };
-  }, [token, currentUserId, logout, navigate, queryClient, addToast]);
+  }, [token, currentUserId, notifPrefs, logout, navigate, queryClient, addToast]);
 
   useEffect(() => {
     connect();

@@ -174,7 +174,7 @@ export const usersApi = {
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 export const profileApi = {
-  update: (data: { name?: string }) =>
+  update: (data: { name?: string; avatar_key?: string; notification_prefs?: import('../types').NotificationPrefs }) =>
     api.patch('/users/me', data),
   getMe: () => api.get('/auth/me'),
 };

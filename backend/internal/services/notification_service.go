@@ -8,6 +8,50 @@ import (
 	"kanban-app/internal/models"
 )
 
+// containsType checks if a notification type is in the allowed list.
+func containsType(types []string, t string) bool {
+	for _, v := range types {
+		if v == t {
+			return true
+		}
+	}
+	return false
+}
+
+// isUserAssignedToProduct returns true if the user is in product_assignees for the given product.
+func isUserAssignedToProduct(userID, productID uint) bool {
+	var count int64
+	database.DB.Table("product_assignees").
+		Where("user_id = ? AND product_id = ?", userID, productID).
+		Count(&count)
+	return count > 0
+}
+
+// shouldDeliverWeb returns true if a web notification should be delivered to the user.
+// Mention type always bypasses prefs.
+func shouldDeliverWeb(user models.User, notifType, entityType string, entityID uint) bool {
+	if notifType == "mention" {
+		return true
+	}
+	prefs := user.NotificationPrefs
+	if !prefs.Web.Enabled {
+		return false
+	}
+	switch prefs.Mode {
+	case "all", "custom":
+		return containsType(prefs.Web.Types, notifType)
+	case "my_orders":
+		if notifType == "chat" || entityType == "chat" {
+			return containsType(prefs.Web.Types, notifType)
+		}
+		if entityType == "product" && entityID > 0 {
+			return isUserAssignedToProduct(user.ID, entityID) && containsType(prefs.Web.Types, notifType)
+		}
+		return false
+	}
+	return true
+}
+
 var mentionRe = regexp.MustCompile(`@\[([^\]]+)\]`)
 
 // buildNotifWSMsg constructs the "notification" WS message the frontend toast expects.
@@ -45,6 +89,7 @@ func CreateNotificationForUser(userID uint, message, notifType, entityType strin
 // CreateNotificationForAllExcept persists a notification and delivers a WS toast for every
 // user except the sender and any IDs in alsoExclude (e.g. users already receiving a mention
 // notification). Each user gets their own EmitToUser call so the excluded set is exact.
+// Notifications are filtered by each user's notification_prefs.
 func CreateNotificationForAllExcept(excludeUserID uint, alsoExclude []uint, message, notifType, entityType string, entityID uint, content, senderName string) {
 	excluded := append([]uint{excludeUserID}, alsoExclude...)
 	var users []models.User
@@ -54,6 +99,9 @@ func CreateNotificationForAllExcept(excludeUserID uint, alsoExclude []uint, mess
 		EntityID: entityID, Content: content, SenderName: senderName,
 	})
 	for _, user := range users {
+		if !shouldDeliverWeb(user, notifType, entityType, entityID) {
+			continue
+		}
 		notif := models.Notification{
 			UserID:     user.ID,
 			Message:    message,
@@ -70,6 +118,7 @@ func CreateNotificationForAllExcept(excludeUserID uint, alsoExclude []uint, mess
 
 // BroadcastChatToastExcept sends a transient WS toast to every user except the sender.
 // Nothing is written to the notifications table, so the bell panel stays clean.
+// Delivery is filtered by each user's notification_prefs.
 func BroadcastChatToastExcept(excludeUserID uint, message, notifType, content, senderName string) {
 	wsMsg := buildNotifWSMsg(models.Notification{
 		Message:    message,
@@ -81,6 +130,9 @@ func BroadcastChatToastExcept(excludeUserID uint, message, notifType, content, s
 	var users []models.User
 	database.DB.Where("id != ?", excludeUserID).Find(&users)
 	for _, user := range users {
+		if !shouldDeliverWeb(user, notifType, "chat", 0) {
+			continue
+		}
 		database.EmitToUser(user.ID, wsMsg)
 	}
 }

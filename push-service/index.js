@@ -125,6 +125,89 @@ async function deleteInvalidTokens(tokens) {
   await client.end();
 }
 
+// ─── Notification prefs helpers ───────────────────────────────────────────────
+
+// Fetch a user's notification_prefs JSONB from the users table.
+async function getUserPrefs(userId) {
+  const client = newClient();
+  await client.connect();
+  const { rows } = await client.query(
+    'SELECT notification_prefs FROM users WHERE id = $1',
+    [userId]
+  );
+  await client.end();
+  if (!rows.length) return null;
+  const raw = rows[0].notification_prefs;
+  try {
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return null;
+  }
+}
+
+const DEFAULT_PUSH_TYPES = [
+  'status_change', 'comment', 'mention', 'assignment',
+  'attachment', 'chat', 'product_created', 'product_deleted', 'delivery_reminder',
+];
+
+// Check if userId is assigned to productId via product_assignees.
+async function isAssignedToProduct(userId, productId) {
+  if (!productId) return false;
+  const client = newClient();
+  await client.connect();
+  const { rows } = await client.query(
+    'SELECT 1 FROM product_assignees WHERE user_id = $1 AND product_id = $2 LIMIT 1',
+    [userId, productId]
+  );
+  await client.end();
+  return rows.length > 0;
+}
+
+// Determine whether a push should be sent based on user prefs.
+// notifType: one of the prefs type keys (e.g. "status_change", "comment", etc.)
+// entityType: "product" | "chat" | other
+// entityId: product ID (for my_orders mode assignment check), 0 otherwise
+async function shouldSendPush(userId, notifType, entityType, entityId) {
+  // mention always goes through
+  if (notifType === 'mention') return true;
+
+  const prefs = await getUserPrefs(userId);
+  if (!prefs) return true; // no prefs → default allow
+
+  const push = prefs.push || { enabled: true, types: DEFAULT_PUSH_TYPES };
+  if (!push.enabled) return false;
+
+  const types = Array.isArray(push.types) ? push.types : DEFAULT_PUSH_TYPES;
+  if (!types.includes(notifType)) return false;
+
+  const mode = prefs.mode || 'all';
+  if (mode === 'all' || mode === 'custom') return true;
+
+  if (mode === 'my_orders') {
+    if (notifType === 'chat' || entityType === 'chat') return true;
+    if (entityType === 'product' && entityId) {
+      return isAssignedToProduct(userId, entityId);
+    }
+    return false;
+  }
+
+  return true;
+}
+
+// Like sendPushToAllExcept but respects each user's notification prefs.
+async function sendPushToAllExceptFiltered(excludeId, opts, notifType, entityType, entityId) {
+  try {
+    const userIds = await getPushUserIdsExcept(excludeId);
+    if (!userIds.length) return;
+    await Promise.all(userIds.map(async (uid) => {
+      const allowed = await shouldSendPush(uid, notifType, entityType, entityId);
+      if (allowed) await sendPushToUser(uid, opts);
+    }));
+  } catch (err) {
+    console.error('sendPushToAllExceptFiltered error:', err.message);
+  }
+}
+
 // ─── Send push to a single user ───────────────────────────────────────────────
 async function sendPushToUser(userId, { title, body, data }) {
   const tokens = await getTokensForUser(userId);
@@ -290,6 +373,24 @@ async function startListener() {
           }
         }
 
+        // Map the push service type to the prefs type key
+        const prefsTypeMap = {
+          comment_added:                'comment',
+          mention:                      'mention',
+          attachment_uploaded:          'attachment',
+          customer_comment_added:       'comment',
+          customer_attachment_uploaded: 'attachment',
+          chat_message:                 'chat',
+          assignment:                   'assignment',
+          delivery_reminder:            'delivery_reminder',
+        };
+        const prefsType = prefsTypeMap[type] || type;
+
+        const allowed = await shouldSendPush(
+          event.user_id, prefsType, entity, p.entity_id || 0
+        );
+        if (!allowed) return;
+
         await sendPushToUser(event.user_id, {
           title,
           body,
@@ -335,11 +436,19 @@ async function startListener() {
         // Body: "Actor: full activity message" so recipient knows who did it
         const body = msg ? `${actor}: ${msg}` : 'Order activity updated';
 
-        await sendPushToAllExcept(event.exclude_id || 0, {
-          title,
-          body,
-          data: { entityType: 'product', entityId: p.entity_id || 0, type: 'activity' },
-        });
+        // Determine prefs type for this activity event
+        let activityPrefsType = 'status_change';
+        if (/created for customer/i.test(msg) || / created$/i.test(msg)) activityPrefsType = 'product_created';
+        else if (/moved to trash/i.test(msg)) activityPrefsType = 'product_deleted';
+        else if (/restored from trash/i.test(msg)) activityPrefsType = 'product_deleted';
+
+        await sendPushToAllExceptFiltered(
+          event.exclude_id || 0,
+          { title, body, data: { entityType: 'product', entityId: p.entity_id || 0, type: 'activity' } },
+          activityPrefsType,
+          'product',
+          p.entity_id || 0
+        );
         return;
       }
 

@@ -9,6 +9,13 @@ import { useThemeStore } from '../store/themeStore';
 import { darkColors, lightColors, ThemeColors } from '../theme';
 import { profileApi, authApi } from '../api/services';
 import { Feather } from '@expo/vector-icons';
+import {
+  NotificationMode,
+  NotifType,
+  NotificationPrefs,
+  ALL_NOTIF_TYPES,
+  DEFAULT_NOTIFICATION_PREFS,
+} from '../types';
 
 const ROLE_META: Record<string, { label: string; color: string; bg: string }> = {
   admin:     { label: 'Admin',     color: '#F87171', bg: 'rgba(239,68,68,0.15)' },
@@ -21,6 +28,30 @@ const ROLE_META: Record<string, { label: string; color: string; bg: string }> = 
 const AVATAR_BG = [
   '#6366F1', '#8B5CF6', '#EC4899', '#F97316',
   '#10B981', '#06B6D4', '#EF4444', '#FBBF24',
+];
+
+const NOTIF_TYPE_LABELS: Record<NotifType, string> = {
+  status_change:      'Status Changes',
+  comment:            'Comments',
+  mention:            'Mentions',
+  assignment:         'Assignments',
+  attachment:         'Attachments',
+  chat:               'Team Chat',
+  product_created:    'New Orders',
+  product_deleted:    'Deleted Orders',
+  delivery_reminder:  'Delivery Reminders',
+};
+
+const PRESET_ALL: NotifType[]       = [...ALL_NOTIF_TYPES];
+const PRESET_MY_ORDERS: NotifType[] = [
+  'status_change', 'comment', 'mention', 'assignment',
+  'attachment', 'product_created', 'product_deleted', 'delivery_reminder',
+];
+
+const NOTIF_MODES: { value: NotificationMode; label: string; desc: string }[] = [
+  { value: 'all',       label: 'All Notifications',    desc: 'Receive every notification' },
+  { value: 'my_orders', label: 'My Orders + Chat',     desc: 'Orders assigned to me & team chat' },
+  { value: 'custom',    label: 'Custom',               desc: 'Choose exactly what you receive' },
 ];
 
 function getAvatarBg(name: string) {
@@ -44,6 +75,12 @@ export default function ProfileScreen() {
   const [savingName, setSavingName]   = useState(false);
   const [showLogout, setShowLogout]   = useState(false);
 
+  // Notification prefs state
+  const initPrefs: NotificationPrefs = user?.notification_prefs ?? DEFAULT_NOTIFICATION_PREFS;
+  const [prefs, setPrefs]       = useState<NotificationPrefs>(initPrefs);
+  const [savingPrefs, setSavingPrefs] = useState(false);
+  const [prefsExpanded, setPrefsExpanded] = useState(false);
+
   const roleName = user?.role?.name ?? 'employee';
   const meta     = ROLE_META[roleName] ?? ROLE_META.employee;
   const avatarBg = getAvatarBg(user?.name ?? '');
@@ -64,6 +101,52 @@ export default function ProfileScreen() {
     }
     setSavingName(false);
   };
+
+  // ── Save notification prefs ────────────────────────────────────────────────
+  const savePrefs = async (newPrefs: NotificationPrefs) => {
+    setSavingPrefs(true);
+    try {
+      const res = await profileApi.update({ notification_prefs: newPrefs });
+      updateUser(res.data);
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.error || 'Failed to save preferences');
+      setPrefs(initPrefs);
+    }
+    setSavingPrefs(false);
+  };
+
+  const setMode = (mode: NotificationMode) => {
+    const updated = { ...prefs, mode };
+    setPrefs(updated);
+    savePrefs(updated);
+  };
+
+  const setPushEnabled = (enabled: boolean) => {
+    const updated = { ...prefs, push: { ...prefs.push, enabled } };
+    setPrefs(updated);
+    savePrefs(updated);
+  };
+
+  const togglePushType = (t: NotifType, checked: boolean) => {
+    const types = checked
+      ? [...prefs.push.types, t]
+      : prefs.push.types.filter((x) => x !== t);
+    const updated = { ...prefs, push: { ...prefs.push, types } };
+    setPrefs(updated);
+    savePrefs(updated);
+  };
+
+  const setPushPreset = (preset: NotifType[]) => {
+    const updated = { ...prefs, push: { ...prefs.push, types: preset } };
+    setPrefs(updated);
+    savePrefs(updated);
+  };
+
+  const isPushAllSelected      = PRESET_ALL.every((t) => t === 'mention' || prefs.push.types.includes(t));
+  const isPushMyOrdersSelected = (
+    PRESET_MY_ORDERS.every((t) => t === 'mention' || prefs.push.types.includes(t)) &&
+    !prefs.push.types.includes('chat')
+  );
 
   // ── Logout ─────────────────────────────────────────────────────────────────
   const doLogout = async () => {
@@ -181,6 +264,135 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        {/* ── Notification Preferences card ──────────────────────── */}
+        <View style={s.card}>
+          <TouchableOpacity
+            style={s.row}
+            onPress={() => setPrefsExpanded((v) => !v)}
+            activeOpacity={0.7}
+          >
+            <View style={s.rowLeft}>
+              <View style={s.rowIcon}><Feather name="bell" size={20} color={c.textSec} /></View>
+              <View>
+                <Text style={s.rowLabel}>Notifications</Text>
+                <Text style={s.rowValue}>
+                  {NOTIF_MODES.find((m) => m.value === prefs.mode)?.label ?? 'All Notifications'}
+                </Text>
+              </View>
+            </View>
+            <Feather
+              name={prefsExpanded ? 'chevron-up' : 'chevron-down'}
+              size={18}
+              color={c.textMuted}
+            />
+          </TouchableOpacity>
+
+          {prefsExpanded && (
+            <>
+              <View style={s.divider} />
+
+              {/* Mode selector */}
+              <View style={s.prefsSection}>
+                <Text style={s.prefsSectionTitle}>Notification Mode</Text>
+                {NOTIF_MODES.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      s.modeOption,
+                      prefs.mode === opt.value && s.modeOptionActive,
+                    ]}
+                    onPress={() => setMode(opt.value)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[s.radioOuter, prefs.mode === opt.value && s.radioOuterActive]}>
+                      {prefs.mode === opt.value && <View style={s.radioInner} />}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.modeLabel, prefs.mode === opt.value && { color: c.brand }]}>
+                        {opt.label}
+                      </Text>
+                      <Text style={s.modeDesc}>{opt.desc}</Text>
+                    </View>
+                    {savingPrefs && prefs.mode === opt.value && (
+                      <ActivityIndicator size="small" color={c.brand} />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Custom: Push channel types */}
+              {prefs.mode === 'custom' && (
+                <>
+                  <View style={s.divider} />
+                  <View style={s.prefsSection}>
+                    <View style={s.channelHeader}>
+                      <Feather name="smartphone" size={16} color={c.textSec} />
+                      <Text style={s.prefsSectionTitle}>Mobile Push</Text>
+                      <View style={{ flex: 1 }} />
+                      <Switch
+                        value={prefs.push.enabled}
+                        onValueChange={setPushEnabled}
+                        trackColor={{ false: '#CBD5E1', true: '#6366F1' }}
+                        thumbColor="#fff"
+                        style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+                      />
+                    </View>
+
+                    {prefs.push.enabled && (
+                      <View>
+                        {/* Quick-select preset buttons */}
+                        <View style={s.presetRow}>
+                          <TouchableOpacity
+                            style={[s.presetBtn, isPushAllSelected && s.presetBtnActive]}
+                            onPress={() => setPushPreset(PRESET_ALL)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[s.presetBtnTxt, isPushAllSelected && s.presetBtnTxtActive]}>
+                              All
+                            </Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[s.presetBtn, isPushMyOrdersSelected && s.presetBtnActive]}
+                            onPress={() => setPushPreset(PRESET_MY_ORDERS)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={[s.presetBtnTxt, isPushMyOrdersSelected && s.presetBtnTxtActive]}>
+                              My Orders
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={s.typeGrid}>
+                        {ALL_NOTIF_TYPES.map((t) => {
+                          const locked  = t === 'mention';
+                          const checked = locked || prefs.push.types.includes(t);
+                          return (
+                            <TouchableOpacity
+                              key={t}
+                              style={s.typeRow}
+                              onPress={() => !locked && togglePushType(t, !checked)}
+                              activeOpacity={locked ? 1 : 0.7}
+                            >
+                              <View style={[s.checkbox, checked && s.checkboxChecked]}>
+                                {checked && <Feather name="check" size={11} color="#fff" />}
+                              </View>
+                              <Text style={[s.typeLabel, locked && s.typeLabelMuted]}>
+                                {NOTIF_TYPE_LABELS[t]}
+                                {locked ? ' ✦' : ''}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                </>
+              )}
+            </>
+          )}
+        </View>
+
         {/* ── Logout ──────────────────────────────────────────────── */}
         <TouchableOpacity style={s.logoutBtn} onPress={() => setShowLogout(true)}>
           <Feather name="log-out" size={20} color="#EF4444" style={s.logoutIcon} />
@@ -219,8 +431,8 @@ function makeStyles(c: ThemeColors) {
     header: { alignItems: 'center', marginBottom: 8, gap: 12 },
 
     avatarWrap: { position: 'relative' },
-    avatar: { 
-      width: 110, height: 110, borderRadius: 55, 
+    avatar: {
+      width: 110, height: 110, borderRadius: 55,
       borderWidth: 2, borderColor: c.brand,
       shadowColor: c.brand, shadowOffset: { width: 0, height: 6 },
       shadowOpacity: 0.2, shadowRadius: 12, elevation: 6
@@ -285,6 +497,58 @@ function makeStyles(c: ThemeColors) {
       paddingVertical: 6, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(99,102,241,0.25)',
     },
     editChipTxt: { fontSize: 12, fontWeight: '700', color: c.brandLight },
+
+    // ── Notification prefs
+    prefsSection: { paddingHorizontal: 18, paddingVertical: 16, gap: 10 },
+    prefsSectionTitle: { fontSize: 11, color: c.textMuted, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 4 },
+
+    channelHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+
+    modeOption: {
+      flexDirection: 'row', alignItems: 'center', gap: 12,
+      paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14,
+      borderWidth: 1, borderColor: c.border,
+      marginBottom: 6,
+    },
+    modeOptionActive: {
+      borderColor: 'rgba(99,102,241,0.5)',
+      backgroundColor: 'rgba(99,102,241,0.08)',
+    },
+    radioOuter: {
+      width: 18, height: 18, borderRadius: 9,
+      borderWidth: 2, borderColor: c.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    radioOuterActive: { borderColor: '#6366F1' },
+    radioInner: {
+      width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#6366F1',
+    },
+    modeLabel: { fontSize: 14, fontWeight: '600', color: c.text },
+    modeDesc:  { fontSize: 12, color: c.textMuted, marginTop: 1 },
+
+    presetRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+    presetBtn: {
+      flex: 1, paddingVertical: 7, borderRadius: 10,
+      borderWidth: 1, borderColor: c.border,
+      alignItems: 'center',
+    },
+    presetBtnActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
+    presetBtnTxt:    { fontSize: 12, fontWeight: '700', color: c.textMuted },
+    presetBtnTxtActive: { color: '#fff' },
+
+    typeGrid: { gap: 2, marginTop: 4 },
+    typeRow: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingVertical: 8, paddingHorizontal: 4,
+    },
+    checkbox: {
+      width: 18, height: 18, borderRadius: 5,
+      borderWidth: 2, borderColor: c.border,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    checkboxChecked: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
+    typeLabel: { fontSize: 14, color: c.text, fontWeight: '500' },
+    typeLabelMuted: { opacity: 0.6 },
 
     // ── Logout button
     logoutBtn: {

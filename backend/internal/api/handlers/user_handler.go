@@ -192,20 +192,21 @@ func (h *UserHandler) GetAvatarUploadURL(c *gin.Context) {
 	})
 }
 
-// UpdateProfile lets any authenticated user update their own name and/or avatar.
+// UpdateProfile lets any authenticated user update their own name, avatar, and/or notification prefs.
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
 	var req struct {
-		Name      string `json:"name"`
-		AvatarKey string `json:"avatar_key"`
+		Name              string                      `json:"name"`
+		AvatarKey         string                      `json:"avatar_key"`
+		NotificationPrefs *models.NotificationPrefs   `json:"notification_prefs"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := services.UpdateProfile(userID, req.Name, req.AvatarKey); err != nil {
+	if err := services.UpdateProfile(userID, req.Name, req.AvatarKey, req.NotificationPrefs); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
 		return
 	}

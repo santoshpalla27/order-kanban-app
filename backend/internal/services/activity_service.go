@@ -34,12 +34,13 @@ func CreateActivityLog(log *models.ActivityLog) error {
 	wsMsg, _ := json.Marshal(map[string]interface{}{
 		"type": "activity_updated",
 		"payload": map[string]interface{}{
-			"actor_id":   log.UserID,
-			"actor_name": actorName,
-			"message":    log.Details,
-			"entity":     log.Entity,
-			"entity_id":  log.EntityID,
-			"entity_url": entityURL,
+			"actor_id":      log.UserID,
+			"actor_name":    actorName,
+			"message":       log.Details,
+			"entity":        log.Entity,
+			"entity_action": log.Action,
+			"entity_id":     log.EntityID,
+			"entity_url":    entityURL,
 		},
 	})
 	// Exclude the actor — they know what they did.
