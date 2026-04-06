@@ -268,15 +268,64 @@ function CreateUserModal({ onClose }: { onClose: () => void }) {
 }
 
 export function UserCapabilitiesModal({ onClose }: { onClose: () => void }) {
-  const CAPABILITIES = [
-    { name: 'Manage Users & Roles (Add/Delete/Change Role)', roles: [1] },
-    { name: 'Delete Orders Permanently', roles: [1, 2] },
-    { name: 'View Admin Analytics Dashboard', roles: [1, 2] },
-    { name: 'Manage System Products & Configurations', roles: [1, 2, 3] },
-    { name: 'Create New Orders & Edit Order Details', roles: [1, 2, 3, 4] },
-    { name: 'Update Order Status (Move Kanban Cards)', roles: [1, 2, 3, 4] },
-    { name: 'Participate in Team Chat Channels', roles: [1, 2, 3, 4, 5] },
-    { name: 'View All Live Orders & Kanban Board', roles: [1, 2, 3, 4, 5] },
+  const CAPABILITY_GROUPS = [
+    {
+      group: 'User Management',
+      items: [
+        { name: 'View all users', roles: [1] },
+        { name: 'Create new users', roles: [1] },
+        { name: 'Change user roles', roles: [1] },
+        { name: 'Delete users', roles: [1] },
+      ],
+    },
+    {
+      group: 'Orders / Products',
+      items: [
+        { name: 'View orders & kanban board', roles: [1, 2, 3, 4, 5] },
+        { name: 'Create new orders', roles: [1, 2, 3] },
+        { name: 'Edit order details', roles: [1, 2, 3] },
+        { name: 'Delete orders', roles: [1, 2] },
+        { name: 'Restore deleted orders', roles: [1, 2] },
+      ],
+    },
+    {
+      group: 'Kanban Board',
+      items: [
+        { name: 'Drag & drop cards between columns', roles: [1, 2, 3, 4] },
+        { name: 'Move card via status dropdown', roles: [1, 2, 3, 4] },
+        { name: 'Yet to Start → Working', roles: [1, 2, 3, 4] },
+        { name: 'Working → Review', roles: [1, 2, 3, 4] },
+        { name: 'Review → Done', roles: [1, 2, 3, 4] },
+        { name: 'Move card backwards (any column)', roles: [1, 2, 3, 4] },
+      ],
+    },
+    {
+      group: 'Attachments',
+      items: [
+        { name: 'View attachments', roles: [1, 2, 3, 4, 5] },
+        { name: 'Upload attachments', roles: [1, 2, 3, 4] },
+        { name: 'Delete own attachments', roles: [1, 2, 3, 4] },
+        { name: 'Delete any attachment', roles: [1, 2] },
+      ],
+    },
+    {
+      group: 'Comments & Chat',
+      items: [
+        { name: 'View comments', roles: [1, 2, 3, 4, 5] },
+        { name: 'Post comments', roles: [1, 2, 3, 4] },
+        { name: 'Delete own comments', roles: [1, 2, 3, 4] },
+        { name: 'Delete any comment', roles: [1, 2] },
+        { name: 'Send chat messages', roles: [1, 2, 3, 4] },
+      ],
+    },
+    {
+      group: 'Analytics & System',
+      items: [
+        { name: 'View stats dashboard', roles: [1, 2] },
+        { name: 'Manage customer links', roles: [1, 2, 3] },
+        { name: 'Run purge / admin tools', roles: [1] },
+      ],
+    },
   ];
 
   /* 1 = admin, 2 = manager, 3 = organiser, 4 = employee, 5 = view_only */
@@ -303,30 +352,43 @@ export function UserCapabilitiesModal({ onClose }: { onClose: () => void }) {
         
         <div className="overflow-auto p-5">
           <table className="w-full text-sm text-left border-collapse">
-            <thead className="bg-surface-800/50 text-surface-300">
+            <thead className="bg-surface-800/50 text-surface-300 sticky top-0 z-10">
               <tr>
                 <th className="px-4 py-3 font-semibold rounded-tl-lg border-b border-surface-700/50 text-surface-100">Capability</th>
-                {ROLES.map(r => <th key={r.id} className="px-4 py-3 font-semibold text-center border-b border-surface-700/50">{r.label}</th>)}
+                {ROLES.map(r => (
+                  <th key={r.id} className="px-4 py-3 font-semibold text-center border-b border-surface-700/50">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.color}`}>{r.label}</span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {CAPABILITIES.map((cap, i) => (
-                <tr key={i} className="border-b border-surface-700/30 hover:bg-surface-700/20 transition-colors">
-                  <td className="px-4 py-4 font-medium text-surface-200">{cap.name}</td>
-                  {ROLES.map(r => (
-                    <td key={r.id} className="px-4 py-4 text-center border-l border-surface-700/20">
-                      {cap.roles.includes(r.id) ? (
-                        <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        </div>
-                      ) : (
-                        <div className="w-6 h-6 flex items-center justify-center mx-auto text-surface-600 opacity-50">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </div>
-                      )}
+              {CAPABILITY_GROUPS.map((group) => (
+                <>
+                  <tr key={group.group} className="bg-surface-800/60">
+                    <td colSpan={ROLES.length + 1} className="px-4 py-2 text-xs font-bold uppercase tracking-wider text-surface-400">
+                      {group.group}
                     </td>
+                  </tr>
+                  {group.items.map((cap, i) => (
+                    <tr key={i} className="border-b border-surface-700/30 hover:bg-surface-700/20 transition-colors">
+                      <td className="px-4 py-3 text-surface-200 pl-6">{cap.name}</td>
+                      {ROLES.map(r => (
+                        <td key={r.id} className="px-4 py-3 text-center border-l border-surface-700/20">
+                          {cap.roles.includes(r.id) ? (
+                            <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto text-emerald-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </div>
+                          ) : (
+                            <div className="w-6 h-6 flex items-center justify-center mx-auto text-surface-600 opacity-50">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </div>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
+                </>
               ))}
             </tbody>
           </table>
