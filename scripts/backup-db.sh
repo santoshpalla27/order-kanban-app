@@ -12,10 +12,12 @@ CONTAINER=kanban-postgres
 
 # ── Load .env (get DB creds + R2 creds) ──────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/../.env"
-if [ -f "$ENV_FILE" ]; then
+if [ -f "$SCRIPT_DIR/../.env" ]; then
   # shellcheck disable=SC1090
-  set -a; source "$ENV_FILE"; set +a
+  set -a; source "$SCRIPT_DIR/../.env"; set +a
+elif [ -f "$SCRIPT_DIR/.env" ]; then
+  # shellcheck disable=SC1090
+  set -a; source "$SCRIPT_DIR/.env"; set +a
 fi
 
 POSTGRES_USER="${POSTGRES_USER:-kanban}"

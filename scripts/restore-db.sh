@@ -21,9 +21,10 @@ COMPOSE_FILE="$(cd "$(dirname "$0")/.." && pwd)/docker-compose.prod.yml"
 
 # ── Load .env ─────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ENV_FILE="$SCRIPT_DIR/../.env"
-if [ -f "$ENV_FILE" ]; then
-  set -a; source "$ENV_FILE"; set +a
+if [ -f "$SCRIPT_DIR/../.env" ]; then
+  set -a; source "$SCRIPT_DIR/../.env"; set +a
+elif [ -f "$SCRIPT_DIR/.env" ]; then
+  set -a; source "$SCRIPT_DIR/.env"; set +a
 fi
 POSTGRES_USER="${POSTGRES_USER:-kanban}"
 POSTGRES_DB="${POSTGRES_DB:-kanban}"
