@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Alert, ActivityIndicator, Modal, Switch, KeyboardAvoidingView,
@@ -69,6 +69,20 @@ export default function ProfileScreen() {
   const [prefs, setPrefs] = useState<NotificationPrefs>(initPrefs);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsExpanded, setPrefsExpanded] = useState(false);
+
+  // Refresh user from server so prefs are always up-to-date (e.g. changed on web)
+  useEffect(() => {
+    profileApi.getMe().then((res) => {
+      updateUser(res.data);
+      const fresh = res.data?.notification_prefs;
+      if (fresh) {
+        setPrefs({
+          custom_my_types:  fresh.custom_my_types  ?? [...MY_ORDERS_NOTIF_TYPES],
+          custom_all_types: fresh.custom_all_types ?? [...ALL_NOTIF_TYPES],
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
   const roleName = user?.role?.name ?? 'employee';
   const meta     = ROLE_META[roleName] ?? ROLE_META.employee;
