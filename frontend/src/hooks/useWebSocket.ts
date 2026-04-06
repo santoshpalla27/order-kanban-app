@@ -17,8 +17,8 @@ const ACTION_TO_NOTIF_TYPE: Record<string, NotifType> = {
   updated:        'status_change', // product detail updates — treat same as status_change
 };
 
-// Returns true if the user's web prefs allow showing this notification type.
-// productId is needed only for my_orders mode to check assignment.
+// Returns true if the user's prefs allow showing this activity toast.
+// @mention always bypasses.
 function webPrefsAllow(
   prefs: NotificationPrefs | undefined,
   notifType: NotifType,
@@ -27,21 +27,15 @@ function webPrefsAllow(
   cachedProducts: Product[],
 ): boolean {
   if (!prefs) return true;
-  const types: NotifType[] = prefs.web?.types ?? [...ALL_NOTIF_TYPES];
-  const enabled = prefs.web?.enabled ?? true;
-  if (!enabled) return false;
-  if (!types.includes(notifType)) return false;
+  if (notifType === 'mention') return true;
 
-  const mode = prefs.mode ?? 'all';
-  if (mode === 'all' || mode === 'custom') return true;
+  const product = cachedProducts.find((p) => p.id === productId);
+  const isMyOrder = product?.assignees?.some((a) => a.id === currentUserId) ?? false;
 
-  if (mode === 'my_orders') {
-    // Find the product in any cached query data to check assignees.
-    const product = cachedProducts.find((p) => p.id === productId);
-    if (!product) return true; // not in cache — allow (can't tell, don't suppress)
-    return product.assignees?.some((a) => a.id === currentUserId) ?? false;
-  }
-  return true;
+  const types: NotifType[] = isMyOrder
+    ? (prefs.custom_my_types  ?? [...ALL_NOTIF_TYPES])
+    : (prefs.custom_all_types ?? [...ALL_NOTIF_TYPES]);
+  return types.includes(notifType);
 }
 
 export function useWebSocket() {
@@ -126,12 +120,19 @@ export function useWebSocket() {
               const actAction = (data.payload.entity_action as string) || '';
               const notifType: NotifType = ACTION_TO_NOTIF_TYPE[actAction] ?? 'status_change';
 
+              // product_created toast is handled by the targeted notification event
+              if (notifType === 'product_created') break;
+
               // Collect all products from any matching query cache entries.
               const cachedProducts: Product[] = [];
               queryClient.getQueriesData<any>({ queryKey: ['products'] }).forEach(([, d]) => {
                 if (Array.isArray(d)) cachedProducts.push(...d);
-                else if (d?.data && Array.isArray(d.data)) cachedProducts.push(...d.data);
-                else if (d?.pages) d.pages.forEach((p: any) => Array.isArray(p?.data) && cachedProducts.push(...p.data));
+                else if (Array.isArray(d?.data)) cachedProducts.push(...d.data);
+                else if (Array.isArray(d?.data?.data)) cachedProducts.push(...d.data.data);
+                else if (d?.pages) d.pages.forEach((p: any) => {
+                  if (Array.isArray(p?.data)) cachedProducts.push(...p.data);
+                  else if (Array.isArray(p?.data?.data)) cachedProducts.push(...p.data.data);
+                });
               });
 
               if (!webPrefsAllow(notifPrefs, notifType, actEntityId, currentUserId, cachedProducts)) break;
@@ -157,8 +158,8 @@ export function useWebSocket() {
             // Suppress toast and sound when user is already on the chat page
             if (isChatNotif && window.location.pathname.includes('/chat')) break;
             const ntype = data.payload?.notif_type || 'notification';
-            // Suppress toast for status_change and product_created — activity toast handles those
-            if (ntype === 'status_change' || ntype === 'product_created') break;
+            // Suppress toast for status_change — activity toast handles those
+            if (ntype === 'status_change') break;
             const msg = data.payload?.message || 'New notification';
             const entityId = (data.payload?.entity_id as number) || 0;
             const content = (data.payload?.content as string) || '';
@@ -177,6 +178,9 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
+      // If wsRef has already been replaced (e.g. prefs changed → new connect called),
+      // don't schedule a reconnect with this stale closure.
+      if (wsRef.current !== ws) return;
       console.log('WebSocket disconnected, reconnecting...');
       reconnectTimer.current = setTimeout(connect, 3000);
     };

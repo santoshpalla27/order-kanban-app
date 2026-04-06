@@ -7,30 +7,28 @@ import (
 	"time"
 )
 
-// NotificationChannelPrefs holds enabled flag and allowed event types for one channel (web or push).
-type NotificationChannelPrefs struct {
-	Enabled bool     `json:"enabled"`
-	Types   []string `json:"types"`
-}
-
 // NotificationPrefs is stored as JSONB in the users table.
-// Mode: "all" | "my_orders" | "custom"
+// @mention always bypasses both type lists.
 type NotificationPrefs struct {
-	Mode string                    `json:"mode"`
-	Web  NotificationChannelPrefs  `json:"web"`
-	Push NotificationChannelPrefs  `json:"push"`
+	CustomMyTypes  []string `json:"custom_my_types"`  // types for MY assigned orders
+	CustomAllTypes []string `json:"custom_all_types"` // types for all other orders + chat
 }
 
-// DefaultNotificationPrefs returns the default (all notifications on).
+var allNotifTypes = []string{
+	"status_change", "comment", "mention",
+	"attachment", "chat", "product_created", "product_deleted",
+}
+
+var myOrdersNotifTypes = []string{
+	"status_change", "comment", "mention",
+	"attachment", "product_created", "product_deleted",
+}
+
+// DefaultNotificationPrefs returns defaults: all notifications on.
 func DefaultNotificationPrefs() NotificationPrefs {
-	allTypes := []string{
-		"status_change", "comment", "mention", "assignment",
-		"attachment", "chat", "product_created", "product_deleted", "delivery_reminder",
-	}
 	return NotificationPrefs{
-		Mode: "all",
-		Web:  NotificationChannelPrefs{Enabled: true, Types: allTypes},
-		Push: NotificationChannelPrefs{Enabled: true, Types: allTypes},
+		CustomMyTypes:  myOrdersNotifTypes,
+		CustomAllTypes: allNotifTypes,
 	}
 }
 

@@ -33,7 +33,7 @@ function ToastCard({ toast }: { toast: Toast }) {
   const [sending, setSending] = useState(false);
 
   const isChat = toast.entityType === 'chat';
-  const canReply = toast.entityType === 'product' || isChat;
+  const canReply = (toast.entityType === 'product' && toast.type !== 'product_created' && toast.type !== 'product_deleted') || isChat;
   const senderInitials = toast.senderName ? initials(toast.senderName) : '?';
   const colorClass = toast.senderName ? avatarColor(toast.senderName) : 'bg-surface-600';
 

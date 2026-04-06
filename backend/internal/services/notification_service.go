@@ -18,6 +18,19 @@ func containsType(types []string, t string) bool {
 	return false
 }
 
+// normalizeNotifType maps internal event type strings to the prefs key used in
+// custom_my_types / custom_all_types so the filter works correctly.
+func normalizeNotifType(t string) string {
+	switch t {
+	case "comment_added", "customer_comment_added":
+		return "comment"
+	case "attachment_uploaded", "customer_attachment_uploaded":
+		return "attachment"
+	default:
+		return t
+	}
+}
+
 // isUserAssignedToProduct returns true if the user is in product_assignees for the given product.
 func isUserAssignedToProduct(userID, productID uint) bool {
 	var count int64
@@ -28,28 +41,35 @@ func isUserAssignedToProduct(userID, productID uint) bool {
 }
 
 // shouldDeliverWeb returns true if a web notification should be delivered to the user.
-// Mention type always bypasses prefs.
+// @mention always bypasses all filters.
 func shouldDeliverWeb(user models.User, notifType, entityType string, entityID uint) bool {
 	if notifType == "mention" {
 		return true
 	}
+	notifType = normalizeNotifType(notifType)
 	prefs := user.NotificationPrefs
-	if !prefs.Web.Enabled {
-		return false
-	}
-	switch prefs.Mode {
-	case "all", "custom":
-		return containsType(prefs.Web.Types, notifType)
-	case "my_orders":
-		if notifType == "chat" || entityType == "chat" {
-			return containsType(prefs.Web.Types, notifType)
+	if entityType == "chat" {
+		if len(prefs.CustomAllTypes) == 0 {
+			return true
 		}
-		if entityType == "product" && entityID > 0 {
-			return isUserAssignedToProduct(user.ID, entityID) && containsType(prefs.Web.Types, notifType)
-		}
-		return false
+		return containsType(prefs.CustomAllTypes, notifType)
 	}
-	return true
+	if entityType == "product" && entityID > 0 {
+		if isUserAssignedToProduct(user.ID, entityID) {
+			if len(prefs.CustomMyTypes) == 0 {
+				return true
+			}
+			return containsType(prefs.CustomMyTypes, notifType)
+		}
+		if len(prefs.CustomAllTypes) == 0 {
+			return true
+		}
+		return containsType(prefs.CustomAllTypes, notifType)
+	}
+	if len(prefs.CustomAllTypes) == 0 {
+		return true
+	}
+	return containsType(prefs.CustomAllTypes, notifType)
 }
 
 var mentionRe = regexp.MustCompile(`@\[([^\]]+)\]`)

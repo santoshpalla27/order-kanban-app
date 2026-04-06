@@ -2,6 +2,16 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { wsManager } from '../websocket/wsManager';
+import { ALL_NOTIF_TYPES } from '../types';
+
+// Maps activity entity_action → notification prefs type key.
+const ACTION_TO_NOTIF_TYPE: Record<string, string> = {
+  status_changed: 'status_change',
+  created:        'product_created',
+  deleted:        'product_deleted',
+  restored:       'product_deleted',
+  updated:        'status_change',
+};
 
 export interface WsCallbacks {
   onProductsChanged?: () => void;
@@ -66,6 +76,15 @@ export function useWsEvents(callbacks?: WsCallbacks) {
           cb?.onActivityChanged?.();
           if (data.payload?.actor_id !== currentUserId &&
               data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment') {
+            const actAction = (data.payload?.entity_action as string) || '';
+            const notifType = ACTION_TO_NOTIF_TYPE[actAction] ?? 'status_change';
+            // product_created toast is handled by the targeted notification event
+            if (notifType === 'product_created') break;
+            const prefs = useAuthStore.getState().user?.notification_prefs;
+            // Can't check assignment on mobile, so allow if EITHER list includes the type.
+            const myTypes: string[]  = prefs?.custom_my_types  ?? [...ALL_NOTIF_TYPES];
+            const allTypes: string[] = prefs?.custom_all_types ?? [...ALL_NOTIF_TYPES];
+            if (prefs && !myTypes.includes(notifType) && !allTypes.includes(notifType)) break;
             addToast({
               message: data.payload?.message || 'Activity updated',
               content: '', type: 'activity', entityType: 'activity',
@@ -81,9 +100,8 @@ export function useWsEvents(callbacks?: WsCallbacks) {
           // Suppress chat notification toasts when the user is already on the chat screen
           const isChatNotif = entityType === 'chat';
           const isStatusChange = (data.payload?.notif_type || '') === 'status_change';
-          const isProductCreated = (data.payload?.notif_type || '') === 'product_created';
-          // Suppress toast for status_change and product_created — activity toast handles those
-          if (!isStatusChange && !isProductCreated && (!isChatNotif || !useNotificationStore.getState().chatScreenActive)) {
+          // Suppress toast for status_change — activity toast handles those
+          if (!isStatusChange && (!isChatNotif || !useNotificationStore.getState().chatScreenActive)) {
             addToast({
               message: data.payload?.message || 'New notification',
               content: data.payload?.content || '',

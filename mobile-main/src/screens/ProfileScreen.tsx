@@ -10,11 +10,10 @@ import { darkColors, lightColors, ThemeColors } from '../theme';
 import { profileApi, authApi } from '../api/services';
 import { Feather } from '@expo/vector-icons';
 import {
-  NotificationMode,
   NotifType,
   NotificationPrefs,
   ALL_NOTIF_TYPES,
-  DEFAULT_NOTIFICATION_PREFS,
+  MY_ORDERS_NOTIF_TYPES,
 } from '../types';
 
 const ROLE_META: Record<string, { label: string; color: string; bg: string }> = {
@@ -31,28 +30,14 @@ const AVATAR_BG = [
 ];
 
 const NOTIF_TYPE_LABELS: Record<NotifType, string> = {
-  status_change:      'Status Changes',
-  comment:            'Comments',
-  mention:            'Mentions',
-  assignment:         'Assignments',
-  attachment:         'Attachments',
-  chat:               'Team Chat',
-  product_created:    'New Orders',
-  product_deleted:    'Deleted Orders',
-  delivery_reminder:  'Delivery Reminders',
+  status_change:     'Status & Movements',
+  comment:           'Comments',
+  mention:           'Mentions',
+  attachment:        'Files & Attachments',
+  chat:              'Team Chat',
+  product_created:   'New Orders',
+  product_deleted:   'Deleted Orders',
 };
-
-const PRESET_ALL: NotifType[]       = [...ALL_NOTIF_TYPES];
-const PRESET_MY_ORDERS: NotifType[] = [
-  'status_change', 'comment', 'mention', 'assignment',
-  'attachment', 'product_created', 'product_deleted', 'delivery_reminder',
-];
-
-const NOTIF_MODES: { value: NotificationMode; label: string; desc: string }[] = [
-  { value: 'all',       label: 'All Notifications',    desc: 'Receive every notification' },
-  { value: 'my_orders', label: 'My Orders + Chat',     desc: 'Orders assigned to me & team chat' },
-  { value: 'custom',    label: 'Custom',               desc: 'Choose exactly what you receive' },
-];
 
 function getAvatarBg(name: string) {
   let h = 0;
@@ -75,9 +60,13 @@ export default function ProfileScreen() {
   const [savingName, setSavingName]   = useState(false);
   const [showLogout, setShowLogout]   = useState(false);
 
-  // Notification prefs state
-  const initPrefs: NotificationPrefs = user?.notification_prefs ?? DEFAULT_NOTIFICATION_PREFS;
-  const [prefs, setPrefs]       = useState<NotificationPrefs>(initPrefs);
+  // Notification prefs state.
+  const raw = user?.notification_prefs;
+  const initPrefs: NotificationPrefs = {
+    custom_my_types:  raw?.custom_my_types  ?? [...MY_ORDERS_NOTIF_TYPES],
+    custom_all_types: raw?.custom_all_types ?? [...ALL_NOTIF_TYPES],
+  };
+  const [prefs, setPrefs] = useState<NotificationPrefs>(initPrefs);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [prefsExpanded, setPrefsExpanded] = useState(false);
 
@@ -115,38 +104,23 @@ export default function ProfileScreen() {
     setSavingPrefs(false);
   };
 
-  const setMode = (mode: NotificationMode) => {
-    const updated = { ...prefs, mode };
-    setPrefs(updated);
-    savePrefs(updated);
-  };
-
-  const setPushEnabled = (enabled: boolean) => {
-    const updated = { ...prefs, push: { ...prefs.push, enabled } };
-    setPrefs(updated);
-    savePrefs(updated);
-  };
-
-  const togglePushType = (t: NotifType, checked: boolean) => {
+  const toggleMyType = (t: NotifType, checked: boolean) => {
     const types = checked
-      ? [...prefs.push.types, t]
-      : prefs.push.types.filter((x) => x !== t);
-    const updated = { ...prefs, push: { ...prefs.push, types } };
+      ? [...prefs.custom_my_types, t]
+      : prefs.custom_my_types.filter((x) => x !== t);
+    const updated = { ...prefs, custom_my_types: types };
     setPrefs(updated);
     savePrefs(updated);
   };
 
-  const setPushPreset = (preset: NotifType[]) => {
-    const updated = { ...prefs, push: { ...prefs.push, types: preset } };
+  const toggleAllType = (t: NotifType, checked: boolean) => {
+    const types = checked
+      ? [...prefs.custom_all_types, t]
+      : prefs.custom_all_types.filter((x) => x !== t);
+    const updated = { ...prefs, custom_all_types: types };
     setPrefs(updated);
     savePrefs(updated);
   };
-
-  const isPushAllSelected      = PRESET_ALL.every((t) => t === 'mention' || prefs.push.types.includes(t));
-  const isPushMyOrdersSelected = (
-    PRESET_MY_ORDERS.every((t) => t === 'mention' || prefs.push.types.includes(t)) &&
-    !prefs.push.types.includes('chat')
-  );
 
   // ── Logout ─────────────────────────────────────────────────────────────────
   const doLogout = async () => {
@@ -275,9 +249,7 @@ export default function ProfileScreen() {
               <View style={s.rowIcon}><Feather name="bell" size={20} color={c.textSec} /></View>
               <View>
                 <Text style={s.rowLabel}>Notifications</Text>
-                <Text style={s.rowValue}>
-                  {NOTIF_MODES.find((m) => m.value === prefs.mode)?.label ?? 'All Notifications'}
-                </Text>
+                <Text style={s.rowValue}>Customize</Text>
               </View>
             </View>
             <Feather
@@ -291,104 +263,66 @@ export default function ProfileScreen() {
             <>
               <View style={s.divider} />
 
-              {/* Mode selector */}
+              {/* My Orders section */}
               <View style={s.prefsSection}>
-                <Text style={s.prefsSectionTitle}>Notification Mode</Text>
-                {NOTIF_MODES.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      s.modeOption,
-                      prefs.mode === opt.value && s.modeOptionActive,
-                    ]}
-                    onPress={() => setMode(opt.value)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[s.radioOuter, prefs.mode === opt.value && s.radioOuterActive]}>
-                      {prefs.mode === opt.value && <View style={s.radioInner} />}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[s.modeLabel, prefs.mode === opt.value && { color: c.brand }]}>
-                        {opt.label}
-                      </Text>
-                      <Text style={s.modeDesc}>{opt.desc}</Text>
-                    </View>
-                    {savingPrefs && prefs.mode === opt.value && (
-                      <ActivityIndicator size="small" color={c.brand} />
-                    )}
-                  </TouchableOpacity>
-                ))}
+                <Text style={s.prefsSectionTitle}>My Orders</Text>
+                <Text style={[s.modeDesc, { marginBottom: 8 }]}>
+                  Notifications for orders assigned to me
+                </Text>
+                <View style={s.typeGrid}>
+                  {MY_ORDERS_NOTIF_TYPES.map((t) => {
+                    const locked  = t === 'mention';
+                    const checked = locked || prefs.custom_my_types.includes(t);
+                    return (
+                      <TouchableOpacity
+                        key={t}
+                        style={s.typeRow}
+                        onPress={() => !locked && toggleMyType(t, !checked)}
+                        activeOpacity={locked ? 1 : 0.7}
+                      >
+                        <View style={[s.checkbox, checked && s.checkboxChecked]}>
+                          {checked && <Feather name="check" size={11} color="#fff" />}
+                        </View>
+                        <Text style={[s.typeLabel, locked && s.typeLabelMuted]}>
+                          {NOTIF_TYPE_LABELS[t]}{locked ? ' ✦' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                {savingPrefs && <ActivityIndicator size="small" color={c.brand} style={{ marginTop: 8 }} />}
               </View>
 
-              {/* Custom: Push channel types */}
-              {prefs.mode === 'custom' && (
-                <>
-                  <View style={s.divider} />
-                  <View style={s.prefsSection}>
-                    <View style={s.channelHeader}>
-                      <Feather name="smartphone" size={16} color={c.textSec} />
-                      <Text style={s.prefsSectionTitle}>Mobile Push</Text>
-                      <View style={{ flex: 1 }} />
-                      <Switch
-                        value={prefs.push.enabled}
-                        onValueChange={setPushEnabled}
-                        trackColor={{ false: '#CBD5E1', true: '#6366F1' }}
-                        thumbColor="#fff"
-                        style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
-                      />
-                    </View>
+              <View style={s.divider} />
 
-                    {prefs.push.enabled && (
-                      <View>
-                        {/* Quick-select preset buttons */}
-                        <View style={s.presetRow}>
-                          <TouchableOpacity
-                            style={[s.presetBtn, isPushAllSelected && s.presetBtnActive]}
-                            onPress={() => setPushPreset(PRESET_ALL)}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[s.presetBtnTxt, isPushAllSelected && s.presetBtnTxtActive]}>
-                              All
-                            </Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[s.presetBtn, isPushMyOrdersSelected && s.presetBtnActive]}
-                            onPress={() => setPushPreset(PRESET_MY_ORDERS)}
-                            activeOpacity={0.7}
-                          >
-                            <Text style={[s.presetBtnTxt, isPushMyOrdersSelected && s.presetBtnTxtActive]}>
-                              My Orders
-                            </Text>
-                          </TouchableOpacity>
+              {/* All Other Orders section */}
+              <View style={s.prefsSection}>
+                <Text style={s.prefsSectionTitle}>All Other Orders</Text>
+                <Text style={[s.modeDesc, { marginBottom: 8 }]}>
+                  Notifications for orders not assigned to me (+ Team Chat)
+                </Text>
+                <View style={s.typeGrid}>
+                  {ALL_NOTIF_TYPES.map((t) => {
+                    const locked  = t === 'mention';
+                    const checked = locked || prefs.custom_all_types.includes(t);
+                    return (
+                      <TouchableOpacity
+                        key={t}
+                        style={s.typeRow}
+                        onPress={() => !locked && toggleAllType(t, !checked)}
+                        activeOpacity={locked ? 1 : 0.7}
+                      >
+                        <View style={[s.checkbox, checked && s.checkboxChecked]}>
+                          {checked && <Feather name="check" size={11} color="#fff" />}
                         </View>
-
-                        <View style={s.typeGrid}>
-                        {ALL_NOTIF_TYPES.map((t) => {
-                          const locked  = t === 'mention';
-                          const checked = locked || prefs.push.types.includes(t);
-                          return (
-                            <TouchableOpacity
-                              key={t}
-                              style={s.typeRow}
-                              onPress={() => !locked && togglePushType(t, !checked)}
-                              activeOpacity={locked ? 1 : 0.7}
-                            >
-                              <View style={[s.checkbox, checked && s.checkboxChecked]}>
-                                {checked && <Feather name="check" size={11} color="#fff" />}
-                              </View>
-                              <Text style={[s.typeLabel, locked && s.typeLabelMuted]}>
-                                {NOTIF_TYPE_LABELS[t]}
-                                {locked ? ' ✦' : ''}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                        </View>
-                      </View>
-                    )}
-                  </View>
-                </>
-              )}
+                        <Text style={[s.typeLabel, locked && s.typeLabelMuted]}>
+                          {NOTIF_TYPE_LABELS[t]}{locked ? ' ✦' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
             </>
           )}
         </View>
@@ -502,39 +436,9 @@ function makeStyles(c: ThemeColors) {
     prefsSection: { paddingHorizontal: 18, paddingVertical: 16, gap: 10 },
     prefsSectionTitle: { fontSize: 11, color: c.textMuted, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase', marginBottom: 4 },
 
-    channelHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
 
-    modeOption: {
-      flexDirection: 'row', alignItems: 'center', gap: 12,
-      paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14,
-      borderWidth: 1, borderColor: c.border,
-      marginBottom: 6,
-    },
-    modeOptionActive: {
-      borderColor: 'rgba(99,102,241,0.5)',
-      backgroundColor: 'rgba(99,102,241,0.08)',
-    },
-    radioOuter: {
-      width: 18, height: 18, borderRadius: 9,
-      borderWidth: 2, borderColor: c.border,
-      alignItems: 'center', justifyContent: 'center',
-    },
-    radioOuterActive: { borderColor: '#6366F1' },
-    radioInner: {
-      width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#6366F1',
-    },
-    modeLabel: { fontSize: 14, fontWeight: '600', color: c.text },
+
     modeDesc:  { fontSize: 12, color: c.textMuted, marginTop: 1 },
-
-    presetRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-    presetBtn: {
-      flex: 1, paddingVertical: 7, borderRadius: 10,
-      borderWidth: 1, borderColor: c.border,
-      alignItems: 'center',
-    },
-    presetBtnActive: { backgroundColor: '#6366F1', borderColor: '#6366F1' },
-    presetBtnTxt:    { fontSize: 12, fontWeight: '700', color: c.textMuted },
-    presetBtnTxtActive: { color: '#fff' },
 
     typeGrid: { gap: 2, marginTop: 4 },
     typeRow: {

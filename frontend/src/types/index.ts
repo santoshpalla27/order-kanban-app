@@ -3,30 +3,28 @@ export interface Role {
   name: string;
 }
 
-export type NotificationMode = 'all' | 'my_orders' | 'custom';
-
 export const ALL_NOTIF_TYPES = [
-  'status_change', 'comment', 'mention', 'assignment',
-  'attachment', 'chat', 'product_created', 'product_deleted', 'delivery_reminder',
+  'status_change', 'comment', 'mention',
+  'attachment', 'chat', 'product_created', 'product_deleted',
 ] as const;
 
 export type NotifType = typeof ALL_NOTIF_TYPES[number];
 
-export interface NotificationChannelPrefs {
-  enabled: boolean;
-  types: NotifType[];
-}
+// Types shown in the "My Orders" section (chat & product_created are global, not per-order).
+export const MY_ORDERS_NOTIF_TYPES: NotifType[] = [
+  'status_change', 'comment', 'mention',
+  'attachment', 'product_created', 'product_deleted',
+];
 
 export interface NotificationPrefs {
-  mode: NotificationMode;
-  web: NotificationChannelPrefs;
-  push: NotificationChannelPrefs;
+  // @mention always bypasses both lists.
+  custom_my_types: NotifType[];   // types for orders assigned to me
+  custom_all_types: NotifType[];  // types for all other orders (+ team chat)
 }
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPrefs = {
-  mode: 'all',
-  web: { enabled: true, types: [...ALL_NOTIF_TYPES] },
-  push: { enabled: true, types: [...ALL_NOTIF_TYPES] },
+  custom_my_types:  [...MY_ORDERS_NOTIF_TYPES],
+  custom_all_types: [...ALL_NOTIF_TYPES],
 };
 
 export interface User {
@@ -39,6 +37,8 @@ export interface User {
   notification_prefs?: NotificationPrefs;
   created_at: string;
 }
+
+export type ProductStatus = 'yet_to_start' | 'working' | 'review' | 'done';
 
 export interface Product {
   id: number;
@@ -58,8 +58,6 @@ export interface Product {
   created_at: string;
 }
 
-export type ProductStatus = 'yet_to_start' | 'working' | 'review' | 'done';
-
 export interface Attachment {
   id: number;
   product_id: number;
@@ -70,9 +68,9 @@ export interface Attachment {
   uploaded_by: number;
   uploader?: User;
   uploaded_at: string;
-  source?: string; // "direct" | "comment" | "customer"
+  source?: string;
   portal_sender?: string;
-  view_url?: string; // S3 presigned view URL (when S3 enabled)
+  view_url?: string;
 }
 
 export interface Comment {
@@ -81,7 +79,7 @@ export interface Comment {
   user_id: number;
   user?: User;
   message: string;
-  source?: string; // "internal" | "customer"
+  source?: string;
   portal_sender?: string;
   created_at: string;
   updated_at: string;

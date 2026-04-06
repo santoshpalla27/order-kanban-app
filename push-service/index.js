@@ -146,9 +146,10 @@ async function getUserPrefs(userId) {
 }
 
 const DEFAULT_PUSH_TYPES = [
-  'status_change', 'comment', 'mention', 'assignment',
-  'attachment', 'chat', 'product_created', 'product_deleted', 'delivery_reminder',
+  'status_change', 'comment', 'mention',
+  'attachment', 'chat', 'product_created', 'product_deleted',
 ];
+
 
 // Check if userId is assigned to productId via product_assignees.
 async function isAssignedToProduct(userId, productId) {
@@ -166,7 +167,7 @@ async function isAssignedToProduct(userId, productId) {
 // Determine whether a push should be sent based on user prefs.
 // notifType: one of the prefs type keys (e.g. "status_change", "comment", etc.)
 // entityType: "product" | "chat" | other
-// entityId: product ID (for my_orders mode assignment check), 0 otherwise
+// entityId: product ID (for assignment check), 0 otherwise
 async function shouldSendPush(userId, notifType, entityType, entityId) {
   // mention always goes through
   if (notifType === 'mention') return true;
@@ -174,24 +175,21 @@ async function shouldSendPush(userId, notifType, entityType, entityId) {
   const prefs = await getUserPrefs(userId);
   if (!prefs) return true; // no prefs → default allow
 
-  const push = prefs.push || { enabled: true, types: DEFAULT_PUSH_TYPES };
-  if (!push.enabled) return false;
-
-  const types = Array.isArray(push.types) ? push.types : DEFAULT_PUSH_TYPES;
-  if (!types.includes(notifType)) return false;
-
-  const mode = prefs.mode || 'all';
-  if (mode === 'all' || mode === 'custom') return true;
-
-  if (mode === 'my_orders') {
-    if (notifType === 'chat' || entityType === 'chat') return true;
-    if (entityType === 'product' && entityId) {
-      return isAssignedToProduct(userId, entityId);
-    }
-    return false;
+  if (entityType === 'chat') {
+    const types = Array.isArray(prefs.custom_all_types) ? prefs.custom_all_types : DEFAULT_PUSH_TYPES;
+    return types.includes(notifType);
   }
 
-  return true;
+  if (entityType === 'product' && entityId) {
+    const isAssigned = await isAssignedToProduct(userId, entityId);
+    const types = isAssigned
+      ? (Array.isArray(prefs.custom_my_types)  ? prefs.custom_my_types  : DEFAULT_PUSH_TYPES)
+      : (Array.isArray(prefs.custom_all_types) ? prefs.custom_all_types : DEFAULT_PUSH_TYPES);
+    return types.includes(notifType);
+  }
+
+  const types = Array.isArray(prefs.custom_all_types) ? prefs.custom_all_types : DEFAULT_PUSH_TYPES;
+  return types.includes(notifType);
 }
 
 // Like sendPushToAllExcept but respects each user's notification prefs.
@@ -363,8 +361,9 @@ async function startListener() {
           }
 
           case 'product_created': {
-            // Handled by broadcast_except (activity_updated) — skip to avoid duplicate push
-            return;
+            title = '📦 New Order Assigned';
+            body  = trunc(message || 'You have been assigned to a new order');
+            break;
           }
 
           default: {
@@ -437,9 +436,11 @@ async function startListener() {
         const body = msg ? `${actor}: ${msg}` : 'Order activity updated';
 
         // Determine prefs type for this activity event
+        // product_created is handled by targeted notification events — skip to avoid duplicate push
+        if (/created for customer/i.test(msg) || / created$/i.test(msg)) return;
+
         let activityPrefsType = 'status_change';
-        if (/created for customer/i.test(msg) || / created$/i.test(msg)) activityPrefsType = 'product_created';
-        else if (/moved to trash/i.test(msg)) activityPrefsType = 'product_deleted';
+        if (/moved to trash/i.test(msg)) activityPrefsType = 'product_deleted';
         else if (/restored from trash/i.test(msg)) activityPrefsType = 'product_deleted';
 
         await sendPushToAllExceptFiltered(
