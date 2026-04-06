@@ -25,6 +25,7 @@ function todayAtMidnight() {
 interface Props {
   productId: number;
   onClose: () => void;
+  initialTab?: string;
 }
 
 // ── Download helper ──
@@ -292,8 +293,9 @@ function ImageLightbox({ src, alt, attId, onClose }: { src: string; alt: string;
 }
 
 // ── Main Modal ──
-export default function ProductDetailModal({ productId, onClose }: Props) {
-  const [activeTab, setActiveTab] = useState<'details' | 'attachments' | 'comments' | 'customer-attachments' | 'customer-comments'>('details');
+export default function ProductDetailModal({ productId, onClose, initialTab }: Props) {
+  type TabId = 'details' | 'attachments' | 'comments' | 'customer-attachments' | 'customer-comments';
+  const [activeTab, setActiveTab] = useState<TabId>((initialTab as TabId) || 'details');
   const [commentingAttachment, setCommentingAttachment] = useState<Attachment | null>(null);
   const queryClient = useQueryClient();
 
@@ -318,10 +320,13 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
 
   const { has } = useProductBadges();
 
-  // Wrap onClose: clear status_change badge when modal is dismissed (status is visible just by opening)
+  // On close: mark all unread notification types for this product as read
   const handleClose = () => {
-    if (has(productId, 'status_change')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES).then(() => {
+    const allTypes = [...COMMENT_TYPES, ...ATTACHMENT_TYPES, ...STATUS_CHANGE_TYPES, ...CUSTOMER_COMMENT_TYPES, ...CUSTOMER_ATTACHMENT_TYPES];
+    const hasAny = has(productId, 'comments') || has(productId, 'attachments') ||
+      has(productId, 'status_change') || has(productId, 'customer_comments') || has(productId, 'customer_attachments');
+    if (hasAny) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, allTypes).then(() => {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         queryClient.invalidateQueries({ queryKey: ['unread-count'] });
         queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
@@ -329,23 +334,6 @@ export default function ProductDetailModal({ productId, onClose }: Props) {
     }
     onClose();
   };
-
-  useEffect(() => {
-    const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
-    };
-    if (activeTab === 'comments' && has(productId, 'comments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES).then(invalidate);
-    } else if (activeTab === 'attachments' && has(productId, 'attachments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES).then(invalidate);
-    } else if (activeTab === 'customer-comments' && has(productId, 'customer_comments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_COMMENT_TYPES).then(invalidate);
-    } else if (activeTab === 'customer-attachments' && has(productId, 'customer_attachments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES).then(invalidate);
-    }
-  }, [activeTab, productId, commentsData]);
 
   const statusMutation = useMutation({
     mutationFn: (newStatus: string) => productsApi.updateStatus(productId, newStatus),

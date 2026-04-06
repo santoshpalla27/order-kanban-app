@@ -33,16 +33,18 @@ export default function KanbanBoard() {
     search: '', status: '', created_by: '', date_from: '', date_to: '', assigned_to: '', delivery_from: '', delivery_to: '',
   });
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
+  const [selectedProductTab, setSelectedProductTab] = useState<string | undefined>();
   const [showCreate, setShowCreate] = useState(false);
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const { canCreateProduct } = useAuthStore();
   const queryClient = useQueryClient();
 
-  // Open product modal via ?product=id (e.g. from notification link)
+  // Open product modal via ?product=id&tab=comments (e.g. from notification link)
   useEffect(() => {
     const id = searchParams.get('product');
     if (id) {
       setSelectedProduct(Number(id));
+      setSelectedProductTab(searchParams.get('tab') ?? undefined);
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams]);
@@ -192,7 +194,11 @@ export default function KanbanBoard() {
       </DndContext>
 
       {selectedProduct && (
-        <ProductDetailModal productId={selectedProduct} onClose={() => setSelectedProduct(null)} />
+        <ProductDetailModal
+          productId={selectedProduct}
+          initialTab={selectedProductTab}
+          onClose={() => { setSelectedProduct(null); setSelectedProductTab(undefined); }}
+        />
       )}
       {showCreate && (
         <CreateProductModal onClose={() => setShowCreate(false)} />

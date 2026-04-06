@@ -31,8 +31,18 @@ function getAvatarGradient(name: string) {
   return colors[Math.abs(h) % colors.length];
 }
 
+function notifTypeToTab(type: string): string {
+  if (type === 'comment_added' || type === 'mention') return 'comments';
+  if (type === 'attachment_uploaded') return 'attachments';
+  if (type === 'customer_comment_added') return 'customer-comments';
+  if (type === 'customer_attachment_uploaded') return 'customer-attachments';
+  return 'details';
+}
+
 function getNotificationLink(n: Notification): string | null {
-  if (n.entity_type === 'product' && n.entity_id) return `/?product=${n.entity_id}`;
+  if (n.entity_type === 'product' && n.entity_id) {
+    return `/?product=${n.entity_id}&tab=${notifTypeToTab(n.type)}`;
+  }
   if (n.entity_type === 'chat') return '/chat';
   return null;
 }
@@ -75,9 +85,13 @@ export default function NotificationPanel({ onClose }: Props) {
   };
 
   const handleClick = (n: Notification) => {
-    if (!n.is_read) markRead.mutate(n);
     const link = getNotificationLink(n);
-    if (link) { onClose(); navigate(link); }
+    if (link) {
+      onClose();
+      navigate(link);
+    } else if (!n.is_read) {
+      markRead.mutate(n);
+    }
   };
 
   return (
