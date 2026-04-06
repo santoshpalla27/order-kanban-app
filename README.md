@@ -187,3 +187,37 @@ Traefik — healthy ✓
 Frontend — perfect ✓
 
 Completely flat at 3.8 MB. Static file server, nothing to leak.
+
+Disk space remaining on the server:
+
+df -h /
+Most important one — if this hits 100% everything crashes.
+
+Docker log file sizes (these accumulate over time):
+
+du -sh /var/lib/docker/containers/\*/\*-json.log | sort -rh | head -10
+PostgreSQL table bloat (rows deleted but space not reclaimed):
+
+docker exec kanban-postgres psql -U kanban -d kanban -c "
+SELECT relname, n_dead_tup, n_live_tup,
+round(n_dead_tup::numeric/nullif(n_live_tup+n_dead_tup,0)\*100, 1) as dead_pct
+FROM pg_stat_user_tables
+WHERE n_dead_tup > 100
+ORDER BY n_dead_tup DESC;"
+Your app has auto-purge jobs (trash, notifications, activity) that delete rows. If dead_pct is high (>20%), run VACUUM to reclaim that space.
+
+Active DB queries right now:
+
+docker exec kanban-postgres psql -U kanban -d kanban -c "
+SELECT pid, now() - query_start as duration, state, left(query,80)
+FROM pg_stat_activity
+WHERE state != 'idle' AND query_start IS NOT NULL
+ORDER BY duration DESC;"
+
+root@ip-172-26-9-55:/var/lib/docker/containers# docker system df
+TYPE TOTAL ACTIVE SIZE RECLAIMABLE
+Images 5 5 678.7MB 678.7MB (100%)
+Containers 5 5 1.26kB 0B (0%)
+Local Volumes 2 2 49.53MB 0B (0%)
+Build Cache 0 0 0B 0B
+root@ip-172-26-9-55:/var/lib/docker/containers#
