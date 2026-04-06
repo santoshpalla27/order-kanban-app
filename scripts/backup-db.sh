@@ -58,14 +58,14 @@ log "Dump complete: $FILENAME ($SIZE)"
 if command -v rclone &>/dev/null \
    && [ -n "${R2_ACCESS_KEY:-}" ] \
    && [ -n "${R2_SECRET_KEY:-}" ] \
-   && [ -n "${R2_ACCOUNT_ID:-}" ] \
+   && [ -n "${R2_ENDPOINT:-}" ] \
    && [ -n "${R2_BUCKET:-}" ]; then
 
   if RCLONE_CONFIG_R2_TYPE=s3 \
      RCLONE_CONFIG_R2_PROVIDER=Cloudflare \
      RCLONE_CONFIG_R2_ACCESS_KEY_ID="$R2_ACCESS_KEY" \
      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY="$R2_SECRET_KEY" \
-     RCLONE_CONFIG_R2_ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com" \
+     RCLONE_CONFIG_R2_ENDPOINT="$R2_ENDPOINT" \
      rclone copy "$DUMP_FILE" "r2:${R2_BUCKET}/db-backups/" \
        --no-traverse \
        --log-level ERROR 2>> "$LOG"; then
@@ -74,7 +74,7 @@ if command -v rclone &>/dev/null \
     log "WARNING: R2 upload failed — local backup is still intact"
   fi
 else
-  log "INFO: rclone or R2 creds not found — skipping R2 upload"
+  log "INFO: rclone or R2 creds not found — skipping R2 upload (need: rclone, R2_ACCESS_KEY, R2_SECRET_KEY, R2_ENDPOINT, R2_BUCKET)"
 fi
 
 # ── Rotate local backups ──────────────────────────────────────────────────────
