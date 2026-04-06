@@ -36,7 +36,7 @@ export type RootStackParamList = {
   Login:         undefined;
   Pending:       undefined;
   MainTabs:      undefined;
-  ProductDetail: { productId: number };
+  ProductDetail: { productId: number; initialTab?: string };
   CreateProduct: undefined;
   Notifications: undefined;
   Activity:      undefined;

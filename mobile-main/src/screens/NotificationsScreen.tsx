@@ -121,10 +121,22 @@ export default function NotificationsScreen() {
     } catch {}
   };
 
+  const notifTypeToTab = (type: string): string => {
+    if (type === 'comment_added' || type === 'mention') return 'comments';
+    if (type === 'attachment_uploaded') return 'attachments';
+    if (type === 'customer_comment_added') return 'customer-messages';
+    if (type === 'customer_attachment_uploaded') return 'customer-files';
+    return 'details';
+  };
+
   const handlePress = (n: Notification) => {
-    if (!n.is_read) markRead(n);
     if (n.entity_type === 'product' && n.entity_id) {
-      navigation.navigate('ProductDetail', { productId: n.entity_id });
+      navigation.navigate('ProductDetail', {
+        productId: n.entity_id,
+        initialTab: notifTypeToTab(n.type),
+      });
+    } else if (!n.is_read) {
+      markRead(n);
     }
   };
 

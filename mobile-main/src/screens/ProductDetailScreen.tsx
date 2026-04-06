@@ -2244,7 +2244,7 @@ function makeCustMsgStyles(c: ThemeColors) {
 export default function ProductDetailScreen() {
   const route     = useRoute<RouteT>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { productId } = route.params;
+  const { productId, initialTab } = route.params;
 
   const isDark = useThemeStore((s) => s.isDark);
   const c = isDark ? darkColors : lightColors;
@@ -2254,7 +2254,7 @@ export default function ProductDetailScreen() {
 
   const [product, setProduct]       = useState<Product | null>(null);
   const [loading, setLoading]       = useState(true);
-  const [activeTab, setActiveTab]   = useState<TabId>('details');
+  const [activeTab, setActiveTab]   = useState<TabId>((initialTab as TabId) || 'details');
   const [showStatus, setShowStatus] = useState(false);
   const [users, setUsers]           = useState<User[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -2302,18 +2302,43 @@ export default function ProductDetailScreen() {
   const { has, refreshBadges } = useProductBadges();
   const { refreshUnreadCount, bumpListVersion } = useNotificationStore();
 
-  // Keep refs so the beforeRemove listener always sees the latest values
+  // Keep refs so callbacks always see the latest values
   const hasRef = useRef(has);
   hasRef.current = has;
   const refreshBadgesRef = useRef(refreshBadges);
   refreshBadgesRef.current = refreshBadges;
   const refreshUnreadCountRef = useRef(refreshUnreadCount);
   refreshUnreadCountRef.current = refreshUnreadCount;
+  const activeTabRef = useRef(activeTab);
+  activeTabRef.current = activeTab;
+  const prevTabRef = useRef<typeof activeTab>(activeTab);
 
-  // On screen close, mark status_change (movement) badges as read —
-  // since the status is visible just by opening the product, closing should clear it
+  // Helper: mark a specific tab's notifications as read
+  const markTabRead = (tab: typeof activeTab) => {
+    const done = () => { refreshBadgesRef.current(); refreshUnreadCountRef.current(); bumpListVersion(); };
+    if (tab === 'comments' && hasRef.current(productId, 'comments'))
+      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES).then(done).catch(() => {});
+    else if (tab === 'attachments' && hasRef.current(productId, 'attachments'))
+      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES).then(done).catch(() => {});
+    else if (tab === 'customer-messages' && hasRef.current(productId, 'customer_comments'))
+      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_COMMENT_TYPES).then(done).catch(() => {});
+    else if (tab === 'customer-files' && hasRef.current(productId, 'customer_attachments'))
+      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES).then(done).catch(() => {});
+  };
+
+  // When switching tabs, mark the tab we're leaving as read
+  useEffect(() => {
+    const prev = prevTabRef.current;
+    if (prev !== activeTab) {
+      markTabRead(prev);
+      prevTabRef.current = activeTab;
+    }
+  }, [activeTab]);
+
+  // On screen close: mark the current tab + status_change as read
   useEffect(() => {
     return navigation.addListener('beforeRemove', () => {
+      markTabRead(activeTabRef.current);
       if (hasRef.current(productId, 'status_change')) {
         notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES)
           .then(() => { refreshBadgesRef.current(); refreshUnreadCountRef.current(); })
@@ -2321,27 +2346,6 @@ export default function ProductDetailScreen() {
       }
     });
   }, [navigation, productId]);
-
-  // Mark notifications as read and refresh badge state when user opens a tab
-  useEffect(() => {
-    if (activeTab === 'comments' && has(productId, 'comments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES)
-        .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
-        .catch(() => {});
-    } else if (activeTab === 'attachments' && has(productId, 'attachments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES)
-        .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
-        .catch(() => {});
-    } else if (activeTab === 'customer-messages' && has(productId, 'customer_comments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_COMMENT_TYPES)
-        .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
-        .catch(() => {});
-    } else if (activeTab === 'customer-files' && has(productId, 'customer_attachments')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES)
-        .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
-        .catch(() => {});
-    }
-  }, [activeTab, productId]);
 
   const handleStatusChange = async (newStatus: ProductStatus) => {
     if (!product) return;

@@ -298,6 +298,7 @@ export default function ProductDetailModal({ productId, onClose, initialTab }: P
   const [activeTab, setActiveTab] = useState<TabId>((initialTab as TabId) || 'details');
   const [commentingAttachment, setCommentingAttachment] = useState<Attachment | null>(null);
   const queryClient = useQueryClient();
+  const prevTabRef = useRef<TabId>((initialTab as TabId) || 'details');
 
   const { data: productData } = useQuery({ queryKey: ['products', productId], queryFn: () => productsApi.getById(productId) });
   const product: Product | null = productData?.data || null;
@@ -320,13 +321,37 @@ export default function ProductDetailModal({ productId, onClose, initialTab }: P
 
   const { has } = useProductBadges();
 
-  // On close: mark all unread notification types for this product as read
+  // Mark a tab's notifications as read and invalidate caches
+  const markTabRead = (tab: TabId) => {
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+    };
+    if (tab === 'comments' && has(productId, 'comments'))
+      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES).then(invalidate);
+    else if (tab === 'attachments' && has(productId, 'attachments'))
+      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES).then(invalidate);
+    else if (tab === 'customer-comments' && has(productId, 'customer_comments'))
+      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_COMMENT_TYPES).then(invalidate);
+    else if (tab === 'customer-attachments' && has(productId, 'customer_attachments'))
+      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES).then(invalidate);
+  };
+
+  // When switching tabs, mark the tab we're leaving as read
+  useEffect(() => {
+    const prev = prevTabRef.current;
+    if (prev !== activeTab) {
+      markTabRead(prev);
+      prevTabRef.current = activeTab;
+    }
+  }, [activeTab]);
+
+  // On close: mark the current tab + status_change as read
   const handleClose = () => {
-    const allTypes = [...COMMENT_TYPES, ...ATTACHMENT_TYPES, ...STATUS_CHANGE_TYPES, ...CUSTOMER_COMMENT_TYPES, ...CUSTOMER_ATTACHMENT_TYPES];
-    const hasAny = has(productId, 'comments') || has(productId, 'attachments') ||
-      has(productId, 'status_change') || has(productId, 'customer_comments') || has(productId, 'customer_attachments');
-    if (hasAny) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, allTypes).then(() => {
+    markTabRead(activeTab);
+    if (has(productId, 'status_change')) {
+      notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES).then(() => {
         queryClient.invalidateQueries({ queryKey: ['notifications'] });
         queryClient.invalidateQueries({ queryKey: ['unread-count'] });
         queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
