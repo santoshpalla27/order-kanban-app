@@ -64,6 +64,30 @@ function getAvatarColors(name: string): [string, string] {
   return AVATAR_GRADIENTS[Math.abs(h) % AVATAR_GRADIENTS.length] as [string, string];
 }
 
+interface NotifGroup {
+  key: string;
+  items: Notification[];
+  latest: Notification;
+  unreadCount: number;
+  senders: string[];
+}
+
+function groupNotifications(notifications: Notification[]): NotifGroup[] {
+  const map = new Map<string, NotifGroup>();
+  for (const n of notifications) {
+    const key = `${n.entity_type}:${n.entity_id ?? 'none'}:${n.type}`;
+    if (!map.has(key)) {
+      map.set(key, { key, items: [], latest: n, unreadCount: 0, senders: [] });
+    }
+    const g = map.get(key)!;
+    g.items.push(n);
+    if (!n.is_read) g.unreadCount++;
+    const s = n.sender_name || '';
+    if (s && !g.senders.includes(s)) g.senders.push(s);
+  }
+  return Array.from(map.values());
+}
+
 export default function NotificationsScreen() {
   const isDark = useThemeStore((s) => s.isDark);
   const c = isDark ? darkColors : lightColors;
@@ -146,15 +170,16 @@ export default function NotificationsScreen() {
     [notifications],
   );
 
-  // Filtered list
-  const filtered = useMemo(() => {
-    return notifications.filter((n) => {
+  // Filtered + grouped
+  const groups = useMemo(() => {
+    const filtered = notifications.filter((n) => {
       if (statusFilter === 'unread' && n.is_read) return false;
       if (statusFilter === 'read' && !n.is_read) return false;
       if (typeFilter !== 'all' && n.type !== typeFilter) return false;
       if (search && !n.message.toLowerCase().includes(search.toLowerCase())) return false;
       return true;
     });
+    return groupNotifications(filtered);
   }, [notifications, statusFilter, typeFilter, search]);
 
   const unread = notifications.filter((n) => !n.is_read).length;
@@ -283,7 +308,7 @@ export default function NotificationsScreen() {
       {/* ── Results count ── */}
       <View style={s.countRow}>
         <Text style={s.countText}>
-          {filtered.length} {filtered.length === 1 ? 'notification' : 'notifications'}
+          {groups.length} {groups.length === 1 ? 'notification' : 'notifications'}
           {hasFilters ? ' matching filters' : ''}
         </Text>
       </View>
@@ -295,8 +320,8 @@ export default function NotificationsScreen() {
         </View>
       ) : (
         <FlatList
-          data={filtered}
-          keyExtractor={(n) => String(n.id)}
+          data={groups}
+          keyExtractor={(g) => g.key}
           ListEmptyComponent={
             <View style={s.emptyWrap}>
               <Feather name="bell" size={48} color={c.textMuted} />
@@ -310,36 +335,58 @@ export default function NotificationsScreen() {
               )}
             </View>
           }
-          renderItem={({ item: n }) => {
+          renderItem={({ item: g }) => {
+            const n = g.latest;
             const meta = getTypeMeta(n.type);
-            const senderName = n.sender_name || '';
-            const initial = senderName ? senderName.charAt(0).toUpperCase() : '?';
-            const [avatarFrom] = getAvatarColors(senderName || n.type);
+            const hasMany = g.items.length > 1;
+            const firstSender = g.senders[0] || '';
+            const secondSender = g.senders[1] || '';
+            const [avatarFrom] = getAvatarColors(firstSender || n.type);
+            const [avatarFrom2] = getAvatarColors(secondSender || n.type);
             return (
               <TouchableOpacity
-                style={[s.item, !n.is_read && s.itemUnread]}
+                style={[s.item, g.unreadCount > 0 && s.itemUnread]}
                 onPress={() => handlePress(n)}
                 activeOpacity={0.75}
               >
-                {/* Avatar */}
-                <View style={[s.avatar, { backgroundColor: avatarFrom }]}>
-                  <Text style={s.avatarText}>{initial}</Text>
+                {/* Avatar(s) */}
+                <View style={s.avatarWrap}>
+                  <View style={[s.avatar, { backgroundColor: avatarFrom }]}>
+                    <Text style={s.avatarText}>
+                      {firstSender ? firstSender.charAt(0).toUpperCase() : '?'}
+                    </Text>
+                  </View>
+                  {hasMany && secondSender && secondSender !== firstSender && (
+                    <View style={[s.avatarSecond, { backgroundColor: avatarFrom2 }]}>
+                      <Text style={s.avatarSecondText}>
+                        {secondSender.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 {/* Content */}
                 <View style={s.content}>
                   <View style={s.topRow}>
-                    {!!senderName && (
-                      <Text style={s.senderName}>{senderName}</Text>
+                    {g.senders.length > 0 && (
+                      <Text style={s.senderName}>
+                        {g.senders.length === 1
+                          ? g.senders[0]
+                          : `${g.senders[0]} & ${g.senders.length - 1} other${g.senders.length > 2 ? 's' : ''}`}
+                      </Text>
                     )}
-                    {!!n.type && (
-                      <View style={[s.typeBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
-                        <Text style={[s.typeBadgeText, { color: meta.text }]}>{meta.label}</Text>
+                    <View style={[s.typeBadge, { backgroundColor: meta.bg, borderColor: meta.border }]}>
+                      <Text style={[s.typeBadgeText, { color: meta.text }]}>
+                        {hasMany ? `${g.items.length} ${meta.label}s` : meta.label}
+                      </Text>
+                    </View>
+                    {g.unreadCount > 0 && (
+                      <View style={s.newBadge}>
+                        <Text style={s.newBadgeText}>{g.unreadCount} new</Text>
                       </View>
                     )}
-                    {!n.is_read && <View style={s.unreadDot} />}
                   </View>
-                  <Text style={[s.message, n.is_read && s.messageRead]}>
+                  <Text style={[s.message, g.unreadCount === 0 && s.messageRead]}>
                     {n.message}
                   </Text>
                 </View>
@@ -348,7 +395,7 @@ export default function NotificationsScreen() {
                 <View style={s.rightCol}>
                   <Text style={s.time}>{formatRelative(n.created_at)}</Text>
                   <Text style={s.timeFull}>{formatFull(n.created_at)}</Text>
-                  {!n.is_read && (
+                  {g.unreadCount > 0 && (
                     <TouchableOpacity
                       style={s.eyeBtn}
                       onPress={(e) => { e.stopPropagation?.(); markRead(n); }}
@@ -488,12 +535,19 @@ function makeStyles(c: ThemeColors) {
     itemUnread:  { backgroundColor: 'rgba(99,102,241,0.08)' },
 
     // Avatar
+    avatarWrap: { position: 'relative', width: 36, height: 36, flexShrink: 0, marginTop: 2 },
     avatar: {
       width: 36, height: 36, borderRadius: 18,
       alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0, marginTop: 2,
     },
     avatarText: { fontSize: 14, fontWeight: '700', color: '#fff' },
+    avatarSecond: {
+      position: 'absolute', bottom: -4, right: -4,
+      width: 20, height: 20, borderRadius: 10,
+      alignItems: 'center', justifyContent: 'center',
+      borderWidth: 2, borderColor: c.surface,
+    },
+    avatarSecondText: { fontSize: 9, fontWeight: '700', color: '#fff' },
 
     content:     { flex: 1 },
     topRow:      { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 5, marginBottom: 3 },
@@ -507,6 +561,13 @@ function makeStyles(c: ThemeColors) {
       borderRadius: 12, borderWidth: 1,
     },
     typeBadgeText: { fontSize: 10, fontWeight: '600' },
+    newBadge: {
+      paddingHorizontal: 7, paddingVertical: 2,
+      borderRadius: 12, borderWidth: 1,
+      backgroundColor: 'rgba(99,102,241,0.12)',
+      borderColor: 'rgba(99,102,241,0.25)',
+    },
+    newBadgeText: { fontSize: 10, fontWeight: '700', color: '#818CF8' },
 
     // Right column
     rightCol:  { alignItems: 'flex-end', gap: 2, flexShrink: 0 },

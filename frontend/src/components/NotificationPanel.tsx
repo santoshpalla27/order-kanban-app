@@ -47,6 +47,31 @@ function getNotificationLink(n: Notification): string | null {
   return null;
 }
 
+// Group notifications by entity + type for display purposes only.
+interface NotifGroup {
+  key: string;
+  items: Notification[];   // newest first
+  latest: Notification;
+  unreadCount: number;
+  senders: string[];       // unique sender names, newest first
+}
+
+function groupNotifications(notifications: Notification[]): NotifGroup[] {
+  const map = new Map<string, NotifGroup>();
+  for (const n of notifications) {
+    const key = `${n.entity_type}:${n.entity_id ?? 'none'}:${n.type}`;
+    if (!map.has(key)) {
+      map.set(key, { key, items: [], latest: n, unreadCount: 0, senders: [] });
+    }
+    const g = map.get(key)!;
+    g.items.push(n);
+    if (!n.is_read) g.unreadCount++;
+    const s = n.sender_name || '';
+    if (s && !g.senders.includes(s)) g.senders.push(s);
+  }
+  return Array.from(map.values());
+}
+
 export default function NotificationPanel({ onClose }: Props) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -56,6 +81,7 @@ export default function NotificationPanel({ onClose }: Props) {
     queryFn: () => notificationsApi.getAll(),
   });
   const notifications: Notification[] = data?.data?.data || [];
+  const groups = groupNotifications(notifications);
 
   const markRead = useMutation({
     mutationFn: (n: Notification) => notificationsApi.markAsRead(n.id),
@@ -119,45 +145,61 @@ export default function NotificationPanel({ onClose }: Props) {
       <div className="overflow-y-auto flex-1 divide-y divide-surface-700/20">
         {isLoading ? (
           <div className="p-8 text-center text-surface-500 text-sm">Loading...</div>
-        ) : notifications.length === 0 ? (
+        ) : groups.length === 0 ? (
           <div className="p-8 text-center text-surface-500 text-sm">No notifications</div>
         ) : (
-          notifications.map((n) => {
+          groups.map((g) => {
+            const n = g.latest;
             const link = getNotificationLink(n);
             const meta = getTypeMeta(n.type);
-            const senderName = n.sender_name || '';
-            const initial = senderName ? senderName.charAt(0).toUpperCase() : '?';
+            const hasMany = g.items.length > 1;
+            // Avatar: show up to 2 stacked sender initials for groups, single for solo
+            const firstSender = g.senders[0] || '';
+            const secondSender = g.senders[1] || '';
             return (
               <div
-                key={n.id}
+                key={g.key}
                 className={`flex items-start gap-3 px-4 py-3 transition-colors ${
                   link ? 'cursor-pointer hover:bg-surface-700/30' : 'cursor-default'
-                } ${!n.is_read ? 'bg-brand-600/5' : ''}`}
+                } ${g.unreadCount > 0 ? 'bg-brand-600/5' : ''}`}
                 onClick={() => handleClick(n)}
               >
-                {/* Avatar */}
-                <div
-                  className={`w-8 h-8 rounded-full bg-gradient-to-br ${getAvatarGradient(senderName || n.type)} flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5`}
-                >
-                  {initial}
+                {/* Avatar(s) */}
+                <div className="relative flex-shrink-0 mt-0.5" style={{ width: 32, height: 32 }}>
+                  <div
+                    className={`w-8 h-8 rounded-full bg-gradient-to-br ${getAvatarGradient(firstSender || n.type)} flex items-center justify-center text-xs font-bold text-white`}
+                  >
+                    {firstSender ? firstSender.charAt(0).toUpperCase() : '?'}
+                  </div>
+                  {hasMany && secondSender && secondSender !== firstSender && (
+                    <div
+                      className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br ${getAvatarGradient(secondSender)} flex items-center justify-center text-[9px] font-bold text-white ring-2 ring-surface-800`}
+                    >
+                      {secondSender.charAt(0).toUpperCase()}
+                    </div>
+                  )}
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {senderName && (
-                      <span className="text-xs font-semibold text-surface-200">{senderName}</span>
-                    )}
-                    {n.type && (
-                      <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border ${meta.color}`}>
-                        {meta.label}
+                    {g.senders.length > 0 && (
+                      <span className="text-xs font-semibold text-surface-200">
+                        {g.senders.length === 1
+                          ? g.senders[0]
+                          : `${g.senders[0]} & ${g.senders.length - 1} other${g.senders.length > 2 ? 's' : ''}`}
                       </span>
                     )}
-                    {!n.is_read && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-brand-500 flex-shrink-0" />
+                    <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border ${meta.color}`}>
+                      {hasMany ? `${g.items.length} ${meta.label}s` : meta.label}
+                    </span>
+                    {g.unreadCount > 0 && (
+                      <span className="inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border text-brand-400 bg-brand-400/10 border-brand-400/20">
+                        {g.unreadCount} new
+                      </span>
                     )}
                   </div>
-                  <p className={`text-xs mt-0.5 leading-relaxed ${n.is_read ? 'text-surface-500' : 'text-surface-300'}`}>
+                  <p className={`text-xs mt-0.5 leading-relaxed ${g.unreadCount === 0 ? 'text-surface-500' : 'text-surface-300'}`}>
                     {n.message}
                   </p>
                 </div>
@@ -165,7 +207,7 @@ export default function NotificationPanel({ onClose }: Props) {
                 {/* Right: time + eye */}
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                   <span className="text-[10px] text-surface-500 whitespace-nowrap">{formatTime(n.created_at)}</span>
-                  {!n.is_read && (
+                  {g.unreadCount > 0 && (
                     <button
                       title="Mark as read"
                       onClick={(e) => { e.stopPropagation(); markRead.mutate(n); }}
