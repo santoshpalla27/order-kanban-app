@@ -129,9 +129,16 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		Details:  fmt.Sprintf("Uploaded %s to product %s (R2)", req.FileName, productIDStr),
 	})
 
+	// Resolve the order display label (e.g. "ORD-001") for the notification message.
+	product, _ := services.GetProductByIDSimple(uint(productID))
+	productLabel := fmt.Sprintf("#%d", productID)
+	if product != nil {
+		productLabel = product.ProductID
+	}
+
 	// Persist notification for all users + toast via LISTEN/NOTIFY.
 	// Comment-source uploads badge the Comments tab; direct uploads badge the Files tab.
-	message := fmt.Sprintf("%s uploaded '%s'", senderName, req.FileName)
+	message := fmt.Sprintf("%s uploaded '%s' on %s", senderName, req.FileName, productLabel)
 	notifType := "attachment_uploaded"
 	if req.Source == "comment" {
 		notifType = "comment_added"

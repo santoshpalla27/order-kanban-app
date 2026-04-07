@@ -343,8 +343,9 @@ async function startListener() {
           }
 
           case 'attachment_uploaded': {
-            // backend message: "admin uploaded 'filename.pdf'" — already perfect
-            title = '📎 New Attachment';
+            // backend message: "admin uploaded 'filename.pdf' on ORD-001"
+            const ref = orderRef(message);
+            title = ref ? `📎 Attachment on ${ref}` : '📎 New Attachment';
             body  = trunc(message || (sender ? `${sender} uploaded an attachment` : 'New attachment'));
             break;
           }
@@ -357,7 +358,8 @@ async function startListener() {
           }
 
           case 'customer_attachment_uploaded': {
-            title = '📎 Customer File';
+            const ref = orderRef(message);
+            title = ref ? `📎 Customer File on ${ref}` : '📎 Customer File';
             body  = trunc(message || 'Customer uploaded a file');
             break;
           }
