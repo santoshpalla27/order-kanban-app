@@ -203,6 +203,6 @@ func NotifyStatusChange(userID uint, userName string, product *models.Product, o
 	})
 	database.EmitBroadcast(wsMsg)
 
-	message := fmt.Sprintf("%s moved order %s to %s", userName, product.ProductID, formatStatus(newStatus))
+	message := fmt.Sprintf("%s moved order %s from %s to %s", userName, product.ProductID, formatStatus(oldStatus), formatStatus(newStatus))
 	services.CreateNotificationForAllExcept(userID, nil, message, "status_change", "product", product.ID, "", userName)
 }

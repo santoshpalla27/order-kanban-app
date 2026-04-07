@@ -66,8 +66,14 @@ function groupNotifications(notifications: Notification[]): NotifGroup[] {
     const g = map.get(key)!;
     g.items.push(n);
     if (!n.is_read) g.unreadCount++;
-    const s = n.sender_name || '';
-    if (s && !g.senders.includes(s)) g.senders.push(s);
+  }
+  // Derive senders from unread items only; fall back to all items if everything is read
+  for (const g of map.values()) {
+    const source = g.unreadCount > 0 ? g.items.filter(n => !n.is_read) : g.items;
+    for (const n of source) {
+      const s = n.sender_name || '';
+      if (s && !g.senders.includes(s)) g.senders.push(s);
+    }
   }
   return Array.from(map.values());
 }
