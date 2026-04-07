@@ -124,10 +124,10 @@ go run ./cmd/seed/main.go
 
 docker run --rm -it -v $(pwd):/app -w /app --network order-kanban-app_kanban-net -e DATABASE_URL="postgres://kanban:kaban@kanban-postgres:5432/kanban?sslmode=disable" golang:latest go run ./cmd/seed/main.go
 
-docker compose stop frontend backend
-docker compose rm -f frontend backend
-docker compose build --no-cache frontend backend
-docker compose up -d frontend backend
+docker compose stop frontend backend push-service
+docker compose rm -f frontend backend push-service
+docker compose build --no-cache frontend backend push-service
+docker compose up -d frontend backend push-service
 
 ./run-load.sh # smoke — 1 VU, 2 min (default)
 ./run-load.sh smoke # same

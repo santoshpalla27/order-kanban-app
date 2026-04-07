@@ -208,8 +208,11 @@ async function sendPushToAllExceptFiltered(excludeId, opts, notifType, entityTyp
 
 // Build a collapse key so multiple notifications of the same type on the same
 // entity collapse into one banner instead of stacking.
+// Returns null when entityId is missing — without a real entity ID we can't
+// safely group, so each notification gets its own banner.
 function makeCollapseKey(entityType, entityId, notifType) {
-  return `${entityType}:${entityId || 'none'}:${notifType}`;
+  if (!entityId) return null;
+  return `${entityType}:${entityId}:${notifType}`;
 }
 
 // ─── Send push to a single user ───────────────────────────────────────────────
