@@ -206,19 +206,29 @@ async function sendPushToAllExceptFiltered(excludeId, opts, notifType, entityTyp
   }
 }
 
+// Build a collapse key so multiple notifications of the same type on the same
+// entity collapse into one banner instead of stacking.
+function makeCollapseKey(entityType, entityId, notifType) {
+  return `${entityType}:${entityId || 'none'}:${notifType}`;
+}
+
 // ─── Send push to a single user ───────────────────────────────────────────────
-async function sendPushToUser(userId, { title, body, data }) {
+async function sendPushToUser(userId, { title, body, data, collapseKey }) {
   const tokens = await getTokensForUser(userId);
   if (!tokens.length) return;
 
   const messages = tokens.map(token => ({
-    to:       token,
-    sound:    'default',
+    to:        token,
+    sound:     'default',
     title,
     body,
-    data:     data || {},
-    priority: 'high',
+    data:      data || {},
+    priority:  'high',
     channelId: 'default',
+    // Collapse same-entity same-type notifications into one on Android.
+    // If a newer notification arrives with the same key it replaces the old one
+    // instead of stacking — prevents 10 separate "New Comment" banners.
+    ...(collapseKey ? { collapseKey } : {}),
   }));
 
   const chunks = expo.chunkPushNotifications(messages);
@@ -394,6 +404,7 @@ async function startListener() {
           title,
           body,
           data: { entityType: entity, entityId: p.entity_id || 0, type },
+          collapseKey: makeCollapseKey(entity, p.entity_id || 0, type),
         });
         return;
       }
@@ -445,7 +456,11 @@ async function startListener() {
 
         await sendPushToAllExceptFiltered(
           event.exclude_id || 0,
-          { title, body, data: { entityType: 'product', entityId: p.entity_id || 0, type: 'activity' } },
+          {
+            title, body,
+            data: { entityType: 'product', entityId: p.entity_id || 0, type: 'activity' },
+            collapseKey: makeCollapseKey('product', p.entity_id || 0, activityPrefsType),
+          },
           activityPrefsType,
           'product',
           p.entity_id || 0
