@@ -88,8 +88,17 @@ export default function NotificationPanel({ onClose }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
     },
   });
+
+  const markGroupRead = async (g: NotifGroup) => {
+    const unread = g.items.filter(item => !item.is_read);
+    await Promise.all(unread.map(item => notificationsApi.markAsRead(item.id)));
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+    queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+  };
 
   const markAllRead = useMutation({
     mutationFn: () => notificationsApi.markAllAsRead(),
@@ -210,7 +219,7 @@ export default function NotificationPanel({ onClose }: Props) {
                   {g.unreadCount > 0 && (
                     <button
                       title="Mark as read"
-                      onClick={(e) => { e.stopPropagation(); markRead.mutate(n); }}
+                      onClick={(e) => { e.stopPropagation(); markGroupRead(g); }}
                       className="p-0.5 text-surface-500 hover:text-brand-400 transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />

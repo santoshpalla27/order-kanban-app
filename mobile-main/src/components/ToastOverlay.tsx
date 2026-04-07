@@ -104,16 +104,16 @@ function ToastItem({ toast }: { toast: Toast }) {
           <Feather name={icon.name} size={18} color={icon.color} />
         </View>
         <View style={t.textWrap}>
-          <Text style={[t.sender, { color: c.text }]} numberOfLines={1}>
-            {toast.message || toast.senderName}
-          </Text>
-          {!!toast.content && (
-            <Text style={[t.msg, { color: c.textMuted }]} numberOfLines={2}>
-              {toast.content}
+          {!!toast.senderName && (
+            <Text style={[t.sender, { color: c.text }]} numberOfLines={1}>
+              {toast.senderName}
             </Text>
           )}
+          <Text style={[t.msg, { color: toast.senderName ? c.textMuted : c.text }]} numberOfLines={3}>
+            {toast.message}
+          </Text>
         </View>
-        <TouchableOpacity onPress={dismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity onPress={dismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginTop: 3 }}>
           <Feather name="x" size={14} color={c.textMuted} />
         </TouchableOpacity>
       </TouchableOpacity>
@@ -156,7 +156,7 @@ const t = StyleSheet.create({
   },
   inner: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     padding: 16,
     gap: 12,
   },
@@ -167,6 +167,7 @@ const t = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    marginTop: 1,
   },
   textWrap: {
     flex: 1,

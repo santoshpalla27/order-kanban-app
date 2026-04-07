@@ -136,6 +136,18 @@ export default function NotificationsScreen() {
     } catch {}
   };
 
+  const markGroupRead = async (g: NotifGroup) => {
+    try {
+      const unread = g.items.filter(item => !item.is_read);
+      await Promise.all(unread.map(item => notificationsApi.markAsRead(item.id)));
+      const ids = new Set(unread.map(item => item.id));
+      setNotifications((prev) => prev.map((nn) => ids.has(nn.id) ? { ...nn, is_read: true } : nn));
+      const countRes = await notificationsApi.getUnreadCount();
+      setUnreadCount(countRes.data?.count ?? 0);
+      refreshBadges();
+    } catch {}
+  };
+
   const markAllRead = async () => {
     try {
       await notificationsApi.markAllAsRead();
@@ -398,7 +410,7 @@ export default function NotificationsScreen() {
                   {g.unreadCount > 0 && (
                     <TouchableOpacity
                       style={s.eyeBtn}
-                      onPress={(e) => { e.stopPropagation?.(); markRead(n); }}
+                      onPress={(e) => { e.stopPropagation?.(); markGroupRead(g); }}
                       hitSlop={8}
                     >
                       <Feather name="eye" size={16} color={c.textMuted} />
