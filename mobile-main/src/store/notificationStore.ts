@@ -45,7 +45,7 @@ export const useNotificationStore = create<NotificationStore>((set, get) => ({
     set((s) => ({ toasts: [...s.toasts, { id, ...toast }] }));
     setTimeout(() => {
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
-    }, 6000);
+    }, 10000);
   },
 
   removeToast: (id) =>

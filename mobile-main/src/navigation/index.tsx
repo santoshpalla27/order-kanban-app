@@ -31,6 +31,7 @@ import ProfileScreen        from '../screens/ProfileScreen';
 import { useProductBadges, useMyOrdersBadges } from '../hooks/useProductBadges';
 import SharePickerModal from '../components/SharePickerModal';
 import { useShareStore } from '../store/shareStore';
+import ToastOverlay from '../components/ToastOverlay';
 
 export type RootStackParamList = {
   Login:         undefined;
@@ -251,6 +252,7 @@ export default function Navigation() {
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       <AppNavigator />
+      <ToastOverlay />
     </NavigationContainer>
   );
 }
