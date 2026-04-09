@@ -370,7 +370,7 @@ function KanbanCard({
           <div className="flex items-center gap-2 mb-3">
             <Package className="w-3.5 h-3.5 text-brand-400 flex-shrink-0" />
             <span className="text-xs font-mono text-brand-400">{product.product_id}</span>
-            {product.pinned_at && <Pin className="w-3 h-3 text-amber-400 flex-shrink-0" title="Pinned to top" />}
+            {product.pinned_at && <span title="Pinned to top"><Pin className="w-3 h-3 text-amber-400 flex-shrink-0" /></span>}
             {hasBadge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
           </div>
           {/* Assignees + delivery date */}

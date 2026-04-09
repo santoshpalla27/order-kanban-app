@@ -275,7 +275,7 @@ export default function ListView() {
                   >
                     <div className="px-4 py-4 flex items-center gap-2 min-w-0">
                       <span className="text-sm font-medium text-brand-400 truncate">{product.product_id}</span>
-                      {product.pinned_at && <Pin className="w-3 h-3 text-amber-400 flex-shrink-0" title="Pinned to top" />}
+                      {product.pinned_at && <span title="Pinned to top"><Pin className="w-3 h-3 text-amber-400 flex-shrink-0" /></span>}
                       {hasAny(product.id) && (
                         <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" title="New comment" />
                       )}
