@@ -1,17 +1,22 @@
 services:
   traefik:
-    image: traefik:latest
+    image: traefik:v3.6.10
     container_name: kanban-traefik
     restart: unless-stopped
+    environment:
+      - DOCKER_API_VERSION=1.41
+      - CF_API_TOKEN=${CF_API_TOKEN}
     command:
       - --api.dashboard=true
       - --api.insecure=true
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
+      - --providers.docker.endpoint=unix:///var/run/docker.sock
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
       - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
       - --log.level=INFO
@@ -32,17 +37,45 @@ services:
       - traefik.http.routers.http-catchall.priority=1
       - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
       - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   postgres:
     image: postgres:16-alpine
     container_name: kanban-postgres
     restart: unless-stopped
+    command:
+      - postgres
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - effective_cache_size=256MB
+      - -c
+      - work_mem=2MB
+      - -c
+      - maintenance_work_mem=32MB
+      - -c
+      - max_connections=50
+      - -c
+      - wal_buffers=8MB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - random_page_cost=1.1
     environment:
       - POSTGRES_DB=${POSTGRES_DB:-kanban}
       - POSTGRES_USER=${POSTGRES_USER:-kanban}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     networks:
       - kanban-net
     healthcheck:
@@ -54,7 +87,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.75"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   backend:
     build:
@@ -67,7 +110,7 @@ services:
       - LOG_FORMAT=json
       - DATABASE_URL=postgres://${POSTGRES_USER:-kanban}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-kanban}?sslmode=disable
       - JWT_SECRET=${JWT_SECRET}
-      - CORS_ORIGINS=https://app.santoshdevops.cloud
+      - CORS_ORIGINS=${CORS_ORIGINS}
       - R2_BUCKET=${R2_BUCKET}
       - R2_ACCOUNT_ID=${R2_ACCOUNT_ID}
       - R2_ACCESS_KEY=${R2_ACCESS_KEY}
@@ -78,9 +121,22 @@ services:
         condition: service_healthy
     networks:
       - kanban-net
-
     labels:
-      - traefik.enable=false
+      - traefik.enable=true
+      - traefik.http.routers.backend.rule=Host(`${DOMAIN}`) && PathPrefix(`/api`)
+      - traefik.http.routers.backend.entrypoints=websecure
+      - traefik.http.routers.backend.tls.certresolver=letsencrypt
+      - traefik.http.services.backend.loadbalancer.server.port=8080
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.50"
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   push-service:
     build:
@@ -99,19 +155,29 @@ services:
       - kanban-net
     labels:
       - traefik.enable=true
-      - traefik.http.routers.push.rule=Host(`app.santoshdevops.cloud`) && PathPrefix(`/push-api`)
+      - traefik.http.routers.push.rule=Host(`${DOMAIN}`) && PathPrefix(`/push-api`)
       - traefik.http.routers.push.entrypoints=websecure
       - traefik.http.routers.push.tls.certresolver=letsencrypt
       - traefik.http.middlewares.push-strip.stripprefix.prefixes=/push-api
       - traefik.http.routers.push.middlewares=push-strip
       - traefik.http.services.push.loadbalancer.server.port=4001
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: https://app.santoshdevops.cloud/api
+        VITE_API_URL: https://${DOMAIN}/api
     container_name: kanban-frontend
     restart: unless-stopped
     depends_on:
@@ -120,12 +186,23 @@ services:
       - kanban-net
     labels:
       - traefik.enable=true
-      - traefik.http.routers.frontend.rule=Host(`app.santoshdevops.cloud`)
+      - traefik.http.routers.frontend.rule=Host(`${DOMAIN}`)
       - traefik.http.routers.frontend.entrypoints=websecure
       - traefik.http.routers.frontend.tls.certresolver=letsencrypt
+      - traefik.http.routers.frontend.priority=1
       - traefik.http.services.frontend.loadbalancer.server.port=80
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+          cpus: "0.25"
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
 
-  # ── Monitor — server & Docker dashboard (m.santoshdevops.cloud) ─────────────
+  # ── Monitor — server & Docker dashboard ──────────────────────────────────────
   monitor:
     build:
       context: ./monitor
@@ -146,7 +223,7 @@ services:
       - kanban-net
     labels:
       - traefik.enable=true
-      - traefik.http.routers.monitor.rule=Host(`m.santoshdevops.cloud`)
+      - traefik.http.routers.monitor.rule=Host(`${MONITOR_DOMAIN}`)
       - traefik.http.routers.monitor.entrypoints=websecure
       - traefik.http.routers.monitor.tls.certresolver=letsencrypt
       - traefik.http.middlewares.monitor-auth.basicauth.users=${ADMIN_AUTH}
@@ -164,7 +241,7 @@ services:
         max-file: "2"
 
 volumes:
-  postgres_data:
+  postgres-data:
   letsencrypt-data:
 
 networks:
