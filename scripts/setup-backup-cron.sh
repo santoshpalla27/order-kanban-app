@@ -30,14 +30,14 @@ echo "Log file: $LOG"
 mkdir -p /var/backups/kanban
 echo "Backup dir: /var/backups/kanban"
 
-# Install cron job — runs daily at 02:00 UTC (low-traffic window)
-CRON_JOB="0 2 * * * $BACKUP_SCRIPT"
+# Install cron job — runs every 5 hours
+CRON_JOB="0 */5 * * * $BACKUP_SCRIPT"
 
 if crontab -l 2>/dev/null | grep -qF "$BACKUP_SCRIPT"; then
   echo "Cron job already installed — no changes made."
 else
   (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
-  echo "Cron job installed: daily at 02:00 UTC"
+  echo "Cron job installed: every 5 hours"
 fi
 
 echo ""
