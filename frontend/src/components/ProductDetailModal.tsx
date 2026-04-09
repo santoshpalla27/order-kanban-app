@@ -338,6 +338,16 @@ export default function ProductDetailModal({ productId, onClose, initialTab }: P
       notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES).then(invalidate);
   };
 
+  // On mount: mark product_created notifications as read
+  useEffect(() => {
+    const invalidate = () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
+    };
+    notificationsApi.markReadByEntityAndTypes('product', productId, ['product_created']).then(invalidate);
+  }, [productId]);
+
   // When switching tabs, mark the tab we're leaving as read
   useEffect(() => {
     const prev = prevTabRef.current;

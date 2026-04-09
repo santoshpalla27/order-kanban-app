@@ -2326,6 +2326,13 @@ export default function ProductDetailScreen() {
       notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES).then(done).catch(() => {});
   };
 
+  // On mount: mark product_created notifications as read
+  useEffect(() => {
+    notificationsApi.markReadByEntityAndTypes('product', productId, ['product_created'])
+      .then(() => { refreshBadges(); refreshUnreadCount(); bumpListVersion(); })
+      .catch(() => {});
+  }, [productId]);
+
   // When switching tabs, mark the tab we're leaving as read
   useEffect(() => {
     const prev = prevTabRef.current;
