@@ -96,6 +96,8 @@ export const productsApi = {
   delete: (id: number) => api.delete(`/products/${id}`),
   getDeleted: () => api.get('/products/deleted'),
   restore: (id: number) => api.post(`/products/${id}/restore`),
+  pin: (id: number) => api.patch(`/products/${id}/pin`),
+  unpin: (id: number) => api.delete(`/products/${id}/pin`),
 };
 
 // Attachments — R2 only, no local fallback

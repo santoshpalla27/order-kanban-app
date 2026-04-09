@@ -21,6 +21,7 @@ type Product struct {
 	Attachments   []Attachment   `json:"attachments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
 	Comments      []Comment      `json:"comments,omitempty" gorm:"foreignKey:ProductID;references:ID"`
 	DeliveryAt    *time.Time     `json:"delivery_at"`
+	PinnedAt      *time.Time     `json:"pinned_at"`
 	DeletedBy     uint           `json:"deleted_by" gorm:"default:0"`
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`

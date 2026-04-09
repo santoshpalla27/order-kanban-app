@@ -52,6 +52,7 @@ export interface Product {
   attachments?: Attachment[];
   comments?: Comment[];
   delivery_at?: string | null;
+  pinned_at?: string | null;
   assignees?: User[];
   deleted_at?: string | null;
   deleted_by?: number;

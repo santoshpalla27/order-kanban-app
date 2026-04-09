@@ -2377,6 +2377,24 @@ export default function ProductDetailScreen() {
     ]);
   };
 
+  const [pinning, setPinning] = useState(false);
+  const handleTogglePin = async () => {
+    if (!product || pinning) return;
+    setPinning(true);
+    try {
+      if (product.pinned_at) {
+        await productsApi.unpin(product.id);
+        setProduct((p) => p ? { ...p, pinned_at: null } : p);
+      } else {
+        const res = await productsApi.pin(product.id);
+        setProduct((p) => p ? { ...p, pinned_at: res.data?.pinned_at ?? new Date().toISOString() } : p);
+      }
+    } catch {
+      Alert.alert('Error', 'Failed to update pin');
+    }
+    setPinning(false);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.screen}>
@@ -2411,6 +2429,13 @@ export default function ProductDetailScreen() {
           <Text style={styles.productId}>{product.product_id}</Text>
           <Text style={styles.customerName} numberOfLines={1}>{product.customer_name}</Text>
         </View>
+        <TouchableOpacity
+          style={[styles.pinBtn, product.pinned_at ? styles.pinBtnActive : null]}
+          onPress={handleTogglePin}
+          disabled={pinning}
+        >
+          <Feather name="bookmark" size={16} color={product.pinned_at ? '#F59E0B' : c.textMuted} />
+        </TouchableOpacity>
         <View style={styles.headerRight}>
           {canChangeStatus() && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -2522,6 +2547,13 @@ function makeScreenStyles(c: ThemeColors) {
     productId: { fontSize: 12, fontWeight: '700', color: c.brandLight, fontFamily: 'monospace' },
     customerName: { fontSize: 16, fontWeight: '700', color: c.text },
     headerRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+    pinBtn: {
+      width: 34, height: 34, borderRadius: 10,
+      backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center',
+    },
+    pinBtnActive: {
+      backgroundColor: 'rgba(245,158,11,0.15)',
+    },
     deleteBtn: {
       width: 34, height: 34, borderRadius: 10,
       backgroundColor: 'rgba(239,68,68,0.1)', alignItems: 'center', justifyContent: 'center',

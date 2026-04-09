@@ -105,6 +105,8 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 					products.POST("", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.CreateProduct)
 					products.PUT("/:id", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UpdateProduct)
 					products.PATCH("/:id/status", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UpdateStatus)
+					products.PATCH("/:id/pin", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.PinProduct)
+					products.DELETE("/:id/pin", middleware.RBACMiddleware("admin", "manager", "organiser"), productHandler.UnpinProduct)
 					products.DELETE("/:id", middleware.RBACMiddleware("admin", "manager"), productHandler.DeleteProduct)
 
 					// Attachments (nested under products/:id)

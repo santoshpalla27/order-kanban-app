@@ -10,7 +10,7 @@ import MentionInput, { renderWithMentions, MentionInputHandle } from './MentionI
 import {
   X, Paperclip, MessageSquare, Package, Upload, Download, Trash2,
   Send, Edit2, Image, FileText, File, ImagePlus, Plus, Reply, MoreVertical,
-  ExternalLink, Link2, Copy, Check, User,
+  ExternalLink, Link2, Copy, Check, User, Pin, PinOff,
 } from 'lucide-react';
 import { UserAvatar } from './UserAvatar';
 
@@ -365,6 +365,11 @@ export default function ProductDetailModal({ productId, onClose, initialTab }: P
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 
+  const pinMutation = useMutation({
+    mutationFn: () => product?.pinned_at ? productsApi.unpin(productId) : productsApi.pin(productId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
+  });
+
   const tabs = [
     { id: 'details' as const, label: 'Details', icon: Package, badge: has(productId, 'status_change') },
     { id: 'attachments' as const, label: `Files (${directAttachmentsCount})`, icon: Paperclip, badge: has(productId, 'attachments') },
@@ -377,9 +382,19 @@ export default function ProductDetailModal({ productId, onClose, initialTab }: P
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
         <div className="w-full max-w-2xl max-h-[85vh] glass rounded-2xl flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center justify-between p-5 border-b border-surface-700/50">
-            <h2 className="text-lg font-semibold">{product?.product_id || 'Loading...'}</h2>
-            <div className="flex items-center gap-4 mr-1">
+          <div className="flex items-center gap-3 p-5 border-b border-surface-700/50">
+            <h2 className="text-lg font-semibold flex-1 min-w-0 truncate">{product?.product_id || 'Loading...'}</h2>
+            {product && (
+              <button
+                onClick={() => pinMutation.mutate()}
+                disabled={pinMutation.isPending}
+                title={product.pinned_at ? 'Unpin order' : 'Pin to top'}
+                className={`btn-ghost p-2 rounded-lg transition-colors flex-shrink-0 ${product.pinned_at ? 'text-amber-400 hover:text-amber-300' : 'text-surface-400 hover:text-surface-200'}`}
+              >
+                {product.pinned_at ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+              </button>
+            )}
+            <div className="flex items-center gap-3 flex-shrink-0">
               {product && (
                 <div className="relative flex items-center">
                   {has(productId, 'status_change') && (

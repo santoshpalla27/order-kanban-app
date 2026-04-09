@@ -70,7 +70,7 @@ func GetProducts(filter ProductFilter) ([]models.Product, error) {
 		filter,
 	)
 	var products []models.Product
-	err := query.Order("created_at DESC").Find(&products).Error
+	err := query.Order("pinned_at DESC NULLS LAST, created_at DESC").Find(&products).Error
 	return products, err
 }
 
@@ -85,7 +85,7 @@ func GetProductsCursor(filter ProductFilter, limit int, cursor uint) (ProductCur
 	}
 
 	var products []models.Product
-	if err := query.Order("updated_at DESC, id DESC").Limit(limit + 1).Find(&products).Error; err != nil {
+	if err := query.Order("pinned_at DESC NULLS LAST, updated_at DESC, id DESC").Limit(limit + 1).Find(&products).Error; err != nil {
 		return ProductCursorPage{}, err
 	}
 
@@ -179,6 +179,19 @@ func UpdateProduct(id uint, updates map[string]interface{}, assigneeIDs []uint) 
 func UpdateProductStatus(id uint, status string) error {
 	return database.DB.Model(&models.Product{}).Where("id = ?", id).
 		Updates(map[string]interface{}{"status": status, "updated_at": time.Now()}).Error
+}
+
+// PinProduct sets pinned_at to now, floating the product to the top of all lists.
+func PinProduct(id uint) error {
+	now := time.Now()
+	return database.DB.Model(&models.Product{}).Where("id = ?", id).
+		Update("pinned_at", now).Error
+}
+
+// UnpinProduct clears pinned_at, returning the product to natural sort order.
+func UnpinProduct(id uint) error {
+	return database.DB.Model(&models.Product{}).Where("id = ?", id).
+		Update("pinned_at", nil).Error
 }
 
 // DeleteProduct soft-deletes a product.

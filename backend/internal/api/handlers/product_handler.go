@@ -292,6 +292,38 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Product moved to trash"})
 }
 
+func (h *ProductHandler) PinProduct(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		return
+	}
+	if err := services.PinProduct(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to pin product"})
+		return
+	}
+	product, _ := services.GetProductByIDSimple(uint(id))
+	wsMsg, _ := json.Marshal(WSMessage{Type: "product_update", Payload: product})
+	database.EmitBroadcast(wsMsg)
+	c.JSON(http.StatusOK, product)
+}
+
+func (h *ProductHandler) UnpinProduct(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		return
+	}
+	if err := services.UnpinProduct(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to unpin product"})
+		return
+	}
+	product, _ := services.GetProductByIDSimple(uint(id))
+	wsMsg, _ := json.Marshal(WSMessage{Type: "product_update", Payload: product})
+	database.EmitBroadcast(wsMsg)
+	c.JSON(http.StatusOK, product)
+}
+
 func (h *ProductHandler) GetDeletedProducts(c *gin.Context) {
 	products, err := services.GetDeletedProducts()
 	if err != nil {
