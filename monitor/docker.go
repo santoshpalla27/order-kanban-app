@@ -13,16 +13,21 @@ import (
 
 const dockerAPI = "http://localhost/v1.43"
 
-// dockerClient dials Docker's Unix socket directly — no SDK needed.
-func dockerClient() *http.Client {
-	return &http.Client{
-		Timeout: 15 * time.Second,
-		Transport: &http.Transport{
-			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				return (&net.Dialer{}).DialContext(ctx, "unix", "/var/run/docker.sock")
-			},
+// sharedDockerClient is a package-level singleton that reuses Unix socket connections.
+var sharedDockerClient = &http.Client{
+	Timeout: 15 * time.Second,
+	Transport: &http.Transport{
+		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+			return (&net.Dialer{}).DialContext(ctx, "unix", "/var/run/docker.sock")
 		},
-	}
+		MaxIdleConns:    10,
+		IdleConnTimeout: 30 * time.Second,
+	},
+}
+
+// dockerClient returns the shared Docker HTTP client.
+func dockerClient() *http.Client {
+	return sharedDockerClient
 }
 
 // ── Types decoded from the Docker REST API ───────────────────────────────────
