@@ -26,6 +26,7 @@ services:
     restart: unless-stopped
     environment:
       - DOCKER_API_VERSION=1.41
+      - CF_API_TOKEN=${CF_API_TOKEN}
     command:
       - --api.dashboard=false
       - --providers.docker=true
@@ -33,8 +34,9 @@ services:
       - --providers.docker.endpoint=unix:///var/run/docker.sock
       - --entrypoints.web.address=:80
       - --entrypoints.websecure.address=:443
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.resolvers=1.1.1.1:53,8.8.8.8:53
       - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
       - --log.level=INFO
