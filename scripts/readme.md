@@ -2,13 +2,13 @@
 
 ## How it works
 
-| Step | What happens | RAM cost |
-|------|-------------|----------|
-| `docker exec kanban-postgres pg_dump` | Runs inside the **existing** postgres container | 0 extra MB on host |
-| `| gzip -6` | Streams through host gzip | ~2 MB |
-| Save to `/var/backups/kanban/` | Compressed SQL file | disk only |
-| Upload to Cloudflare R2 | Off-site copy via `aws` CLI | ~20 MB while uploading |
-| Rotate files > 7 days | `find -mtime +7 -delete` | 0 MB |
+| Step                                  | What happens                                    | RAM cost                  |
+| ------------------------------------- | ----------------------------------------------- | ------------------------- | ----- |
+| `docker exec kanban-postgres pg_dump` | Runs inside the **existing** postgres container | 0 extra MB on host        |
+| `                                     | gzip -6`                                        | Streams through host gzip | ~2 MB |
+| Save to `/var/backups/kanban/`        | Compressed SQL file                             | disk only                 |
+| Upload to Cloudflare R2               | Off-site copy via `aws` CLI                     | ~20 MB while uploading    |
+| Rotate files > 7 days                 | `find -mtime +7 -delete`                        | 0 MB                      |
 
 Total extra RAM during backup: **~22 MB** peak — well within the 640 MB buffer.
 
@@ -91,3 +91,5 @@ tail /var/log/kanban-backup.log
 # Should end with:
 # [2025-01-15T02:00:05Z] Done.
 ```
+
+sudo crontab -l. -- to check
