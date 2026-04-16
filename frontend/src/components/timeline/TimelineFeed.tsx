@@ -125,9 +125,9 @@ export default function TimelineFeed({ productId, canPost = true }: Props) {
   let lastDate = '';
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1 h-full min-h-0">
       {/* Feed */}
-      <div className="flex-1 space-y-1 mb-3 overflow-y-auto pr-1">
+      <div className="flex-1 min-h-0 space-y-1 mb-3 overflow-y-auto pr-1">
         {isLoading ? (
           <div className="flex flex-col gap-3 py-8">
             {[1,2,3].map(i => <div key={i} className="h-10 bg-surface-800/50 rounded-xl animate-pulse" />)}
