@@ -48,6 +48,7 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 	purgeHandler := handlers.NewPurgeHandler()
 	customerLinkHandler := handlers.NewCustomerLinkHandler()
 	customerPortalHandler := handlers.NewCustomerPortalHandler()
+	timelineHandler := handlers.NewTimelineHandler()
 
 	// Public customer portal routes (no authentication)
 	portal := r.Group("/api/portal")
@@ -113,6 +114,9 @@ func SetupRouter(cfg *config.Config) *gin.Engine {
 					products.GET("/:id/attachments", attachmentHandler.GetByProduct)
 					products.GET("/:id/attachments/presign", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), attachmentHandler.GetPresignedUploadURL)
 					products.POST("/:id/attachments/confirm", middleware.RBACMiddleware("admin", "manager", "organiser", "employee"), attachmentHandler.ConfirmUpload)
+
+					// Timeline (nested under products/:id) — unified feed
+					products.GET("/:id/timeline", timelineHandler.GetTimeline)
 
 					// Comments (nested under products/:id)
 					products.GET("/:id/comments", commentHandler.GetByProduct)

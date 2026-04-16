@@ -188,8 +188,9 @@ func (h *AuthHandler) generateTokenPair(user *models.User) (string, string, erro
 	return accessToken, refreshToken, nil
 }
 
-// NotifyStatusChange broadcasts a product_update WS event so all clients refresh their board,
-// and creates a persistent notification for all other users so it appears in the bell panel.
+// NotifyStatusChange broadcasts a product_update WS event so all clients refresh their board.
+// A persistent "completed" notification is sent only when status reaches "done",
+// targeted at assignees and managers only — not everyone.
 func NotifyStatusChange(userID uint, userName string, product *models.Product, oldStatus, newStatus string) {
 	wsMsg, _ := json.Marshal(WSMessage{
 		Type: "product_update",
@@ -203,6 +204,8 @@ func NotifyStatusChange(userID uint, userName string, product *models.Product, o
 	})
 	database.EmitBroadcast(wsMsg)
 
-	message := fmt.Sprintf("%s moved order %s from %s to %s", userName, product.ProductID, formatStatus(oldStatus), formatStatus(newStatus))
-	services.CreateNotificationForAllExcept(userID, nil, message, "status_change", "product", product.ID, "", userName)
+	if newStatus == "done" {
+		message := fmt.Sprintf("%s completed order %s", userName, product.ProductID)
+		services.CreateNotificationForAssigneesAndManagers(userID, product.ID, message, "completed", "product", product.ID, "", userName)
+	}
 }

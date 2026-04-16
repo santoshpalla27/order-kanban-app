@@ -102,8 +102,6 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 	}
 
 	userID := c.GetUint("user_id")
-	userName, _ := c.Get("user_name")
-	senderName := fmt.Sprintf("%v", userName)
 
 	attachment := &models.Attachment{
 		ProductID:  uint(productID),
@@ -128,22 +126,6 @@ func (h *AttachmentHandler) ConfirmUpload(c *gin.Context) {
 		EntityID: attachment.ID,
 		Details:  fmt.Sprintf("Uploaded %s to product %s (R2)", req.FileName, productIDStr),
 	})
-
-	// Resolve the order display label (e.g. "ORD-001") for the notification message.
-	product, _ := services.GetProductByIDSimple(uint(productID))
-	productLabel := fmt.Sprintf("#%d", productID)
-	if product != nil {
-		productLabel = product.ProductID
-	}
-
-	// Persist notification for all users + toast via LISTEN/NOTIFY.
-	// Comment-source uploads badge the Comments tab; direct uploads badge the Files tab.
-	message := fmt.Sprintf("%s uploaded '%s' on order %s", senderName, req.FileName, productLabel)
-	notifType := "attachment_uploaded"
-	if req.Source == "comment" {
-		notifType = "comment_added"
-	}
-	services.CreateNotificationForAllExcept(userID, nil, message, notifType, "product", attachment.ProductID, "", senderName)
 
 	// Broadcast UI update (attachment panel refresh)
 	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_uploaded", Payload: attachment})

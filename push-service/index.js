@@ -145,10 +145,8 @@ async function getUserPrefs(userId) {
   }
 }
 
-const DEFAULT_PUSH_TYPES = [
-  'status_change', 'comment', 'mention',
-  'attachment', 'chat', 'product_created', 'product_deleted',
-];
+// Push is only sent for actionable notification types — reduces noise significantly.
+const DEFAULT_PUSH_TYPES = ['mention', 'assigned', 'customer_message', 'completed', 'chat'];
 
 
 // Check if userId is assigned to productId via product_assignees.
@@ -169,8 +167,8 @@ async function isAssignedToProduct(userId, productId) {
 // entityType: "product" | "chat" | other
 // entityId: product ID (for assignment check), 0 otherwise
 async function shouldSendPush(userId, notifType, entityType, entityId) {
-  // mention always goes through
-  if (notifType === 'mention') return true;
+  // All 4 actionable types + chat always go through without pref checks
+  if (['mention', 'assigned', 'customer_message', 'completed', 'chat_message'].includes(notifType)) return true;
 
   const prefs = await getUserPrefs(userId);
   if (!prefs) return true; // no prefs → default allow
@@ -320,21 +318,11 @@ async function startListener() {
         let title, body;
 
         switch (type) {
-          case 'comment_added': {
-            // backend message: "admin commented on ABC123"
-            const ref = orderRef(message);
-            title = ref ? `💬 Comment on ${ref}` : '💬 New Comment';
-            body  = sender && content ? trunc(`${sender}: ${content}`) : trunc(message);
-            break;
-          }
-
           case 'mention': {
             if (entity === 'chat') {
-              // Chat mention — show the actual message
               title = '💬 Team Chat';
               body  = sender && content ? trunc(`${sender}: ${content}`) : trunc(message);
             } else {
-              // Product mention: "admin mentioned you in ABC123"
               const ref = orderRef(message);
               title = ref ? `💬 Mentioned in ${ref}` : '💬 You were mentioned';
               body  = sender && content ? trunc(`${sender}: ${content}`) : trunc(message);
@@ -342,25 +330,24 @@ async function startListener() {
             break;
           }
 
-          case 'attachment_uploaded': {
-            // backend message: "admin uploaded 'filename.pdf' on ORD-001"
+          case 'assigned': {
             const ref = orderRef(message);
-            title = ref ? `📎 Attachment on ${ref}` : '📎 New Attachment';
-            body  = trunc(message || (sender ? `${sender} uploaded an attachment` : 'New attachment'));
+            title = ref ? `📦 Assigned to ${ref}` : '📦 New Order Assigned';
+            body  = trunc(message || 'You have been assigned to an order');
             break;
           }
 
-          case 'customer_comment_added': {
+          case 'customer_message': {
             const ref = orderRef(message);
-            title = ref ? `💬 Customer Message on ${ref}` : '💬 New Customer Message';
+            title = ref ? `💬 Customer on ${ref}` : '💬 Customer Message';
             body  = content ? trunc(content) : trunc(message || 'Customer sent a message');
             break;
           }
 
-          case 'customer_attachment_uploaded': {
+          case 'completed': {
             const ref = orderRef(message);
-            title = ref ? `📎 Customer File on ${ref}` : '📎 Customer File';
-            body  = trunc(message || 'Customer uploaded a file');
+            title = ref ? `✅ Order ${ref} completed` : '✅ Order Completed';
+            body  = trunc(message || 'An order was marked as done');
             break;
           }
 
@@ -370,35 +357,13 @@ async function startListener() {
             break;
           }
 
-          case 'status_change': {
-            // Handled by broadcast_except (activity_updated) — skip to avoid duplicate push
+          default:
+            // Skip all other notification types (comment_added, attachment_uploaded, status_change, etc.)
             return;
-          }
-
-          case 'product_created': {
-            title = '📦 New Order Assigned';
-            body  = trunc(message || 'You have been assigned to a new order');
-            break;
-          }
-
-          default: {
-            title = sender ? `📦 ${sender}` : '📦 KanbanFlow';
-            body  = trunc(message || 'You have a new notification');
-          }
         }
 
-        // Map the push service type to the prefs type key
-        const prefsTypeMap = {
-          comment_added:                'comment',
-          mention:                      'mention',
-          attachment_uploaded:          'attachment',
-          customer_comment_added:       'comment',
-          customer_attachment_uploaded: 'attachment',
-          chat_message:                 'chat',
-          assignment:                   'assignment',
-          delivery_reminder:            'delivery_reminder',
-        };
-        const prefsType = prefsTypeMap[type] || type;
+        // type is used directly as the prefs key
+        const prefsType = type;
 
         const allowed = await shouldSendPush(
           event.user_id, prefsType, entity, p.entity_id || 0
@@ -414,64 +379,8 @@ async function startListener() {
         return;
       }
 
-      // ── 2. Broadcast-except: activity events (status changes, order movements, etc.) ──
-      if (event.event_type === 'broadcast_except') {
-        const wsMsg = JSON.parse(event.ws_msg);
-        if (wsMsg.type !== 'activity_updated') return;
-
-        const p     = wsMsg.payload || {};
-        const msg   = (p.message    || '').trim();
-        const actor = p.actor_name  || 'Someone';
-
-        // Skip comment/attachment activities — those go via targeted notification events.
-        if (p.entity === 'comment' || p.entity === 'attachment') return;
-
-        // Derive a descriptive title from the pre-formatted activity message.
-        // Backend formats:
-        //   "Order ABC moved from Yet to Start to Working"  → 🔄 Status Update
-        //   "Order ABC created for customer X"              → 📦 New Order
-        //   "Order ABC details updated (customer: X)"       → 📝 Order Updated
-        //   "Order ABC moved to trash"                      → 🗑️ Order Deleted
-        //   "Order ABC restored from trash"                 → ♻️ Order Restored
-        let title;
-        if (/moved from .+ to /i.test(msg)) {
-          title = '🔄 Status Update';
-        } else if (/created for customer/i.test(msg) || / created$/i.test(msg)) {
-          title = '📦 New Order';
-        } else if (/details updated/i.test(msg) || / updated/i.test(msg)) {
-          title = '📝 Order Updated';
-        } else if (/moved to trash/i.test(msg)) {
-          title = '🗑️ Order Deleted';
-        } else if (/restored from trash/i.test(msg)) {
-          title = '♻️ Order Restored';
-        } else {
-          title = `📦 ${actor}`;
-        }
-
-        // Body: "Actor: full activity message" so recipient knows who did it
-        const body = msg ? `${actor}: ${msg}` : 'Order activity updated';
-
-        // Determine prefs type for this activity event
-        // product_created is handled by targeted notification events — skip to avoid duplicate push
-        if (/created for customer/i.test(msg) || / created$/i.test(msg)) return;
-
-        let activityPrefsType = 'status_change';
-        if (/moved to trash/i.test(msg)) activityPrefsType = 'product_deleted';
-        else if (/restored from trash/i.test(msg)) activityPrefsType = 'product_deleted';
-
-        await sendPushToAllExceptFiltered(
-          event.exclude_id || 0,
-          {
-            title, body,
-            data: { entityType: 'product', entityId: p.entity_id || 0, type: 'activity' },
-            collapseKey: makeCollapseKey('product', p.entity_id || 0, activityPrefsType),
-          },
-          activityPrefsType,
-          'product',
-          p.entity_id || 0
-        );
-        return;
-      }
+      // broadcast_except events (activity_updated, status changes) no longer generate push.
+      // The timeline feed shows these events inline; targeted notifications handle completions.
 
     } catch (err) {
       console.error('Notification handler error:', err.message);

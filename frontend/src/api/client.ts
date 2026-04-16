@@ -163,6 +163,12 @@ export const commentsApi = {
   delete: (id: number) => api.delete(`/comments/${id}`),
 };
 
+// Timeline — unified product activity feed
+export const timelineApi = {
+  getByProduct: (productId: number) =>
+    api.get<{ items: any[] }>(`/products/${productId}/timeline`),
+};
+
 // Chat
 export const chatApi = {
   getMessages: (limit = 50, cursor?: number) =>

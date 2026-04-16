@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"kanban-app/database"
 	"kanban-app/internal/models"
@@ -93,21 +92,10 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	})
 
 	senderName := userName.(string)
-	message := fmt.Sprintf("%s commented on order %s", senderName, productLabel)
 
-	// Attachment comments (contain "[attachment:") already triggered an attachment_uploaded
-	// notification when the file was saved — skip the comment_added one to avoid duplicates.
-	isAttachmentComment := strings.HasPrefix(req.Message, "📎 Uploaded: ") && strings.Contains(req.Message, "[attachment:")
-
-	// Mention notifications first — returns IDs of users who will receive a mention toast.
+	// Only notify users who are explicitly @mentioned — no broadcast for regular comments.
 	mentionMsg := fmt.Sprintf("%s mentioned you in order %s", senderName, productLabel)
-	mentionedIDs := services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID), req.Message, senderName)
-
-	// If the message contains @mentions, only the mentioned users are notified.
-	// If there are no @mentions and it's not an attachment comment, notify everyone.
-	if len(mentionedIDs) == 0 && !isAttachmentComment {
-		services.CreateNotificationForAllExcept(userID, nil, message, "comment_added", "product", uint(productID), req.Message, senderName)
-	}
+	services.NotifyMentions(userID, req.Message, mentionMsg, "product", uint(productID), req.Message, senderName)
 
 	// Broadcast UI update event (comment panel refresh) via LISTEN/NOTIFY
 	wsMsg, _ := json.Marshal(WSMessage{

@@ -9,11 +9,10 @@ interface Props {
 }
 
 const NOTIF_META: Record<string, { color: string; label: string }> = {
-  comment_added:       { color: 'text-cyan-400 bg-cyan-400/10 border-cyan-400/20',       label: 'Comment'    },
-  mention:             { color: 'text-purple-400 bg-purple-400/10 border-purple-400/20', label: 'Mention'    },
-  attachment_uploaded: { color: 'text-orange-400 bg-orange-400/10 border-orange-400/20', label: 'Attachment' },
-  status_change:       { color: 'text-amber-400 bg-amber-400/10 border-amber-400/20',    label: 'Status'     },
-  chat_message:        { color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', label: 'Chat'   },
+  mention:          { color: 'text-purple-400 bg-purple-400/10 border-purple-400/20', label: 'Mention'          },
+  assigned:         { color: 'text-blue-400 bg-blue-400/10 border-blue-400/20',       label: 'Assigned'         },
+  customer_message: { color: 'text-teal-400 bg-teal-400/10 border-teal-400/20',       label: 'Customer'         },
+  completed:        { color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20', label: 'Completed'      },
 };
 
 function getTypeMeta(type: string) {
@@ -31,29 +30,21 @@ function getAvatarGradient(name: string) {
   return colors[Math.abs(h) % colors.length];
 }
 
-function notifTypeToTab(type: string): string {
-  if (type === 'comment_added' || type === 'mention') return 'comments';
-  if (type === 'attachment_uploaded') return 'attachments';
-  if (type === 'customer_comment_added') return 'customer-comments';
-  if (type === 'customer_attachment_uploaded') return 'customer-attachments';
-  return 'details';
-}
-
 function getNotificationLink(n: Notification): string | null {
   if (n.entity_type === 'product' && n.entity_id) {
-    return `/?product=${n.entity_id}&tab=${notifTypeToTab(n.type)}`;
+    // All product notifications open to the timeline tab
+    return `/?product=${n.entity_id}&tab=timeline`;
   }
   if (n.entity_type === 'chat') return '/chat';
   return null;
 }
 
-// Group notifications by entity + type for display purposes only.
 interface NotifGroup {
   key: string;
-  items: Notification[];   // newest first
+  items: Notification[];
   latest: Notification;
   unreadCount: number;
-  senders: string[];       // unique sender names, newest first
+  senders: string[];
 }
 
 function groupNotifications(notifications: Notification[]): NotifGroup[] {
@@ -67,7 +58,6 @@ function groupNotifications(notifications: Notification[]): NotifGroup[] {
     g.items.push(n);
     if (!n.is_read) g.unreadCount++;
   }
-  // Derive senders from unread items only; fall back to all items if everything is read
   for (const g of map.values()) {
     const source = g.unreadCount > 0 ? g.items.filter(n => !n.is_read) : g.items;
     for (const n of source) {
@@ -142,16 +132,10 @@ export default function NotificationPanel({ onClose }: Props) {
           <Bell className="w-4 h-4" /> Notifications
         </h3>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => { onClose(); navigate('/notifications'); }}
-            className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1"
-          >
+          <button onClick={() => { onClose(); navigate('/notifications'); }} className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
             View all <ArrowRight className="w-3 h-3" />
           </button>
-          <button
-            onClick={() => markAllRead.mutate()}
-            className="text-xs text-surface-400 hover:text-surface-300 flex items-center gap-1"
-          >
+          <button onClick={() => markAllRead.mutate()} className="text-xs text-surface-400 hover:text-surface-300 flex items-center gap-1">
             <CheckCheck className="w-3 h-3" /> Mark all
           </button>
         </div>
@@ -168,41 +152,30 @@ export default function NotificationPanel({ onClose }: Props) {
             const link = getNotificationLink(n);
             const meta = getTypeMeta(n.type);
             const hasMany = g.items.length > 1;
-            // Avatar: show up to 2 stacked sender initials for groups, single for solo
             const firstSender = g.senders[0] || '';
             const secondSender = g.senders[1] || '';
             return (
               <div
                 key={g.key}
-                className={`flex items-start gap-3 px-4 py-3 transition-colors ${
-                  link ? 'cursor-pointer hover:bg-surface-700/30' : 'cursor-default'
-                } ${g.unreadCount > 0 ? 'bg-brand-600/5' : ''}`}
+                className={`flex items-start gap-3 px-4 py-3 transition-colors ${link ? 'cursor-pointer hover:bg-surface-700/30' : 'cursor-default'} ${g.unreadCount > 0 ? 'bg-brand-600/5' : ''}`}
                 onClick={() => handleClick(n)}
               >
-                {/* Avatar(s) */}
                 <div className="relative flex-shrink-0 mt-0.5" style={{ width: 32, height: 32 }}>
-                  <div
-                    className={`w-8 h-8 rounded-full bg-gradient-to-br ${getAvatarGradient(firstSender || n.type)} flex items-center justify-center text-xs font-bold text-white`}
-                  >
+                  <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${getAvatarGradient(firstSender || n.type)} flex items-center justify-center text-xs font-bold text-white`}>
                     {firstSender ? firstSender.charAt(0).toUpperCase() : '?'}
                   </div>
                   {hasMany && secondSender && secondSender !== firstSender && (
-                    <div
-                      className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br ${getAvatarGradient(secondSender)} flex items-center justify-center text-[9px] font-bold text-white ring-2 ring-surface-800`}
-                    >
+                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-gradient-to-br ${getAvatarGradient(secondSender)} flex items-center justify-center text-[9px] font-bold text-white ring-2 ring-surface-800`}>
                       {secondSender.charAt(0).toUpperCase()}
                     </div>
                   )}
                 </div>
 
-                {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {g.senders.length > 0 && (
                       <span className="text-xs font-semibold text-surface-200">
-                        {g.senders.length === 1
-                          ? g.senders[0]
-                          : `${g.senders[0]} & ${g.senders.length - 1} other${g.senders.length > 2 ? 's' : ''}`}
+                        {g.senders.length === 1 ? g.senders[0] : `${g.senders[0]} & ${g.senders.length - 1} other${g.senders.length > 2 ? 's' : ''}`}
                       </span>
                     )}
                     <span className={`inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded border ${meta.color}`}>
@@ -219,7 +192,6 @@ export default function NotificationPanel({ onClose }: Props) {
                   </p>
                 </div>
 
-                {/* Right: time + eye */}
                 <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                   <span className="text-[10px] text-surface-500 whitespace-nowrap">{formatTime(n.created_at)}</span>
                   {g.unreadCount > 0 && (

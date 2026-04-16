@@ -22,12 +22,67 @@ func containsType(types []string, t string) bool {
 // custom_my_types / custom_all_types so the filter works correctly.
 func normalizeNotifType(t string) string {
 	switch t {
-	case "comment_added", "customer_comment_added":
+	case "comment_added", "customer_comment_added", "customer_message":
 		return "comment"
 	case "attachment_uploaded", "customer_attachment_uploaded":
 		return "attachment"
+	case "completed":
+		return "status_change"
 	default:
 		return t
+	}
+}
+
+// CreateNotificationForAssigneesAndManagers sends a notification only to users who are
+// assigned to the product plus all admin/manager/organiser users (excluding the sender).
+// Used for customer messages and "completed" events to reduce noise.
+func CreateNotificationForAssigneesAndManagers(excludeUserID uint, productID uint, message, notifType, entityType string, entityID uint, content, senderName string) {
+	// Collect assignee IDs
+	var assigneeIDs []uint
+	database.DB.Table("product_assignees").
+		Where("product_id = ?", productID).
+		Pluck("user_id", &assigneeIDs)
+
+	// Collect admin/manager/organiser IDs
+	var managerIDs []uint
+	database.DB.Table("users").
+		Joins("JOIN roles ON roles.id = users.role_id").
+		Where("roles.name IN ?", []string{"admin", "manager", "organiser"}).
+		Pluck("users.id", &managerIDs)
+
+	// Union both sets, exclude sender
+	seen := map[uint]bool{excludeUserID: true}
+	var targetIDs []uint
+	for _, id := range append(assigneeIDs, managerIDs...) {
+		if !seen[id] {
+			seen[id] = true
+			targetIDs = append(targetIDs, id)
+		}
+	}
+
+	if len(targetIDs) == 0 {
+		return
+	}
+
+	wsMsg := buildNotifWSMsg(models.Notification{
+		Message: message, Type: notifType, EntityType: entityType,
+		EntityID: entityID, Content: content, SenderName: senderName,
+	})
+
+	var users []models.User
+	database.DB.Where("id IN ?", targetIDs).Find(&users)
+	for _, user := range users {
+		notif := models.Notification{
+			UserID:     user.ID,
+			Message:    message,
+			Type:       notifType,
+			EntityType: entityType,
+			EntityID:   entityID,
+			Content:    content,
+			SenderName: senderName,
+		}
+		database.DB.Create(&notif)
+		database.EmitToUser(user.ID, wsMsg)
 	}
 }
 

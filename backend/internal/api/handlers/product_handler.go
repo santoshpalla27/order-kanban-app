@@ -154,8 +154,15 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	wsMsg, _ := json.Marshal(WSMessage{Type: "product_created", Payload: product})
 	database.EmitBroadcast(wsMsg)
 
-	message := fmt.Sprintf("%s created new order %s for %s", userName.(string), product.ProductID, product.CustomerName)
-	services.CreateNotificationForAllExcept(userID, nil, message, "product_created", "product", product.ID, "", userName.(string))
+	// Notify only assigned users (if any) — creating an order isn't news to everyone
+	if len(req.AssigneeIDs) > 0 {
+		message := fmt.Sprintf("%s assigned you to new order %s", userName.(string), product.ProductID)
+		for _, assigneeID := range req.AssigneeIDs {
+			if uint(assigneeID) != userID {
+				services.CreateNotificationForUser(uint(assigneeID), message, "assigned", "product", product.ID, "", userName.(string))
+			}
+		}
+	}
 
 	c.JSON(http.StatusCreated, product)
 }

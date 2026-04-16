@@ -193,6 +193,13 @@ export const statsApi = {
   getStats: () => api.get('/stats'),
 };
 
+// ─── Timeline ─────────────────────────────────────────────────────────────────
+
+export const timelineApi = {
+  getByProduct: (productId: number) =>
+    api.get<{ items: any[] }>(`/products/${productId}/timeline`),
+};
+
 // ─── Customer Link ─────────────────────────────────────────────────────────────
 
 export const customerLinkApi = {

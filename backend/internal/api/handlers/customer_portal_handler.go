@@ -129,9 +129,9 @@ func (h *CustomerPortalHandler) PostMessage(c *gin.Context) {
 		productLabel = product.ProductID
 	}
 
-	// Notify all team members
-	message := fmt.Sprintf("%s commented on order %s via customer portal", senderName, productLabel)
-	services.CreateNotificationForAllExcept(0, nil, message, "customer_comment_added", "product", link.ProductID, req.Message, senderName)
+	// Notify only assignees + managers — not the whole team
+	message := fmt.Sprintf("%s sent a message on order %s", senderName, productLabel)
+	services.CreateNotificationForAssigneesAndManagers(0, link.ProductID, message, "customer_message", "product", link.ProductID, req.Message, senderName)
 
 	// Broadcast UI refresh
 	wsMsg, _ := json.Marshal(WSMessage{
@@ -263,9 +263,9 @@ func (h *CustomerPortalHandler) ConfirmUpload(c *gin.Context) {
 		productLabel = product.ProductID
 	}
 
-	// Notify all team members
-	message := fmt.Sprintf("%s uploaded '%s' to order %s via customer portal", senderName, req.FileName, productLabel)
-	services.CreateNotificationForAllExcept(0, nil, message, "customer_attachment_uploaded", "product", link.ProductID, "", senderName)
+	// Notify only assignees + managers — not the whole team
+	message := fmt.Sprintf("%s uploaded '%s' on order %s", senderName, req.FileName, productLabel)
+	services.CreateNotificationForAssigneesAndManagers(0, link.ProductID, message, "customer_message", "product", link.ProductID, "", senderName)
 
 	// Broadcast UI refresh
 	wsMsg, _ := json.Marshal(WSMessage{Type: "attachment_uploaded", Payload: attachment})

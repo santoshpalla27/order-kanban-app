@@ -2,11 +2,12 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, attachmentsApi, commentsApi, usersApi, notificationsApi, customerLinkApi } from '../api/client';
-import { useProductBadges, COMMENT_TYPES, ATTACHMENT_TYPES, STATUS_CHANGE_TYPES, CUSTOMER_COMMENT_TYPES, CUSTOMER_ATTACHMENT_TYPES } from '../hooks/useProductBadges';
+import { useProductBadges, STATUS_CHANGE_TYPES } from '../hooks/useProductBadges';
 import { formatDate, formatDateTime, formatTime } from '../utils/date';
 import { useAuthStore } from '../store/authStore';
 import { Product, Attachment, Comment, CustomerLink, STATUS_LABELS, STATUS_ORDER } from '../types';
 import MentionInput, { renderWithMentions, MentionInputHandle } from './MentionInput';
+import TimelineFeed from './timeline/TimelineFeed';
 import {
   X, Paperclip, MessageSquare, Package, Upload, Download, Trash2,
   Send, Edit2, Image, FileText, File, ImagePlus, Plus, Reply, MoreVertical,
@@ -294,78 +295,40 @@ function ImageLightbox({ src, alt, attId, onClose }: { src: string; alt: string;
 
 // ── Main Modal ──
 export default function ProductDetailModal({ productId, onClose, initialTab }: Props) {
-  type TabId = 'details' | 'attachments' | 'comments' | 'customer-attachments' | 'customer-comments';
-  const [activeTab, setActiveTab] = useState<TabId>((initialTab as TabId) || 'details');
-  const [commentingAttachment, setCommentingAttachment] = useState<Attachment | null>(null);
+  // Map old tab names to the new 2-tab system for backwards compatibility
+  const resolveInitialTab = (t?: string): 'details' | 'timeline' => {
+    if (!t || t === 'details') return 'details';
+    return 'timeline';
+  };
+  type TabId = 'details' | 'timeline';
+  const [activeTab, setActiveTab] = useState<TabId>(resolveInitialTab(initialTab));
   const queryClient = useQueryClient();
-  const prevTabRef = useRef<TabId>((initialTab as TabId) || 'details');
 
   const { data: productData } = useQuery({ queryKey: ['products', productId], queryFn: () => productsApi.getById(productId) });
   const product: Product | null = productData?.data || null;
 
   const { data: attachmentsData } = useQuery({ queryKey: ['attachments', productId], queryFn: () => attachmentsApi.getByProduct(productId) });
   const attachments: Attachment[] = attachmentsData?.data || [];
-  const directAttachmentsCount = attachments.filter((a) => !a.source || a.source === 'direct').length;
-  const customerAttachments = attachments.filter((a) => a.source === 'customer');
-
-  const { data: commentsData } = useQuery({ queryKey: ['comments', productId], queryFn: () => commentsApi.getByProduct(productId) });
-  const allComments: Comment[] = commentsData?.data || [];
-  const comments = allComments.filter(c => !c.source || c.source === 'internal');
-  const customerComments = allComments.filter(c => c.source === 'customer');
-  // Visible count: exclude attachment-only messages whose attachment was deleted
-  const visibleCustomerCommentsCount = customerComments.filter(c => {
-    const p = parseCommentMessage(c.message);
-    const hasAtt = p.attachmentId ? customerAttachments.some(a => a.id === p.attachmentId) : !!p.attachmentUrl;
-    return p.text || hasAtt;
-  }).length;
 
   const { has } = useProductBadges();
 
-  // Mark a tab's notifications as read and invalidate caches
-  const markTabRead = (tab: TabId) => {
-    const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
-    };
-    if (tab === 'comments' && has(productId, 'comments'))
-      notificationsApi.markReadByEntityAndTypes('product', productId, COMMENT_TYPES).then(invalidate);
-    else if (tab === 'attachments' && has(productId, 'attachments'))
-      notificationsApi.markReadByEntityAndTypes('product', productId, ATTACHMENT_TYPES).then(invalidate);
-    else if (tab === 'customer-comments' && has(productId, 'customer_comments'))
-      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_COMMENT_TYPES).then(invalidate);
-    else if (tab === 'customer-attachments' && has(productId, 'customer_attachments'))
-      notificationsApi.markReadByEntityAndTypes('product', productId, CUSTOMER_ATTACHMENT_TYPES).then(invalidate);
+  const invalidateNotifs = () => {
+    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+    queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+    queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
   };
 
-  // On mount: mark product_created notifications as read
+  // On open: mark all product notifications as read (single call covers all types)
   useEffect(() => {
-    const invalidate = () => {
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-      queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
-    };
-    notificationsApi.markReadByEntityAndTypes('product', productId, ['product_created']).then(invalidate);
+    notificationsApi.markReadByEntityAndTypes('product', productId,
+      ['mention', 'assigned', 'customer_message', 'completed', 'product_created']
+    ).then(invalidateNotifs);
   }, [productId]);
 
-  // When switching tabs, mark the tab we're leaving as read
-  useEffect(() => {
-    const prev = prevTabRef.current;
-    if (prev !== activeTab) {
-      markTabRead(prev);
-      prevTabRef.current = activeTab;
-    }
-  }, [activeTab]);
-
-  // On close: mark the current tab + status_change as read
+  // On close: mark status_change as read if any
   const handleClose = () => {
-    markTabRead(activeTab);
     if (has(productId, 'status_change')) {
-      notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES).then(() => {
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
-        queryClient.invalidateQueries({ queryKey: ['unread-count'] });
-        queryClient.invalidateQueries({ queryKey: ['unread-summary'] });
-      });
+      notificationsApi.markReadByEntityAndTypes('product', productId, STATUS_CHANGE_TYPES).then(invalidateNotifs);
     }
     onClose();
   };
@@ -380,75 +343,64 @@ export default function ProductDetailModal({ productId, onClose, initialTab }: P
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['products'] }),
   });
 
+  const { canCreateProduct } = useAuthStore();
+
   const tabs = [
-    { id: 'details' as const, label: 'Details', icon: Package, badge: has(productId, 'status_change') },
-    { id: 'attachments' as const, label: `Files (${directAttachmentsCount})`, icon: Paperclip, badge: has(productId, 'attachments') },
-    { id: 'comments' as const, label: `Comments (${comments.length})`, icon: MessageSquare, badge: has(productId, 'comments') },
-    { id: 'customer-attachments' as const, label: `Customer Files (${customerAttachments.length})`, icon: User, badge: has(productId, 'customer_attachments') },
-    { id: 'customer-comments' as const, label: `Customer Messages (${visibleCustomerCommentsCount})`, icon: User, badge: has(productId, 'customer_comments') },
+    { id: 'details' as const, label: 'Details', icon: Package },
+    { id: 'timeline' as const, label: 'Timeline', icon: MessageSquare, badge: has(productId, 'mentions') || has(productId, 'customer_comments') },
   ];
 
   return (
-    <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
-        <div className="w-full max-w-2xl max-h-[85vh] glass rounded-2xl flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-3 p-5 border-b border-surface-700/50">
-            <h2 className="text-lg font-semibold flex-1 min-w-0 truncate">{product?.product_id || 'Loading...'}</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in" onMouseDown={(e) => { if (e.target === e.currentTarget) handleClose(); }}>
+      <div className="w-full max-w-2xl max-h-[90vh] glass rounded-2xl flex flex-col animate-scale-in" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center gap-3 p-5 border-b border-surface-700/50">
+          <h2 className="text-lg font-semibold flex-1 min-w-0 truncate">{product?.product_id || 'Loading...'}</h2>
+          {product && (
+            <button onClick={() => pinMutation.mutate()} disabled={pinMutation.isPending} title={product.pinned_at ? 'Unpin order' : 'Pin to top'}
+              className={`btn-ghost p-2 rounded-lg transition-colors flex-shrink-0 ${product.pinned_at ? 'text-amber-400 hover:text-amber-300' : 'text-surface-400 hover:text-surface-200'}`}>
+              {product.pinned_at ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+            </button>
+          )}
+          <div className="flex items-center gap-3 flex-shrink-0">
             {product && (
-              <button
-                onClick={() => pinMutation.mutate()}
-                disabled={pinMutation.isPending}
-                title={product.pinned_at ? 'Unpin order' : 'Pin to top'}
-                className={`btn-ghost p-2 rounded-lg transition-colors flex-shrink-0 ${product.pinned_at ? 'text-amber-400 hover:text-amber-300' : 'text-surface-400 hover:text-surface-200'}`}
-              >
-                {product.pinned_at ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
-              </button>
+              <select value={product.status} onChange={(e) => statusMutation.mutate(e.target.value)} disabled={statusMutation.isPending}
+                className={`text-xs px-2.5 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer disabled:opacity-60`}>
+                {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+              </select>
             )}
-            <div className="flex items-center gap-3 flex-shrink-0">
-              {product && (
-                <div className="relative flex items-center">
-                  {has(productId, 'status_change') && (
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse mr-1.5 flex-shrink-0" />
-                  )}
-                  <select
-                    value={product.status}
-                    onChange={(e) => statusMutation.mutate(e.target.value)}
-                    disabled={statusMutation.isPending}
-                    className={`text-xs px-2.5 py-1 rounded-full status-${product.status} bg-transparent border-0 cursor-pointer disabled:opacity-60`}
-                  >
-                    {STATUS_ORDER.map((s) => (
-                      <option key={s} value={s}>{STATUS_LABELS[s]}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <button onClick={handleClose} className="btn-ghost p-2 rounded-lg"><X className="w-5 h-5" /></button>
-            </div>
-          </div>
-          <div className="flex-shrink-0 flex border-b border-surface-700/50 overflow-x-auto scrollbar-hide">
-            {tabs.map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-shrink-0 flex items-center justify-center gap-1.5 px-3 py-3 text-xs font-medium transition-all duration-200 border-b-2 whitespace-nowrap ${activeTab === tab.id ? 'border-brand-500 text-brand-400' : 'border-transparent text-surface-400 hover:text-surface-200'}`}>
-                <tab.icon className="w-3.5 h-3.5" /> {tab.label}
-                {tab.badge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
-              </button>
-            ))}
-          </div>
-          <div className="flex-1 overflow-y-auto p-5">
-            {activeTab === 'details' && product && <DetailsTab product={product} productId={productId} attachments={attachments} onViewAll={() => setActiveTab('attachments')} onCommentAttachment={setCommentingAttachment} />}
-            {activeTab === 'attachments' && <AttachmentsTab productId={productId} attachments={attachments} onCommentAttachment={setCommentingAttachment} />}
-            {activeTab === 'comments' && <CommentsTab productId={productId} comments={comments} attachments={attachments} />}
-            {activeTab === 'customer-attachments' && <CustomerAttachmentsTab productId={productId} attachments={customerAttachments} />}
-            {activeTab === 'customer-comments' && <CustomerCommentsTab comments={customerComments} attachments={customerAttachments} />}
+            <button onClick={handleClose} className="btn-ghost p-2 rounded-lg"><X className="w-5 h-5" /></button>
           </div>
         </div>
+
+        {/* Tabs */}
+        <div className="flex-shrink-0 flex border-b border-surface-700/50">
+          {tabs.map((tab) => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-5 py-3 text-xs font-medium transition-all duration-200 border-b-2 ${activeTab === tab.id ? 'border-brand-500 text-brand-400' : 'border-transparent text-surface-400 hover:text-surface-200'}`}>
+              <tab.icon className="w-3.5 h-3.5" /> {tab.label}
+              {tab.badge && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className={`flex-1 min-h-0 ${activeTab === 'timeline' ? 'flex flex-col p-5' : 'overflow-y-auto p-5'}`}>
+          {activeTab === 'details' && product && (
+            <DetailsTab product={product} productId={productId} attachments={attachments}
+              onViewTimeline={() => setActiveTab('timeline')} />
+          )}
+          {activeTab === 'timeline' && (
+            <TimelineFeed productId={productId} canPost={canCreateProduct() || true} />
+          )}
+        </div>
       </div>
-      {commentingAttachment && <ImageCommentModal attachment={commentingAttachment} productId={productId} onClose={() => setCommentingAttachment(null)} />}
-    </>
+    </div>
   );
 }
 
 // ── Details Tab ──
-function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttachment }: { product: Product; productId: number; attachments: Attachment[]; onViewAll: () => void; onCommentAttachment: (att: Attachment) => void }) {
+function DetailsTab({ product, productId, attachments, onViewTimeline }: { product: Product; productId: number; attachments: Attachment[]; onViewTimeline: () => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { uploading, uploadFiles_state, uploadFiles, cancelUpload } = useMultiUpload(productId);
   const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) uploadFiles(e.target.files); if (fileInputRef.current) fileInputRef.current.value = ''; };
@@ -653,7 +605,7 @@ function DetailsTab({ product, productId, attachments, onViewAll, onCommentAttac
             <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 transition-colors bg-brand-500/10 hover:bg-brand-500/20 px-2.5 py-1.5 rounded-lg">
               <Plus className="w-3.5 h-3.5" /> Add Files
             </button>
-            {attachments.filter((a) => !a.source || a.source === 'direct').length > 0 && <button onClick={onViewAll} className="text-xs text-surface-400 hover:text-surface-200 transition-colors">Manage →</button>}
+            {attachments.filter((a) => !a.source || a.source === 'direct').length > 0 && <button onClick={onViewTimeline} className="text-xs text-surface-400 hover:text-surface-200 transition-colors">View in Timeline →</button>}
           </div>
         </div>
         {attachments.filter((a) => !a.source || a.source === 'direct').length === 0 ? (

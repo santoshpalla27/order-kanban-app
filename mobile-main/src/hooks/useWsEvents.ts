@@ -2,19 +2,14 @@ import { useEffect, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { wsManager } from '../websocket/wsManager';
-import { ALL_NOTIF_TYPES } from '../types';
 
-// Maps activity entity_action → notification prefs type key.
-const ACTION_TO_NOTIF_TYPE: Record<string, string> = {
-  status_changed: 'status_change',
-  created:        'product_created',
-  deleted:        'product_deleted',
-  restored:       'product_deleted',
-  updated:        'status_change',
-};
+// Only these 4 types generate a visible toast — everything else is silent.
+const ACTIONABLE_NOTIF_TYPES = new Set(['mention', 'assigned', 'customer_message', 'completed']);
 
 export interface WsCallbacks {
   onProductsChanged?: () => void;
+  onTimelineChanged?: () => void;
+  // Kept for backwards-compat with hooks that still use them
   onCommentsChanged?: () => void;
   onAttachmentsChanged?: () => void;
   onNotification?: () => void;
@@ -47,72 +42,65 @@ export function useWsEvents(callbacks?: WsCallbacks) {
           logout();
           cb?.onForceLogout?.();
           break;
+
         case 'product_created':
         case 'product_update':
         case 'product_deleted':
           cb?.onProductsChanged?.();
           break;
+
         case 'comment_added':
+          cb?.onTimelineChanged?.();
           cb?.onCommentsChanged?.();
           cb?.onProductsChanged?.();
           cb?.onBadgesChanged?.();
-          // Re-fetch real count — comment_added may or may not generate
-          // a notification for the current user, so don't blindly increment
           refreshUnreadCount();
           break;
+
         case 'attachment_uploaded':
+          cb?.onTimelineChanged?.();
           cb?.onAttachmentsChanged?.();
           cb?.onProductsChanged?.();
           cb?.onBadgesChanged?.();
           break;
+
         case 'attachment_deleted':
+          cb?.onTimelineChanged?.();
           cb?.onAttachmentsChanged?.();
           break;
+
         case 'comment_deleted':
+          cb?.onTimelineChanged?.();
           cb?.onCommentsChanged?.();
-          cb?.onAttachmentsChanged?.();
           break;
+
         case 'activity_updated':
+          cb?.onTimelineChanged?.();
           cb?.onActivityChanged?.();
-          if (data.payload?.actor_id !== currentUserId &&
-              data.payload?.entity !== 'comment' && data.payload?.entity !== 'attachment') {
-            const actAction = (data.payload?.entity_action as string) || '';
-            const notifType = ACTION_TO_NOTIF_TYPE[actAction] ?? 'status_change';
-            // product_created toast is handled by the targeted notification event
-            if (notifType === 'product_created') break;
-            const prefs = useAuthStore.getState().user?.notification_prefs;
-            // Can't check assignment on mobile, so allow if EITHER list includes the type.
-            const myTypes: string[]  = prefs?.custom_my_types  ?? [...ALL_NOTIF_TYPES];
-            const allTypes: string[] = prefs?.custom_all_types ?? [...ALL_NOTIF_TYPES];
-            if (prefs && !myTypes.includes(notifType) && !allTypes.includes(notifType)) break;
-            addToast({
-              message: data.payload?.message || 'Activity updated',
-              content: '', type: 'activity', entityType: 'activity',
-              entityId: data.payload?.entity_id || 0,
-              senderName: data.payload?.actor_name || '',
-            });
-          }
+          // No toast for activity updates — timeline shows them inline
           break;
+
         case 'notification': {
           cb?.onNotification?.();
+          cb?.onBadgesChanged?.();
           refreshUnreadCount();
-          const entityType = data.payload?.entity_type || '';
-          // Suppress chat notification toasts when the user is already on the chat screen
+          const ntype      = (data.payload?.notif_type || '') as string;
+          const entityType = data.payload?.entity_type  || '';
           const isChatNotif = entityType === 'chat';
-          const isStatusChange = (data.payload?.notif_type || '') === 'status_change';
-          // Suppress toast for status_change — activity toast handles those
-          if (!isStatusChange && (!isChatNotif || !useNotificationStore.getState().chatScreenActive)) {
+          // Only show toast for the 4 actionable types
+          if (ACTIONABLE_NOTIF_TYPES.has(ntype) && (!isChatNotif || !useNotificationStore.getState().chatScreenActive)) {
             addToast({
-              message: data.payload?.message || 'New notification',
-              content: data.payload?.content || '',
-              type: data.payload?.notif_type || 'notification',
+              message:    data.payload?.message    || 'New notification',
+              content:    data.payload?.content    || '',
+              type:       ntype,
               entityType,
-              entityId: data.payload?.entity_id || 0,
+              entityId:   data.payload?.entity_id  || 0,
               senderName: data.payload?.sender_name || '',
             });
           }
           break;
         }
+
         case 'chat_message':
           cb?.onChatMessage?.(data.payload);
           if (data.payload?.user_id !== currentUserId && !useNotificationStore.getState().chatScreenActive) {
